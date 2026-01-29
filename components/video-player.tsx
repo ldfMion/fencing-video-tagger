@@ -2,8 +2,15 @@
 
 import { useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Play, Pause } from "lucide-react";
-import type { UseVideoReturn } from "@/hooks/use-video";
+import {
+  Play,
+  Pause,
+  SkipBack,
+  SkipForward,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
+import { PLAYBACK_SPEEDS, type UseVideoReturn } from "@/hooks/use-video";
 
 function formatTime(seconds: number): string {
   if (!isFinite(seconds)) return "0:00";
@@ -23,8 +30,12 @@ export function VideoPlayer({ videoUrl, video }: VideoPlayerProps) {
     currentTime,
     duration,
     isPlaying,
+    playbackSpeed,
     togglePlay,
     seek,
+    setPlaybackSpeed,
+    stepFrame,
+    skip,
   } = video;
 
   const handleProgressClick = useCallback(
@@ -67,7 +78,28 @@ export function VideoPlayer({ videoUrl, video }: VideoPlayerProps) {
       </div>
 
       {/* Controls */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 flex-wrap">
+        {/* Frame back */}
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => stepFrame("backward")}
+          title="Previous frame"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+
+        {/* Skip back 5s */}
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => skip("backward")}
+          title="Back 5 seconds"
+        >
+          <SkipBack className="h-4 w-4" />
+        </Button>
+
+        {/* Play/Pause */}
         <Button variant="outline" size="icon" onClick={togglePlay}>
           {isPlaying ? (
             <Pause className="h-4 w-4" />
@@ -75,9 +107,47 @@ export function VideoPlayer({ videoUrl, video }: VideoPlayerProps) {
             <Play className="h-4 w-4" />
           )}
         </Button>
-        <span className="text-sm text-muted-foreground">
+
+        {/* Skip forward 5s */}
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => skip("forward")}
+          title="Forward 5 seconds"
+        >
+          <SkipForward className="h-4 w-4" />
+        </Button>
+
+        {/* Frame forward */}
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => stepFrame("forward")}
+          title="Next frame"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+
+        {/* Time display */}
+        <span className="text-sm text-muted-foreground px-2">
           {formatTime(currentTime)} / {formatTime(duration)}
         </span>
+
+        {/* Speed selector */}
+        <div className="flex items-center gap-1 ml-auto">
+          <span className="text-sm text-muted-foreground mr-1">Speed:</span>
+          {PLAYBACK_SPEEDS.map((speed) => (
+            <Button
+              key={speed}
+              variant={playbackSpeed === speed ? "default" : "outline"}
+              size="sm"
+              onClick={() => setPlaybackSpeed(speed)}
+              className="px-2 h-8 min-w-[3rem]"
+            >
+              {speed}x
+            </Button>
+          ))}
+        </div>
       </div>
     </div>
   );

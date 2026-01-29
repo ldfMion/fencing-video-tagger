@@ -1,65 +1,157 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useCallback, useRef } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { VideoPlayer } from "@/components/video-player";
+import { TagForm } from "@/components/tag-form";
+import { TagList } from "@/components/tag-list";
+import { VideoLibrary } from "@/components/video-library";
+import { useVideo } from "@/hooks/use-video";
+import { useSessions } from "@/hooks/use-sessions";
+import { Upload } from "lucide-react";
 
 export default function Home() {
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const video = useVideo();
+  const { sessions, getSession, addTag, deleteTag, deleteSession } =
+    useSessions();
+
+  const currentSession = fileName ? getSession(fileName) : undefined;
+  const tags = currentSession?.tags ?? [];
+
+  const handleFileSelect = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      // Revoke previous URL to avoid memory leak
+      if (videoUrl) {
+        URL.revokeObjectURL(videoUrl);
+      }
+
+      const url = URL.createObjectURL(file);
+      setVideoUrl(url);
+      setFileName(file.name);
+    },
+    [videoUrl],
+  );
+
+  const handleLibrarySelect = useCallback(
+    (selectedFileName: string) => {
+      // User clicked on a previous session - prompt them to select the file
+      setFileName(selectedFileName);
+      // Clear current video since we need the user to re-select the file
+      if (videoUrl) {
+        URL.revokeObjectURL(videoUrl);
+        setVideoUrl(null);
+      }
+      // Trigger file picker
+      fileInputRef.current?.click();
+    },
+    [videoUrl],
+  );
+
+  const handleAddTag = useCallback(
+    (text: string, timestamp: number) => {
+      if (!fileName) return;
+      addTag(fileName, text, timestamp);
+    },
+    [fileName, addTag],
+  );
+
+  const handleDeleteTag = useCallback(
+    (tagId: string) => {
+      if (!fileName) return;
+      deleteTag(fileName, tagId);
+    },
+    [fileName, deleteTag],
+  );
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto py-8 px-4">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <h1 className="text-2xl font-bold">Fencing Video Tagger</h1>
+          <div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="video/*"
+              onChange={handleFileSelect}
+              className="hidden"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            <Button onClick={() => fileInputRef.current?.click()}>
+              <Upload className="h-4 w-4 mr-2" />
+              Select Video
+            </Button>
+          </div>
         </div>
-      </main>
+
+        {/* Main content */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Video player - takes 2 columns on large screens */}
+          <div className="lg:col-span-2 space-y-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg">
+                  {fileName ?? "No video selected"}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <VideoPlayer videoUrl={videoUrl} video={video} />
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Tags panel */}
+          <div className="space-y-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg">Tags</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <TagList
+                  tags={tags}
+                  onSeek={video.seek}
+                  onDelete={handleDeleteTag}
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="pt-6">
+                <TagForm
+                  currentTime={video.currentTime}
+                  onAddTag={handleAddTag}
+                  disabled={!fileName}
+                />
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* Video library */}
+        <div className="mt-8">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Previous Videos</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <VideoLibrary
+                sessions={sessions}
+                currentFileName={fileName}
+                onSelect={handleLibrarySelect}
+                onDelete={deleteSession}
+              />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }

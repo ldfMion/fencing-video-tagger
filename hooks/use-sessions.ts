@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 import type { Tag, VideoSession } from "@/lib/types";
 
 const STORAGE_KEY = "fencing-tags-sessions";
@@ -9,7 +9,17 @@ function generateId(): string {
   return Math.random().toString(36).substring(2, 9);
 }
 
-function loadSessions(): VideoSession[] {
+// In-memory store that syncs with localStorage
+let sessions: VideoSession[] = [];
+let listeners: Array<() => void> = [];
+
+function emitChange() {
+  for (const listener of listeners) {
+    listener();
+  }
+}
+
+function loadFromStorage(): VideoSession[] {
   if (typeof window === "undefined") return [];
   try {
     const data = localStorage.getItem(STORAGE_KEY);
@@ -19,29 +29,57 @@ function loadSessions(): VideoSession[] {
   }
 }
 
-function saveSessions(sessions: VideoSession[]): void {
+function saveToStorage(data: VideoSession[]): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+function subscribe(listener: () => void) {
+  listeners = [...listeners, listener];
+  return () => {
+    listeners = listeners.filter((l) => l !== listener);
+  };
+}
+
+function getSnapshot(): VideoSession[] {
+  return sessions;
+}
+
+// variable to satisfy the "The result of getServerSnapshot should be cached to avoid an infinite loop" error
+const emptyArray: VideoSession[] = [];
+
+function getServerSnapshot(): VideoSession[] {
+  return emptyArray;
+}
+
+// Initialize from localStorage on client
+if (typeof window !== "undefined") {
+  sessions = loadFromStorage();
+}
+
+function updateSessions(updater: (prev: VideoSession[]) => VideoSession[]) {
+  sessions = updater(sessions);
+  saveToStorage(sessions);
+  emitChange();
 }
 
 export function useSessions() {
-  const [sessions, setSessions] = useState<VideoSession[]>([]);
-
-  // Load sessions from localStorage on mount
-  useEffect(() => {
-    setSessions(loadSessions());
-  }, []);
+  const currentSessions = useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    getServerSnapshot,
+  );
 
   const getSession = useCallback(
     (fileName: string): VideoSession | undefined => {
-      return sessions.find((s) => s.fileName === fileName);
+      return currentSessions.find((s) => s.fileName === fileName);
     },
-    [sessions]
+    [currentSessions],
   );
 
   const getOrCreateSession = useCallback(
     (fileName: string): VideoSession => {
-      const existing = sessions.find((s) => s.fileName === fileName);
+      const existing = currentSessions.find((s) => s.fileName === fileName);
       if (existing) return existing;
 
       const newSession: VideoSession = {
@@ -51,12 +89,10 @@ export function useSessions() {
         lastModified: Date.now(),
       };
 
-      const updated = [...sessions, newSession];
-      setSessions(updated);
-      saveSessions(updated);
+      updateSessions((prev) => [...prev, newSession]);
       return newSession;
     },
-    [sessions]
+    [currentSessions],
   );
 
   const addTag = useCallback(
@@ -68,63 +104,51 @@ export function useSessions() {
         createdAt: Date.now(),
       };
 
-      setSessions((prev) => {
+      updateSessions((prev) => {
         const sessionIndex = prev.findIndex((s) => s.fileName === fileName);
-        let updated: VideoSession[];
 
         if (sessionIndex === -1) {
-          // Create new session with this tag
           const newSession: VideoSession = {
             id: generateId(),
             fileName,
             tags: [tag],
             lastModified: Date.now(),
           };
-          updated = [...prev, newSession];
-        } else {
-          // Add tag to existing session
-          updated = prev.map((s, i) =>
-            i === sessionIndex
-              ? { ...s, tags: [...s.tags, tag], lastModified: Date.now() }
-              : s
-          );
+          return [...prev, newSession];
         }
 
-        saveSessions(updated);
-        return updated;
+        return prev.map((s, i) =>
+          i === sessionIndex
+            ? { ...s, tags: [...s.tags, tag], lastModified: Date.now() }
+            : s,
+        );
       });
 
       return tag;
     },
-    []
+    [],
   );
 
   const deleteTag = useCallback((fileName: string, tagId: string): void => {
-    setSessions((prev) => {
-      const updated = prev.map((s) =>
+    updateSessions((prev) =>
+      prev.map((s) =>
         s.fileName === fileName
           ? {
               ...s,
               tags: s.tags.filter((t) => t.id !== tagId),
               lastModified: Date.now(),
             }
-          : s
-      );
-      saveSessions(updated);
-      return updated;
-    });
+          : s,
+      ),
+    );
   }, []);
 
   const deleteSession = useCallback((fileName: string): void => {
-    setSessions((prev) => {
-      const updated = prev.filter((s) => s.fileName !== fileName);
-      saveSessions(updated);
-      return updated;
-    });
+    updateSessions((prev) => prev.filter((s) => s.fileName !== fileName));
   }, []);
 
   return {
-    sessions,
+    sessions: currentSessions,
     getSession,
     getOrCreateSession,
     addTag,

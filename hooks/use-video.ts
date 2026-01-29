@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 
 export const PLAYBACK_SPEEDS = [0.2, 0.4, 0.5, 0.7, 1, 2, 3] as const;
 export type PlaybackSpeed = (typeof PLAYBACK_SPEEDS)[number];
@@ -25,15 +25,20 @@ export interface UseVideoReturn {
 }
 
 export function useVideo(): UseVideoReturn {
-  const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(
-    null,
-  );
+  const videoElementRef = useRef<HTMLVideoElement | null>(null);
+  const [videoElementTrigger, setVideoElementTrigger] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeedState] = useState<PlaybackSpeed>(1);
 
+  const setVideoElement = useCallback((el: HTMLVideoElement | null) => {
+    videoElementRef.current = el;
+    setVideoElementTrigger((n) => n + 1);
+  }, []);
+
   useEffect(() => {
+    const videoElement = videoElementRef.current;
     if (!videoElement) return;
 
     const handleTimeUpdate = () => setCurrentTime(videoElement.currentTime);
@@ -68,70 +73,70 @@ export function useVideo(): UseVideoReturn {
       videoElement.removeEventListener("pause", handlePause);
       videoElement.removeEventListener("ended", handleEnded);
     };
-  }, [videoElement]);
+  }, [videoElementTrigger]);
 
   const play = useCallback(() => {
-    videoElement?.play();
-  }, [videoElement]);
+    videoElementRef.current?.play();
+  }, []);
 
   const pause = useCallback(() => {
-    videoElement?.pause();
-  }, [videoElement]);
+    videoElementRef.current?.pause();
+  }, []);
 
   const togglePlay = useCallback(() => {
-    if (videoElement?.paused) {
-      videoElement.play();
+    if (videoElementRef.current?.paused) {
+      videoElementRef.current.play();
     } else {
-      videoElement?.pause();
+      videoElementRef.current?.pause();
     }
-  }, [videoElement]);
+  }, []);
 
   const seek = useCallback(
     (time: number) => {
-      if (videoElement) {
-        videoElement.currentTime = Math.max(0, Math.min(time, duration));
-      }
-    },
-    [videoElement, duration],
-  );
-
-  const setPlaybackSpeed = useCallback(
-    (speed: PlaybackSpeed) => {
-      if (videoElement) {
-        videoElement.playbackRate = speed;
-      }
-      setPlaybackSpeedState(speed);
-    },
-    [videoElement],
-  );
-
-  const stepFrame = useCallback(
-    (direction: "forward" | "backward") => {
-      if (videoElement) {
-        // Pause video when stepping frames
-        videoElement.pause();
-        const delta =
-          direction === "forward" ? FRAME_DURATION : -FRAME_DURATION;
-        videoElement.currentTime = Math.max(
+      if (videoElementRef.current) {
+        videoElementRef.current.currentTime = Math.max(
           0,
-          Math.min(videoElement.currentTime + delta, duration),
+          Math.min(time, duration),
         );
       }
     },
-    [videoElement, duration],
+    [duration],
+  );
+
+  const setPlaybackSpeed = useCallback((speed: PlaybackSpeed) => {
+    if (videoElementRef.current) {
+      videoElementRef.current.playbackRate = speed;
+    }
+    setPlaybackSpeedState(speed);
+  }, []);
+
+  const stepFrame = useCallback(
+    (direction: "forward" | "backward") => {
+      if (videoElementRef.current) {
+        // Pause video when stepping frames
+        videoElementRef.current.pause();
+        const delta =
+          direction === "forward" ? FRAME_DURATION : -FRAME_DURATION;
+        videoElementRef.current.currentTime = Math.max(
+          0,
+          Math.min(videoElementRef.current.currentTime + delta, duration),
+        );
+      }
+    },
+    [duration],
   );
 
   const skip = useCallback(
     (direction: "forward" | "backward") => {
-      if (videoElement) {
+      if (videoElementRef.current) {
         const delta = direction === "forward" ? SKIP_DURATION : -SKIP_DURATION;
-        videoElement.currentTime = Math.max(
+        videoElementRef.current.currentTime = Math.max(
           0,
-          Math.min(videoElement.currentTime + delta, duration),
+          Math.min(videoElementRef.current.currentTime + delta, duration),
         );
       }
     },
-    [videoElement, duration],
+    [duration],
   );
 
   return {

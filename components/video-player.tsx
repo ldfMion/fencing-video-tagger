@@ -15,9 +15,17 @@ import {
   SkipForward,
   ChevronLeft,
   ChevronRight,
+  ZoomIn,
+  ZoomOut,
+  ArrowUp,
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  Crosshair,
 } from "lucide-react";
 import {
   PLAYBACK_SPEEDS,
+  ZOOM_LEVELS,
   type PlaybackSpeed,
   type UseVideoReturn,
 } from "@/hooks/use-video";
@@ -63,11 +71,22 @@ export function VideoPlayer({ videoUrl, video }: VideoPlayerProps) {
     duration,
     isPlaying,
     playbackSpeed,
+    zoomLevel,
+    panX,
+    panY,
     togglePlay,
     seek,
     setPlaybackSpeed,
     stepFrame,
     skip,
+    zoomIn,
+    zoomOut,
+    resetZoom,
+    panUp,
+    panDown,
+    panLeft,
+    panRight,
+    centerPan,
   } = video;
 
   // Keyboard shortcuts
@@ -86,20 +105,36 @@ export function VideoPlayer({ videoUrl, video }: VideoPlayerProps) {
           e.preventDefault();
           togglePlay();
           break;
-        case "ArrowLeft": // Left arrow - frame back or skip back with shift
+        case "ArrowLeft": // Left arrow - frame back or skip back/pan left with shift
           e.preventDefault();
-          if (e.shiftKey) {
+          if (e.shiftKey && zoomLevel > 1) {
+            panLeft();
+          } else if (e.shiftKey) {
             skip("backward");
           } else {
             stepFrame("backward");
           }
           break;
-        case "ArrowRight": // Right arrow - frame forward or skip forward with shift
+        case "ArrowRight": // Right arrow - frame forward or skip forward/pan right with shift
           e.preventDefault();
-          if (e.shiftKey) {
+          if (e.shiftKey && zoomLevel > 1) {
+            panRight();
+          } else if (e.shiftKey) {
             skip("forward");
           } else {
             stepFrame("forward");
+          }
+          break;
+        case "ArrowUp": // Up arrow - pan up with shift when zoomed
+          if (e.shiftKey && zoomLevel > 1) {
+            e.preventDefault();
+            panUp();
+          }
+          break;
+        case "ArrowDown": // Down arrow - pan down with shift when zoomed
+          if (e.shiftKey && zoomLevel > 1) {
+            e.preventDefault();
+            panDown();
           }
           break;
         case "j": // j - skip backward
@@ -114,6 +149,54 @@ export function VideoPlayer({ videoUrl, video }: VideoPlayerProps) {
           e.preventDefault();
           togglePlay();
           break;
+        case "+":
+        case "=": // Plus/equals - zoom in
+          e.preventDefault();
+          zoomIn();
+          break;
+        case "-": // Minus - zoom out
+          e.preventDefault();
+          zoomOut();
+          break;
+        case "0": // Zero - reset zoom and pan
+          e.preventDefault();
+          resetZoom();
+          break;
+        case "w":
+        case "W": // W - pan up when zoomed
+          if (zoomLevel > 1) {
+            e.preventDefault();
+            panUp();
+          }
+          break;
+        case "a":
+        case "A": // A - pan left when zoomed
+          if (zoomLevel > 1) {
+            e.preventDefault();
+            panLeft();
+          }
+          break;
+        case "s":
+        case "S": // S - pan down when zoomed
+          if (zoomLevel > 1) {
+            e.preventDefault();
+            panDown();
+          }
+          break;
+        case "d":
+        case "D": // D - pan right when zoomed
+          if (zoomLevel > 1) {
+            e.preventDefault();
+            panRight();
+          }
+          break;
+        case "c":
+        case "C": // C - center pan when zoomed
+          if (zoomLevel > 1) {
+            e.preventDefault();
+            centerPan();
+          }
+          break;
         default:
           // Number keys for speed
           if (SPEED_KEY_MAP[e.key]) {
@@ -126,7 +209,21 @@ export function VideoPlayer({ videoUrl, video }: VideoPlayerProps) {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [togglePlay, stepFrame, skip, setPlaybackSpeed]);
+  }, [
+    togglePlay,
+    stepFrame,
+    skip,
+    setPlaybackSpeed,
+    zoomIn,
+    zoomOut,
+    resetZoom,
+    panUp,
+    panDown,
+    panLeft,
+    panRight,
+    centerPan,
+    zoomLevel,
+  ]);
 
   const handleProgressClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -150,12 +247,18 @@ export function VideoPlayer({ videoUrl, video }: VideoPlayerProps) {
   return (
     <TooltipProvider delayDuration={300}>
       <div className="space-y-2">
-        <video
-          ref={setVideoElement}
-          src={videoUrl}
-          className="w-full aspect-video bg-black rounded-lg"
-          onClick={togglePlay}
-        />
+        <div className="aspect-video bg-black rounded-lg overflow-hidden flex items-center justify-center">
+          <video
+            ref={setVideoElement}
+            src={videoUrl}
+            className="w-full h-full object-contain"
+            style={{
+              transform: `scale(${zoomLevel}) translate(${panX}%, ${panY}%)`,
+              transition: "transform 0.1s ease-out",
+            }}
+            onClick={togglePlay}
+          />
+        </div>
 
         {/* Progress bar */}
         <div
@@ -254,6 +357,119 @@ export function VideoPlayer({ videoUrl, video }: VideoPlayerProps) {
           <span className="text-sm text-muted-foreground px-2">
             {formatTime(currentTime)} / {formatTime(duration)}
           </span>
+
+          {/* Zoom controls */}
+          <div className="flex items-center gap-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={zoomOut}
+                  disabled={zoomLevel === ZOOM_LEVELS[0]}
+                >
+                  <ZoomOut className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Zoom out (-)</p>
+              </TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={resetZoom}
+                  className="px-2 h-8 min-w-[3.5rem]"
+                >
+                  {Math.round(zoomLevel * 100)}%
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Reset zoom & pan (0)</p>
+              </TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={zoomIn}
+                  disabled={zoomLevel === ZOOM_LEVELS[ZOOM_LEVELS.length - 1]}
+                >
+                  <ZoomIn className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Zoom in (+)</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+
+          {/* Pan controls - only show when zoomed in */}
+          {zoomLevel > 1 && (
+            <div className="flex items-center gap-1">
+              <span className="text-sm text-muted-foreground mr-1">Pan:</span>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="icon" onClick={panUp}>
+                    <ArrowUp className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Pan up (W or Shift+↑)</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="icon" onClick={panLeft}>
+                    <ArrowLeft className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Pan left (A or Shift+←)</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="icon" onClick={panDown}>
+                    <ArrowDown className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Pan down (S or Shift+↓)</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="icon" onClick={panRight}>
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Pan right (D or Shift+→)</p>
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="icon" onClick={centerPan}>
+                    <Crosshair className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Center pan (C)</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          )}
 
           {/* Speed selector */}
           <div className="flex items-center gap-1 ml-auto">

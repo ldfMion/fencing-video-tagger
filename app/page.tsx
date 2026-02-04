@@ -33,11 +33,14 @@ export default function Home() {
         URL.revokeObjectURL(videoUrl);
       }
 
+      // Reset zoom/pan state when switching videos
+      video.resetZoom();
+
       const url = URL.createObjectURL(file);
       setVideoUrl(url);
       setFileName(file.name);
     },
-    [videoUrl],
+    [videoUrl, video],
   );
 
   const handleLibrarySelect = useCallback(

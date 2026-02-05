@@ -22,6 +22,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Crosshair,
+  Loader2,
 } from "lucide-react";
 import {
   PLAYBACK_SPEEDS,
@@ -62,18 +63,25 @@ const SPEED_SHORTCUT_MAP: Record<PlaybackSpeed, string> = {
 interface VideoPlayerProps {
   videoUrl: string | null;
   video: UseVideoReturn;
+  maximized?: boolean;
 }
 
-export function VideoPlayer({ videoUrl, video }: VideoPlayerProps) {
+export function VideoPlayer({
+  videoUrl,
+  video,
+  maximized = false,
+}: VideoPlayerProps) {
   const {
     setVideoElement,
     currentTime,
     duration,
     isPlaying,
+    isSeeking,
     playbackSpeed,
     zoomLevel,
     panX,
     panY,
+    error,
     togglePlay,
     seek,
     setPlaybackSpeed,
@@ -87,6 +95,7 @@ export function VideoPlayer({ videoUrl, video }: VideoPlayerProps) {
     panLeft,
     panRight,
     centerPan,
+    clearError,
   } = video;
 
   // Keyboard shortcuts
@@ -238,19 +247,37 @@ export function VideoPlayer({ videoUrl, video }: VideoPlayerProps) {
 
   if (!videoUrl) {
     return (
-      <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
+      <div
+        className={`${maximized ? "h-full" : "aspect-video"} bg-muted rounded-lg flex items-center justify-center`}
+      >
         <p className="text-muted-foreground">Select a video file to begin</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div
+        className={`${maximized ? "h-full" : "aspect-video"} bg-muted rounded-lg flex flex-col items-center justify-center gap-4`}
+      >
+        <p className="text-destructive">{error}</p>
+        <Button variant="outline" onClick={clearError}>
+          Dismiss
+        </Button>
       </div>
     );
   }
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="space-y-2">
-        <div className="aspect-video bg-black rounded-lg overflow-hidden flex items-center justify-center">
+      <div className={maximized ? "h-full flex flex-col" : "space-y-2"}>
+        <div
+          className={`${maximized ? "flex-1 min-h-0" : "aspect-video"} bg-black rounded-lg overflow-hidden flex items-center justify-center relative`}
+        >
           <video
             ref={setVideoElement}
             src={videoUrl}
+            preload="auto"
             className="w-full h-full object-contain"
             style={{
               transform: `scale(${zoomLevel}) translate(${panX}%, ${panY}%)`,
@@ -258,11 +285,16 @@ export function VideoPlayer({ videoUrl, video }: VideoPlayerProps) {
             }}
             onClick={togglePlay}
           />
+          {isSeeking && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+              <Loader2 className="h-12 w-12 text-white animate-spin" />
+            </div>
+          )}
         </div>
 
         {/* Progress bar */}
         <div
-          className="h-2 bg-muted rounded-full cursor-pointer"
+          className={`h-2 bg-muted rounded-full cursor-pointer ${maximized ? "mt-2" : ""}`}
           onClick={handleProgressClick}
         >
           <div
@@ -272,7 +304,9 @@ export function VideoPlayer({ videoUrl, video }: VideoPlayerProps) {
         </div>
 
         {/* Controls */}
-        <div className="flex items-center gap-2 flex-wrap">
+        <div
+          className={`flex items-center gap-2 flex-wrap ${maximized ? "mt-2" : ""}`}
+        >
           {/* Frame back */}
           <Tooltip>
             <TooltipTrigger asChild>

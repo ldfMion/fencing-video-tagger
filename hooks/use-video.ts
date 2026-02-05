@@ -25,10 +25,12 @@ export interface UseVideoReturn {
   currentTime: number;
   duration: number;
   isPlaying: boolean;
+  isSeeking: boolean;
   playbackSpeed: PlaybackSpeed;
   zoomLevel: ZoomLevel;
   panX: number;
   panY: number;
+  error: string | null;
   play: () => void;
   pause: () => void;
   togglePlay: () => void;
@@ -45,6 +47,7 @@ export interface UseVideoReturn {
   panLeft: () => void;
   panRight: () => void;
   centerPan: () => void;
+  clearError: () => void;
 }
 
 export function useVideo(options: UseVideoOptions = {}): UseVideoReturn {
@@ -52,14 +55,17 @@ export function useVideo(options: UseVideoOptions = {}): UseVideoReturn {
   const frameDuration = 1 / frameRate;
 
   const videoElementRef = useRef<HTMLVideoElement | null>(null);
+  const seekTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [videoElementTrigger, setVideoElementTrigger] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isSeeking, setIsSeeking] = useState(false);
   const [playbackSpeed, setPlaybackSpeedState] = useState<PlaybackSpeed>(1);
   const [zoomLevel, setZoomLevelState] = useState<ZoomLevel>(1);
   const [panX, setPanX] = useState(0);
   const [panY, setPanY] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
   const setVideoElement = useCallback((el: HTMLVideoElement | null) => {
     videoElementRef.current = el;
@@ -88,6 +94,56 @@ export function useVideo(options: UseVideoOptions = {}): UseVideoReturn {
     const handlePlay = () => setIsPlaying(true);
     const handlePause = () => setIsPlaying(false);
     const handleEnded = () => setIsPlaying(false);
+    const handleSeeking = () => {
+      setIsSeeking(true);
+    };
+    const handleSeeked = () => {
+      if (seekTimeoutRef.current) {
+        clearTimeout(seekTimeoutRef.current);
+        seekTimeoutRef.current = null;
+      }
+      setIsSeeking(false);
+    };
+    const handleCanPlay = () => {
+      // If we were seeking and can now play, clear seeking state
+      if (seekTimeoutRef.current) {
+        clearTimeout(seekTimeoutRef.current);
+        seekTimeoutRef.current = null;
+      }
+      setIsSeeking(false);
+    };
+    const handleError = () => {
+      const mediaError = videoElement.error;
+      if (!mediaError) return;
+
+      // Ignore errors that occur during seeking - these are often transient
+      // The browser may report decode errors while seeking that resolve themselves
+      if (isSeeking) {
+        return;
+      }
+
+      // MEDIA_ERR_ABORTED (1) is often not a real error - user or browser aborted loading
+      if (mediaError.code === 1) {
+        return;
+      }
+
+      setIsPlaying(false);
+      const errorMessages: Record<number, string> = {
+        1: "Video loading aborted",
+        2: "Network error while loading video",
+        3: "Video decoding failed - the video file may be corrupted or use an unsupported codec",
+        4: "Video format not supported",
+      };
+      setError(
+        errorMessages[mediaError.code] || `Video error: ${mediaError.message}`,
+      );
+    };
+
+    const handleLoadStart = () => {
+      // Clear error when starting to load new video
+      setError(null);
+      setIsSeeking(false);
+    };
 
     // Set initial values only if video metadata is already loaded (readyState >= 1)
     if (videoElement.readyState >= 1) {
@@ -105,6 +161,11 @@ export function useVideo(options: UseVideoOptions = {}): UseVideoReturn {
     videoElement.addEventListener("play", handlePlay);
     videoElement.addEventListener("pause", handlePause);
     videoElement.addEventListener("ended", handleEnded);
+    videoElement.addEventListener("seeking", handleSeeking);
+    videoElement.addEventListener("seeked", handleSeeked);
+    videoElement.addEventListener("canplay", handleCanPlay);
+    videoElement.addEventListener("error", handleError);
+    videoElement.addEventListener("loadstart", handleLoadStart);
 
     return () => {
       videoElement.removeEventListener("timeupdate", handleTimeUpdate);
@@ -113,11 +174,32 @@ export function useVideo(options: UseVideoOptions = {}): UseVideoReturn {
       videoElement.removeEventListener("play", handlePlay);
       videoElement.removeEventListener("pause", handlePause);
       videoElement.removeEventListener("ended", handleEnded);
+      videoElement.removeEventListener("seeking", handleSeeking);
+      videoElement.removeEventListener("seeked", handleSeeked);
+      videoElement.removeEventListener("canplay", handleCanPlay);
+      videoElement.removeEventListener("error", handleError);
+      videoElement.removeEventListener("loadstart", handleLoadStart);
     };
-  }, [videoElementTrigger, playbackSpeed]);
+  }, [videoElementTrigger, playbackSpeed, isSeeking]);
 
   const play = useCallback(() => {
-    videoElementRef.current?.play();
+    const videoElement = videoElementRef.current;
+    if (!videoElement) return;
+
+    videoElement.play().catch((err) => {
+      if (err.name === "AbortError") {
+        // Retry play after a short delay - this happens when play is interrupted by seek
+        setTimeout(() => {
+          videoElement.play().catch((retryErr) => {
+            if (retryErr.name !== "AbortError") {
+              setError(`Failed to play video: ${retryErr.message}`);
+            }
+          });
+        }, 100);
+      } else {
+        setError(`Failed to play video: ${err.message}`);
+      }
+    });
   }, []);
 
   const pause = useCallback(() => {
@@ -125,21 +207,55 @@ export function useVideo(options: UseVideoOptions = {}): UseVideoReturn {
   }, []);
 
   const togglePlay = useCallback(() => {
-    if (videoElementRef.current?.paused) {
-      videoElementRef.current.play();
+    const videoElement = videoElementRef.current;
+    if (!videoElement) return;
+
+    if (videoElement.paused) {
+      videoElement.play().catch((err) => {
+        if (err.name === "AbortError") {
+          // Retry play after a short delay
+          setTimeout(() => {
+            videoElement.play().catch((retryErr) => {
+              if (retryErr.name !== "AbortError") {
+                setError(`Failed to play video: ${retryErr.message}`);
+              }
+            });
+          }, 100);
+        } else {
+          setError(`Failed to play video: ${err.message}`);
+        }
+      });
     } else {
-      videoElementRef.current?.pause();
+      videoElement.pause();
     }
   }, []);
 
   const seek = useCallback((time: number) => {
     const videoElement = videoElementRef.current;
     if (videoElement) {
-      // Use video element's duration directly to avoid issues when state hasn't loaded yet
       const videoDuration = isFinite(videoElement.duration)
         ? videoElement.duration
         : Infinity;
-      videoElement.currentTime = Math.max(0, Math.min(time, videoDuration));
+      const targetTime = Math.max(0, Math.min(time, videoDuration));
+
+      // Clear any existing seek timeout
+      if (seekTimeoutRef.current) {
+        clearTimeout(seekTimeoutRef.current);
+      }
+
+      // Use fastSeek if available - it seeks to nearest keyframe which is more reliable
+      // for videos with sparse keyframes or when using blob URLs
+      if (typeof videoElement.fastSeek === "function") {
+        videoElement.fastSeek(targetTime);
+      } else {
+        videoElement.currentTime = targetTime;
+      }
+
+      // Set a timeout to clear seeking state if seeked event never fires
+      // This can happen with certain video files/codecs (e.g., Firefox with some files)
+      seekTimeoutRef.current = setTimeout(() => {
+        setIsSeeking(false);
+      }, 3000);
     }
   }, []);
 
@@ -267,15 +383,21 @@ export function useVideo(options: UseVideoOptions = {}): UseVideoReturn {
     setPanY(0);
   }, []);
 
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
   return {
     setVideoElement,
     currentTime,
     duration,
     isPlaying,
+    isSeeking,
     playbackSpeed,
     zoomLevel,
     panX,
     panY,
+    error,
     play,
     pause,
     togglePlay,
@@ -292,5 +414,6 @@ export function useVideo(options: UseVideoOptions = {}): UseVideoReturn {
     panLeft,
     panRight,
     centerPan,
+    clearError,
   };
 }

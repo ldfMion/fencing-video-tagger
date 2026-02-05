@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Trash2 } from "lucide-react";
 import type { Tag } from "@/lib/types";
@@ -17,12 +18,18 @@ interface TagListProps {
   tags: Tag[];
   onSeek: (time: number) => void;
   onDelete: (tagId: string) => void;
+  fillHeight?: boolean;
 }
 
-export function TagList({ tags, onSeek, onDelete }: TagListProps) {
+export function TagList({
+  tags,
+  onSeek,
+  onDelete,
+  fillHeight = false,
+}: TagListProps) {
   const sortedTags = useMemo(
     () => [...tags].sort((a, b) => a.timestamp - b.timestamp),
-    [tags]
+    [tags],
   );
 
   if (tags.length === 0) {
@@ -34,31 +41,64 @@ export function TagList({ tags, onSeek, onDelete }: TagListProps) {
   }
 
   return (
-    <ScrollArea className="h-[300px]">
+    <ScrollArea className={fillHeight ? "h-full" : "h-[300px]"}>
       <div className="space-y-2 pr-4">
         {sortedTags.map((tag) => (
-          <div
-            key={tag.id}
-            className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted group"
-          >
-            <button
-              onClick={() => onSeek(tag.timestamp)}
-              className="flex-1 text-left"
-            >
-              <span className="font-mono text-sm text-primary">
-                {formatTime(tag.timestamp)}
-              </span>
-              <span className="mx-2 text-muted-foreground">-</span>
-              <span>{tag.text}</span>
-            </button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-              onClick={() => onDelete(tag.id)}
-            >
-              <Trash2 className="h-4 w-4 text-destructive" />
-            </Button>
+          <div key={tag.id} className="group p-2 rounded-lg hover:bg-muted">
+            <div className="flex items-start justify-between gap-2">
+              <button
+                onClick={() => onSeek(tag.timestamp)}
+                className="text-left"
+              >
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-mono text-sm text-primary">
+                    {formatTime(tag.timestamp)}
+                  </span>
+                  {tag.side && (
+                    <Badge
+                      variant="outline"
+                      className={`text-xs px-1.5 py-0 ${
+                        tag.side === "L"
+                          ? "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800"
+                          : "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800"
+                      }`}
+                    >
+                      {tag.side}
+                    </Badge>
+                  )}
+                  {tag.action && (
+                    <Badge variant="outline" className="text-xs px-1.5 py-0">
+                      {tag.action}
+                    </Badge>
+                  )}
+                  {tag.mistake && (
+                    <Badge
+                      variant="destructive"
+                      className="text-xs px-1.5 py-0"
+                    >
+                      {tag.mistake}
+                    </Badge>
+                  )}
+                </div>
+              </button>
+              <Button
+                variant="ghost"
+                size="icon"
+                title="Delete tag"
+                className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                onClick={() => onDelete(tag.id)}
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </div>
+            {tag.comment && (
+              <p
+                className="text-sm text-muted-foreground mt-1 cursor-pointer"
+                onClick={() => onSeek(tag.timestamp)}
+              >
+                {tag.comment}
+              </p>
+            )}
           </div>
         ))}
       </div>

@@ -46,3 +46,6 @@ app/page.tsx (main page, client component)
 ### UI Components
 
 Uses shadcn/ui components in `components/ui/` with Radix primitives. Styling via Tailwind CSS v4.
+
+# Agent Instructions
+- When planning, don't show code snippets unless specified or unless it is a technical change. During the planning, state stick to concepts.

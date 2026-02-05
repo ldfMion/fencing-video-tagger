@@ -1,24 +1,32 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useCallback, useRef, useEffect } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { VideoPlayer } from "@/components/video-player";
-import { TagForm } from "@/components/tag-form";
+import { TagForm, type TagFormHandle } from "@/components/tag-form";
 import { TagList } from "@/components/tag-list";
-import { VideoLibrary } from "@/components/video-library";
+import { BoutMetadataForm } from "@/components/bout-metadata-form";
+import { ExportButton } from "@/components/export-button";
 import { useVideo } from "@/hooks/use-video";
-import { useSessions } from "@/hooks/use-sessions";
-import { Upload } from "lucide-react";
+import { useSessions, type AddTagParams } from "@/hooks/use-sessions";
+import { useVideoContext } from "@/contexts/video-context";
+import { Upload, Library } from "lucide-react";
 
 export default function Home() {
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [fileName, setFileName] = useState<string | null>(null);
+  const { videoUrl, fileName, setVideo } = useVideoContext();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const tagFormRef = useRef<TagFormHandle>(null);
 
   const video = useVideo();
-  const { sessions, getSession, addTag, deleteTag, deleteSession } =
-    useSessions();
+  const {
+    sessions,
+    getSession,
+    addTag,
+    deleteTag,
+    updateSession,
+    exportToCSV,
+  } = useSessions();
 
   const currentSession = fileName ? getSession(fileName) : undefined;
   const tags = currentSession?.tags ?? [];
@@ -28,40 +36,19 @@ export default function Home() {
       const file = e.target.files?.[0];
       if (!file) return;
 
-      // Revoke previous URL to avoid memory leak
-      if (videoUrl) {
-        URL.revokeObjectURL(videoUrl);
-      }
-
       // Reset zoom/pan state when switching videos
       video.resetZoom();
 
       const url = URL.createObjectURL(file);
-      setVideoUrl(url);
-      setFileName(file.name);
+      setVideo(url, file.name);
     },
-    [videoUrl, video],
-  );
-
-  const handleLibrarySelect = useCallback(
-    (selectedFileName: string) => {
-      // User clicked on a previous session - prompt them to select the file
-      setFileName(selectedFileName);
-      // Clear current video since we need the user to re-select the file
-      if (videoUrl) {
-        URL.revokeObjectURL(videoUrl);
-        setVideoUrl(null);
-      }
-      // Trigger file picker
-      fileInputRef.current?.click();
-    },
-    [videoUrl],
+    [video, setVideo],
   );
 
   const handleAddTag = useCallback(
-    (text: string, timestamp: number) => {
+    (params: AddTagParams) => {
       if (!fileName) return;
-      addTag(fileName, text, timestamp);
+      addTag(fileName, params);
     },
     [fileName, addTag],
   );
@@ -74,87 +61,152 @@ export default function Home() {
     [fileName, deleteTag],
   );
 
+  const handleUpdateSession = useCallback(
+    (updates: {
+      leftFencer?: string;
+      rightFencer?: string;
+      boutDate?: string;
+    }) => {
+      if (!fileName) return;
+      updateSession(fileName, updates);
+    },
+    [fileName, updateSession],
+  );
+
+  // Global keyboard shortcuts for form
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is typing in an input/textarea
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+
+      switch (e.key.toLowerCase()) {
+        case "q": // Select side L
+          e.preventDefault();
+          tagFormRef.current?.setSide("L");
+          break;
+        case "e": // Select side R
+          e.preventDefault();
+          tagFormRef.current?.setSide("R");
+          break;
+        case "t": // Toggle tactical mistake
+          e.preventDefault();
+          tagFormRef.current?.toggleMistake("tactical");
+          break;
+        case "y": // Toggle execution mistake
+          e.preventDefault();
+          tagFormRef.current?.toggleMistake("execution");
+          break;
+        case "enter": // Submit tag
+          if (!e.shiftKey) {
+            e.preventDefault();
+            tagFormRef.current?.submit();
+          }
+          break;
+        case "/": // Focus action search
+          e.preventDefault();
+          tagFormRef.current?.focusAction();
+          break;
+        case "n": // Focus comment
+          e.preventDefault();
+          tagFormRef.current?.focusComment();
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto py-8 px-4">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-2xl font-bold">Fencing Video Tagger</h1>
-          <div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="video/*"
-              onChange={handleFileSelect}
-              className="hidden"
-            />
-            <Button onClick={() => fileInputRef.current?.click()}>
-              <Upload className="h-4 w-4 mr-2" />
-              Select Video
-            </Button>
-          </div>
+    <div className="h-screen flex flex-col bg-background">
+      {/* Minimal header */}
+      <header className="h-12 shrink-0 flex items-center justify-between px-3 border-b">
+        <Link href="/bouts">
+          <Button variant="ghost" size="sm">
+            <Library className="h-4 w-4 mr-1.5" />
+            Bouts
+          </Button>
+        </Link>
+
+        <span className="text-sm text-muted-foreground truncate max-w-[300px]">
+          {fileName ?? "No video selected"}
+        </span>
+
+        <div className="flex gap-2">
+          <ExportButton
+            exportToCSV={exportToCSV}
+            disabled={sessions.length === 0}
+          />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="video/*"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+          <Button size="sm" onClick={() => fileInputRef.current?.click()}>
+            <Upload className="h-4 w-4 mr-1.5" />
+            Select Video
+          </Button>
         </div>
+      </header>
 
-        {/* Main content */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Video player - takes 2 columns on large screens */}
-          <div className="lg:col-span-2 space-y-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg">
-                  {fileName ?? "No video selected"}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <VideoPlayer videoUrl={videoUrl} video={video} />
-              </CardContent>
-            </Card>
+      {/* Main content */}
+      <main className="flex-1 overflow-hidden p-2">
+        <div className="h-full grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-2">
+          {/* Left: Video + Forms */}
+          <div className="flex flex-col min-h-0 gap-2">
+            {/* Video Player - takes remaining space */}
+            <div className="flex-1 min-h-0 bg-card rounded-lg border overflow-hidden p-2">
+              <VideoPlayer videoUrl={videoUrl} video={video} maximized />
+            </div>
+
+            {/* Below Video: Tag Form + Bout Info in single compact row */}
+            <div className="shrink-0 bg-card rounded-lg p-2 border">
+              <div className="flex flex-col lg:flex-row gap-3">
+                <div className="flex-1">
+                  <TagForm
+                    ref={tagFormRef}
+                    currentTime={video.currentTime}
+                    onAddTag={handleAddTag}
+                    disabled={!fileName}
+                  />
+                </div>
+                <div className="lg:border-l lg:pl-3">
+                  <BoutMetadataForm
+                    session={currentSession}
+                    onUpdate={handleUpdateSession}
+                    disabled={!fileName}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Tags panel */}
-          <div className="space-y-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg">Tags</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <TagList
-                  tags={tags}
-                  onSeek={video.seek}
-                  onDelete={handleDeleteTag}
-                />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="pt-6">
-                <TagForm
-                  currentTime={video.currentTime}
-                  onAddTag={handleAddTag}
-                  disabled={!fileName}
-                />
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-
-        {/* Video library */}
-        <div className="mt-8">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg">Previous Videos</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <VideoLibrary
-                sessions={sessions}
-                currentFileName={fileName}
-                onSelect={handleLibrarySelect}
-                onDelete={deleteSession}
+          {/* Right: Tag timeline */}
+          <div className="bg-card rounded-lg border flex flex-col min-h-0 lg:h-full h-[300px]">
+            <div className="p-2 border-b shrink-0 flex items-center justify-between">
+              <span className="text-sm font-medium">Tags</span>
+              <span className="text-xs text-muted-foreground">
+                {tags.length}
+              </span>
+            </div>
+            <div className="flex-1 min-h-0 overflow-hidden p-2">
+              <TagList
+                tags={tags}
+                onSeek={video.seek}
+                onDelete={handleDeleteTag}
+                fillHeight
               />
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

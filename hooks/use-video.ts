@@ -56,6 +56,7 @@ export function useVideo(options: UseVideoOptions = {}): UseVideoReturn {
 
   const videoElementRef = useRef<HTMLVideoElement | null>(null);
   const seekTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isFrameSteppingRef = useRef(false);
   const [videoElementTrigger, setVideoElementTrigger] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -95,9 +96,11 @@ export function useVideo(options: UseVideoOptions = {}): UseVideoReturn {
     const handlePause = () => setIsPlaying(false);
     const handleEnded = () => setIsPlaying(false);
     const handleSeeking = () => {
+      if (isFrameSteppingRef.current) return;
       setIsSeeking(true);
     };
     const handleSeeked = () => {
+      isFrameSteppingRef.current = false;
       if (seekTimeoutRef.current) {
         clearTimeout(seekTimeoutRef.current);
         seekTimeoutRef.current = null;
@@ -272,6 +275,7 @@ export function useVideo(options: UseVideoOptions = {}): UseVideoReturn {
       if (videoElement) {
         // Pause video when stepping frames
         videoElement.pause();
+        isFrameSteppingRef.current = true;
         const delta = direction === "forward" ? frameDuration : -frameDuration;
         const videoDuration = isFinite(videoElement.duration)
           ? videoElement.duration
@@ -288,6 +292,7 @@ export function useVideo(options: UseVideoOptions = {}): UseVideoReturn {
   const skip = useCallback((direction: "forward" | "backward") => {
     const videoElement = videoElementRef.current;
     if (videoElement) {
+      isFrameSteppingRef.current = true;
       const delta = direction === "forward" ? SKIP_DURATION : -SKIP_DURATION;
       const videoDuration = isFinite(videoElement.duration)
         ? videoElement.duration

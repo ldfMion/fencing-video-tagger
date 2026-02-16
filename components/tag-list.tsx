@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -31,6 +31,16 @@ export function TagList({
     () => [...tags].sort((a, b) => a.timestamp - b.timestamp),
     [tags],
   );
+
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const prevTagCountRef = useRef(tags.length);
+
+  useEffect(() => {
+    if (tags.length > prevTagCountRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+    prevTagCountRef.current = tags.length;
+  }, [tags.length]);
 
   if (tags.length === 0) {
     return (
@@ -101,6 +111,7 @@ export function TagList({
             )}
           </div>
         ))}
+        <div ref={bottomRef} />
       </div>
     </ScrollArea>
   );

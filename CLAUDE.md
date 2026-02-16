@@ -31,11 +31,14 @@ This is a **Fencing Video Tagger** application built with Next.js 16 (App Router
 ### Component Structure
 
 ```
-app/page.tsx (main page, client component)
-├── VideoPlayer     - Video element with playback controls, zoom/pan, keyboard shortcuts
-├── TagForm         - Add tags at current timestamp
-├── TagList         - Display/delete tags, click to seek
-└── VideoLibrary    - Previous video sessions from localStorage
+app/layout.tsx (root layout)
+├── ThemeProvider    - next-themes provider (defaults to dark, supports system preference)
+└── VideoProvider    - Video context provider
+    app/page.tsx (main page, client component)
+    ├── VideoPlayer     - Video element with playback controls, zoom/pan, keyboard shortcuts
+    ├── TagForm         - Add tags at current timestamp
+    ├── TagList         - Display/delete tags, click to seek
+    └── VideoLibrary    - Previous video sessions from localStorage
 ```
 
 ### Types (`lib/types.ts`)
@@ -45,7 +48,7 @@ app/page.tsx (main page, client component)
 
 ### UI Components
 
-Uses shadcn/ui components in `components/ui/` with Radix primitives. Styling via Tailwind CSS v4.
+Uses shadcn/ui components in `components/ui/` with Radix primitives. Styling via Tailwind CSS v4. Dark mode managed by `next-themes` with class-based toggling (`@custom-variant dark` in globals.css). Theme defaults to dark.
 
 # Agent Instructions
 - When planning, don't show code snippets unless specified or unless it is a technical change. During the planning, state stick to concepts.

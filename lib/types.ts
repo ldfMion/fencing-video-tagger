@@ -1,6 +1,5 @@
 // Action codes for fencing touches (sorted alphabetically)
 export const ACTION_CODES = [
-  "0",
   "A,R",
   "A,R-P",
   "A-A",
@@ -13,8 +12,8 @@ export const ACTION_CODES = [
   "AN-P",
   "AN-R",
   "AP-A",
-  "AP-F",
   "AP-P",
+  "AP,R",
   "AR,R",
   "bl",
   "Cc-A",
@@ -28,6 +27,8 @@ export const ACTION_CODES = [
   "CT-R",
   "L-A",
   "R,R",
+  "R-AP,P", // parrying an attack on prep and riposting with the opponent trying to parry again
+  "R-AP,R", // parrying an attack on prep and riposting with the opponent renewing
   "R-P",
   "R-R",
   "rc",

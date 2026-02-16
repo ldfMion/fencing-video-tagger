@@ -29,6 +29,7 @@ export const ACTION_CODES = [
   "R,R",
   "R-AP,P", // parrying an attack on prep and riposting with the opponent trying to parry again
   "R-AP,R", // parrying an attack on prep and riposting with the opponent renewing
+  "R-CT,R", // parrying a riposte from a counter time with the opponent renewing
   "R-P",
   "R-R",
   "rc",

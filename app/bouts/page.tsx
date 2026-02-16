@@ -13,7 +13,7 @@ import { ArrowLeft, FileVideo, Hash } from "lucide-react";
 
 export default function BoutsPage() {
   const router = useRouter();
-  const { fileName: currentFileName, setFileName } = useVideoContext();
+  const { fileName: currentFileName, setFileName, clearVideo } = useVideoContext();
   const { sessions, deleteSession, exportToCSV } = useSessions();
 
   const totalTags = useMemo(
@@ -22,6 +22,8 @@ export default function BoutsPage() {
   );
 
   const handleSelect = (selectedFileName: string) => {
+    // Clear the previous video to avoid showing the wrong video with the new bout's tags
+    clearVideo();
     // Set the fileName in context so tags will show even without video loaded
     setFileName(selectedFileName);
     // Navigate to main page using client-side navigation (preserves state)

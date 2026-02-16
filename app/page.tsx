@@ -174,7 +174,7 @@ export default function Home() {
                     ref={tagFormRef}
                     currentTime={video.currentTime}
                     onAddTag={handleAddTag}
-                    disabled={!fileName}
+                    disabled={!videoUrl}
                   />
                 </div>
                 <div className="lg:border-l lg:pl-3">

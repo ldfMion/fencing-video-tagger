@@ -12,7 +12,7 @@ import type {
 const STORAGE_KEY = "fencing-tags-sessions";
 
 function generateId(): string {
-  return Math.random().toString(36).substring(2, 9);
+  return crypto.randomUUID();
 }
 
 // In-memory store that syncs with localStorage

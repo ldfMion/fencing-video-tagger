@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 // Action codes for fencing touches (sorted alphabetically)
 export const ACTION_CODES = [
   "A,R",
@@ -36,28 +38,47 @@ export const ACTION_CODES = [
   "yc",
 ] as const;
 
-export type ActionCode = (typeof ACTION_CODES)[number];
-export type Side = "L" | "R";
-export type MistakeType = "tactical" | "execution";
+export const ActionCodeSchema = z.enum(ACTION_CODES);
+export const SideSchema = z.enum(["L", "R"]);
+export const MistakeTypeSchema = z.enum(["tactical", "execution"]);
 
-export interface Tag {
-  id: string;
-  timestamp: number; // seconds into video
-  createdAt: number; // unix timestamp
-  comment: string; // replaces 'text' field
+export type ActionCode = z.infer<typeof ActionCodeSchema>;
+export type Side = z.infer<typeof SideSchema>;
+export type MistakeType = z.infer<typeof MistakeTypeSchema>;
+
+export const TagSchema = z.object({
+  id: z.string(),
+  timestamp: z.number(), // seconds into video
+  createdAt: z.number(), // unix timestamp
+  comment: z.string(), // replaces 'text' field
   // Optional fields for statistics
-  side?: Side; // required for statistics, optional for notes
-  action?: ActionCode; // only for statistics
-  mistake?: MistakeType; // only for statistics
-}
+  side: SideSchema.optional(), // required for statistics, optional for notes
+  action: ActionCodeSchema.optional(), // only for statistics
+  mistake: MistakeTypeSchema.optional(), // only for statistics
+});
 
-export interface VideoSession {
-  id: string; // serves as bout_id
-  fileName: string;
-  tags: Tag[];
-  lastModified: number; // unix timestamp
+export type Tag = z.infer<typeof TagSchema>;
+
+export const VideoSessionSchema = z.object({
+  id: z.string(), // serves as bout_id
+  fileName: z.string(),
+  tags: z.array(TagSchema),
+  lastModified: z.number(), // unix timestamp
   // Bout metadata
-  leftFencer?: string;
-  rightFencer?: string;
-  boutDate?: string; // ISO date string
-}
+  leftFencer: z.string().optional(),
+  rightFencer: z.string().optional(),
+  boutDate: z.string().optional(), // ISO date string
+});
+
+export type VideoSession = z.infer<typeof VideoSessionSchema>;
+
+// --- Storage versioning ---
+
+export const CURRENT_SCHEMA_VERSION = 1;
+
+export const StorageEnvelopeSchema = z.object({
+  version: z.number(),
+  sessions: z.array(VideoSessionSchema),
+});
+
+export type StorageEnvelope = z.infer<typeof StorageEnvelopeSchema>;

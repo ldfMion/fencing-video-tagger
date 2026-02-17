@@ -1,12 +1,17 @@
 "use client";
 
 import { useCallback, useSyncExternalStore } from "react";
-import type {
-  Tag,
-  VideoSession,
-  Side,
-  ActionCode,
-  MistakeType,
+import { z } from "zod";
+import {
+  type Tag,
+  type VideoSession,
+  type Side,
+  type ActionCode,
+  type MistakeType,
+  TagSchema,
+  VideoSessionSchema,
+  StorageEnvelopeSchema,
+  CURRENT_SCHEMA_VERSION,
 } from "@/lib/types";
 
 const STORAGE_KEY = "fencing-tags-sessions";
@@ -25,39 +30,52 @@ function emitChange() {
   }
 }
 
-// Old tag format for migration
-interface LegacyTag {
-  id: string;
-  timestamp: number;
-  text?: string;
-  comment?: string;
-  createdAt: number;
-  side?: Side;
-  action?: ActionCode;
-  mistake?: MistakeType;
-}
+// --- v0 legacy schemas (bare array with tag.text instead of tag.comment) ---
 
-// Migrate old tag format (text -> comment)
-function migrateTag(tag: LegacyTag): Tag {
-  return {
-    id: tag.id,
-    timestamp: tag.timestamp,
-    createdAt: tag.createdAt,
-    comment: tag.comment ?? tag.text ?? "",
-    side: tag.side,
-    action: tag.action,
-    mistake: tag.mistake,
-  };
-}
+const LegacyTagSchema = z
+  .object({
+    id: z.string(),
+    timestamp: z.number(),
+    createdAt: z.number(),
+    text: z.string().optional(),
+    comment: z.string().optional(),
+    side: z.enum(["L", "R"]).optional(),
+    action: z.string().optional(),
+    mistake: z.enum(["tactical", "execution"]).optional(),
+  })
+  .transform(
+    (tag): z.input<typeof TagSchema> => ({
+      id: tag.id,
+      timestamp: tag.timestamp,
+      createdAt: tag.createdAt,
+      comment: tag.comment ?? tag.text ?? "",
+      side: tag.side,
+      action: tag.action as Tag["action"],
+      mistake: tag.mistake,
+    }),
+  );
 
-// Migrate session data from old format
-function migrateSession(
-  session: Omit<VideoSession, "tags"> & { tags: LegacyTag[] },
-): VideoSession {
-  return {
-    ...session,
-    tags: session.tags.map(migrateTag),
-  };
+const LegacySessionSchema = z
+  .object({
+    id: z.string(),
+    fileName: z.string(),
+    tags: z.array(LegacyTagSchema),
+    lastModified: z.number(),
+    leftFencer: z.string().optional(),
+    rightFencer: z.string().optional(),
+    boutDate: z.string().optional(),
+  })
+  .transform(
+    (session): z.input<typeof VideoSessionSchema> => ({
+      ...session,
+    }),
+  );
+
+// --- Migration pipeline ---
+
+function migrateV0(raw: unknown): VideoSession[] {
+  const result = z.array(LegacySessionSchema).safeParse(raw);
+  return result.success ? result.data : [];
 }
 
 function loadFromStorage(): VideoSession[] {
@@ -65,9 +83,23 @@ function loadFromStorage(): VideoSession[] {
   try {
     const data = localStorage.getItem(STORAGE_KEY);
     if (!data) return [];
-    const parsed = JSON.parse(data) as VideoSession[];
-    // Migrate old data format
-    return parsed.map(migrateSession);
+    const raw = JSON.parse(data);
+
+    // Try versioned envelope first
+    const envelope = StorageEnvelopeSchema.safeParse(raw);
+    if (envelope.success) {
+      return envelope.data.sessions;
+    }
+
+    // Bare array → v0 legacy format
+    if (Array.isArray(raw)) {
+      const migrated = migrateV0(raw);
+      // Re-save in versioned envelope format
+      saveToStorage(migrated);
+      return migrated;
+    }
+
+    return [];
   } catch {
     return [];
   }
@@ -75,7 +107,10 @@ function loadFromStorage(): VideoSession[] {
 
 function saveToStorage(data: VideoSession[]): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify({ version: CURRENT_SCHEMA_VERSION, sessions: data }),
+  );
 }
 
 function subscribe(listener: () => void) {

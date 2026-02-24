@@ -32,7 +32,7 @@ function hasFencerNames(session: VideoSession): boolean {
 
 interface VideoLibraryProps {
   sessions: VideoSession[];
-  currentFileName: string | null;
+  currentFileName?: string | null;
   onSelect: (fileName: string) => void;
   onDelete: (fileName: string) => void;
   expanded?: boolean;

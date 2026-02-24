@@ -185,6 +185,13 @@ export function useSessions() {
     [currentSessions],
   );
 
+  const getSessionById = useCallback(
+    (id: string): VideoSession | undefined => {
+      return currentSessions.find((s) => s.id === id);
+    },
+    [currentSessions],
+  );
+
   const getOrCreateSession = useCallback(
     (fileName: string): VideoSession => {
       const existing = currentSessions.find((s) => s.fileName === fileName);
@@ -346,6 +353,7 @@ export function useSessions() {
   return {
     sessions: currentSessions,
     getSession,
+    getSessionById,
     getOrCreateSession,
     addTag,
     updateTag,

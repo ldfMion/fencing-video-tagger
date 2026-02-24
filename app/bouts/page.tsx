@@ -8,13 +8,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { VideoLibrary } from "@/components/video-library";
 import { ExportButton } from "@/components/export-button";
 import { useSessions } from "@/hooks/use-sessions";
-import { useVideoContext } from "@/contexts/video-context";
 import { ArrowLeft, FileVideo, Hash } from "lucide-react";
 
 export default function BoutsPage() {
   const router = useRouter();
-  const { fileName: currentFileName, setFileName, clearVideo } = useVideoContext();
-  const { sessions, deleteSession, exportToCSV } = useSessions();
+  const { sessions, getSession, deleteSession, exportToCSV } = useSessions();
 
   const totalTags = useMemo(
     () => sessions.reduce((sum, s) => sum + s.tags.length, 0),
@@ -22,12 +20,10 @@ export default function BoutsPage() {
   );
 
   const handleSelect = (selectedFileName: string) => {
-    // Clear the previous video to avoid showing the wrong video with the new bout's tags
-    clearVideo();
-    // Set the fileName in context so tags will show even without video loaded
-    setFileName(selectedFileName);
-    // Navigate to main page using client-side navigation (preserves state)
-    router.push("/");
+    const session = getSession(selectedFileName);
+    if (session) {
+      router.push(`/bouts/${session.id}`);
+    }
   };
 
   return (
@@ -39,7 +35,7 @@ export default function BoutsPage() {
             <Link href="/">
               <Button variant="ghost" size="sm">
                 <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Tagger
+                Home
               </Button>
             </Link>
             <h1 className="text-2xl font-bold">Bouts Library</h1>
@@ -86,7 +82,6 @@ export default function BoutsPage() {
           <CardContent>
             <VideoLibrary
               sessions={sessions}
-              currentFileName={currentFileName}
               onSelect={handleSelect}
               onDelete={deleteSession}
               expanded

@@ -22,11 +22,13 @@ export const ACTION_CODES = [
   "Cc-AP",
   "Cc-CT",
   "CCR-R",
+  "CCR-P",
   "CR,R",
   "CR-P",
   "CR-R",
   "Csh-A",
   "CT-R",
+  "CT-P",
   "L-A",
   "R,R",
   "R-AP,P", // parrying an attack on prep and riposting with the opponent trying to parry again

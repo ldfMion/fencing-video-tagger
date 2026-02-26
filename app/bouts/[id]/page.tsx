@@ -44,8 +44,14 @@ export default function BoutPage() {
 
       const url = URL.createObjectURL(file);
       setVideo(url, file.name);
+
+      if (session && !session.boutDate) {
+        updateSession(session.fileName, {
+          boutDate: new Date(file.lastModified).toISOString().split("T")[0],
+        });
+      }
     },
-    [video, setVideo],
+    [video, setVideo, session, updateSession],
   );
 
   const handleAddTag = useCallback(
@@ -133,7 +139,7 @@ export default function BoutPage() {
         <p className="text-muted-foreground">
           This bout doesn&apos;t exist or may have been deleted.
         </p>
-        <Link href="/bouts">
+        <Link href="/">
           <Button variant="outline">
             <Library className="h-4 w-4 mr-1.5" />
             Back to Bouts
@@ -153,7 +159,7 @@ export default function BoutPage() {
       {/* Header with breadcrumb */}
       <header className="h-12 shrink-0 flex items-center justify-between px-3 border-b">
         <div className="flex items-center gap-1">
-          <Link href="/bouts">
+          <Link href="/">
             <Button variant="ghost" size="sm">
               <Library className="h-4 w-4 mr-1.5" />
               Bouts

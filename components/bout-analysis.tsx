@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { computeScore } from "@/lib/score";
 import type { Tag } from "@/lib/types";
 
 function formatTime(seconds: number): string {
@@ -37,18 +38,21 @@ export function BoutAnalysis({
     let left = 0;
     let right = 0;
     return withAction.map<ScoringEvent>((tag) => {
-      if (tag.side === "L") left++;
-      else right++;
+      if (tag.action === "yc") {
+        // Yellow card: no points awarded
+      } else if (tag.action === "rc") {
+        // Red card: point awarded to opponent
+        if (tag.side === "L") right++;
+        else left++;
+      } else {
+        if (tag.side === "L") left++;
+        else right++;
+      }
       return { tag, leftScore: left, rightScore: right };
     });
   }, [tags]);
 
-  const finalLeft = scoringEvents.length > 0
-    ? scoringEvents[scoringEvents.length - 1].leftScore
-    : 0;
-  const finalRight = scoringEvents.length > 0
-    ? scoringEvents[scoringEvents.length - 1].rightScore
-    : 0;
+  const { left: finalLeft, right: finalRight } = computeScore(tags);
 
   const leftWins = finalLeft > finalRight;
   const rightWins = finalRight > finalLeft;
@@ -89,47 +93,58 @@ export function BoutAnalysis({
         ) : (
           <ScrollArea className="h-[calc(100vh-320px)]">
             <div className="space-y-1">
-              {scoringEvents.map((event) => (
-                <div
-                  key={event.tag.id}
-                  className="grid grid-cols-[1fr_auto_1fr] items-center py-1.5 px-2 rounded hover:bg-muted"
-                >
-                  {/* Left fencer column */}
-                  <div className="flex justify-end">
-                    {event.tag.side === "L" && (
-                      <Badge
-                        variant="outline"
-                        className={`text-xs px-1.5 py-0 ${leftBadge}`}
-                      >
-                        {event.tag.action}
-                      </Badge>
-                    )}
-                  </div>
+              {scoringEvents.map((event) => {
+                const isCard = event.tag.action === "yc" || event.tag.action === "rc";
+                const isRedCard = event.tag.action === "rc";
+                const isYellowCard = event.tag.action === "yc";
 
-                  {/* Center: score */}
-                  <span className="text-sm tabular-nums text-center mx-4">
-                    <span className={event.tag.side === "L" ? `font-bold ${leftColor}` : ""}>
-                      {event.leftScore}
-                    </span>
-                    <span className="text-muted-foreground"> - </span>
-                    <span className={event.tag.side === "R" ? `font-bold ${rightColor}` : ""}>
-                      {event.rightScore}
-                    </span>
-                  </span>
+                // Determine which score to highlight:
+                // - Normal: highlight the scoring fencer's side
+                // - Red card: highlight the opponent's side (they get the point)
+                // - Yellow card: highlight neither
+                const highlightLeft = isYellowCard ? false : isRedCard ? event.tag.side === "R" : event.tag.side === "L";
+                const highlightRight = isYellowCard ? false : isRedCard ? event.tag.side === "L" : event.tag.side === "R";
 
-                  {/* Right fencer column */}
-                  <div className="flex justify-start">
-                    {event.tag.side === "R" && (
-                      <Badge
-                        variant="outline"
-                        className={`text-xs px-1.5 py-0 ${rightBadge}`}
-                      >
-                        {event.tag.action}
-                      </Badge>
-                    )}
+                const badgeClass = isCard
+                  ? "text-xs px-1.5 py-0"
+                  : `text-xs px-1.5 py-0 ${event.tag.side === "L" ? leftBadge : rightBadge}`;
+
+                return (
+                  <div
+                    key={event.tag.id}
+                    className="grid grid-cols-[1fr_auto_1fr] items-center py-1.5 px-2 rounded hover:bg-muted"
+                  >
+                    {/* Left fencer column */}
+                    <div className="flex justify-end">
+                      {event.tag.side === "L" && (
+                        <Badge variant="outline" className={badgeClass}>
+                          {event.tag.action}
+                        </Badge>
+                      )}
+                    </div>
+
+                    {/* Center: score */}
+                    <span className="text-sm tabular-nums text-center mx-4">
+                      <span className={highlightLeft ? `font-bold ${leftColor}` : ""}>
+                        {event.leftScore}
+                      </span>
+                      <span className="text-muted-foreground"> - </span>
+                      <span className={highlightRight ? `font-bold ${rightColor}` : ""}>
+                        {event.rightScore}
+                      </span>
+                    </span>
+
+                    {/* Right fencer column */}
+                    <div className="flex justify-start">
+                      {event.tag.side === "R" && (
+                        <Badge variant="outline" className={badgeClass}>
+                          {event.tag.action}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </ScrollArea>
         )}

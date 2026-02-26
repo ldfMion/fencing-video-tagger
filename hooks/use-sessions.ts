@@ -193,7 +193,7 @@ export function useSessions() {
   );
 
   const getOrCreateSession = useCallback(
-    (fileName: string): VideoSession => {
+    (fileName: string, fileLastModified?: number): VideoSession => {
       const existing = currentSessions.find((s) => s.fileName === fileName);
       if (existing) return existing;
 
@@ -202,6 +202,9 @@ export function useSessions() {
         fileName,
         tags: [],
         lastModified: Date.now(),
+        ...(fileLastModified != null && {
+          boutDate: new Date(fileLastModified).toISOString().split("T")[0],
+        }),
       };
 
       updateSessions((prev) => [...prev, newSession]);

@@ -30,7 +30,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Plus, Check, ChevronsUpDown } from "lucide-react";
+import { Plus, Check, ChevronsUpDown, Clock } from "lucide-react";
 import {
   ACTION_CODES,
   type Side,
@@ -49,7 +49,7 @@ export interface TagFormHandle {
 }
 
 interface TagFormProps {
-  currentTime: number;
+  currentTime: number | undefined;
   onAddTag: (params: AddTagParams) => void;
   disabled?: boolean;
 }
@@ -63,6 +63,9 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
   const [action, setAction] = useState<ActionCode | undefined>(undefined);
   const [mistake, setMistake] = useState<MistakeType | undefined>(undefined);
   const [actionOpen, setActionOpen] = useState(false);
+  const [manualTime, setManualTime] = useState("");
+
+  const isVideoMode = currentTime != null;
 
   const actionButtonRef = useRef<HTMLButtonElement>(null);
   const commentRef = useRef<HTMLTextAreaElement>(null);
@@ -72,7 +75,27 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
     setSide(undefined);
     setAction(undefined);
     setMistake(undefined);
+    setManualTime("");
   }, []);
+
+  const parseManualTime = (timeStr: string): number | undefined => {
+    if (!timeStr.trim()) return undefined;
+    // Parse "m:ss" or "mm:ss" format
+    const parts = timeStr.split(":");
+    if (parts.length === 2) {
+      const mins = parseInt(parts[0], 10);
+      const secs = parseInt(parts[1], 10);
+      if (!isNaN(mins) && !isNaN(secs)) {
+        return mins * 60 + secs;
+      }
+    }
+    // Also accept plain seconds
+    const seconds = parseInt(timeStr, 10);
+    if (!isNaN(seconds)) {
+      return seconds;
+    }
+    return undefined;
+  };
 
   const handleSubmit = useCallback(
     (e?: React.FormEvent) => {
@@ -81,9 +104,16 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
       // Need at least side or comment
       if (!side && !comment.trim()) return false;
 
+      let timestamp: number | undefined;
+      if (isVideoMode) {
+        timestamp = currentTime;
+      } else if (manualTime.trim()) {
+        timestamp = parseManualTime(manualTime);
+      }
+
       onAddTag({
         comment: comment.trim(),
-        timestamp: currentTime,
+        timestamp,
         side,
         action,
         mistake,
@@ -91,7 +121,7 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
       resetForm();
       return true;
     },
-    [comment, currentTime, side, action, mistake, onAddTag, resetForm],
+    [comment, currentTime, manualTime, side, action, mistake, onAddTag, resetForm, isVideoMode],
   );
 
   // Expose methods to parent via ref
@@ -121,11 +151,30 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
   return (
     <TooltipProvider delayDuration={300}>
       <form onSubmit={handleSubmit} className="space-y-2">
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-muted-foreground">
-            Tag at <span className="font-mono">{formatTime(currentTime)}</span>
-          </p>
-        </div>
+        {isVideoMode ? (
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">
+              Tag at <span className="font-mono">{formatTime(currentTime)}</span>
+            </p>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <Label htmlFor="manual-time" className="text-xs shrink-0">
+              Time:
+            </Label>
+            <div className="flex items-center gap-1 flex-1">
+              <Clock className="h-3 w-3 text-muted-foreground" />
+              <input
+                id="manual-time"
+                type="text"
+                placeholder="m:ss (optional)"
+                value={manualTime}
+                onChange={(e) => setManualTime(e.target.value)}
+                className="h-7 text-xs px-2 border border-input rounded-md bg-background flex-1 max-w-[80px]"
+              />
+            </div>
+          </div>
+        )}
 
         {/* Main form row: Side, Action, Mistake */}
         <div className="flex flex-wrap items-end gap-3">

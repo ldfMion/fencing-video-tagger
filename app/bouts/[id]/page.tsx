@@ -1,26 +1,27 @@
 "use client";
 
-import { useCallback, useRef, useEffect } from "react";
+import { useCallback, useRef, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { VideoPlayer } from "@/components/video-player";
 import { TagForm, type TagFormHandle } from "@/components/tag-form";
 import { TagList } from "@/components/tag-list";
-import { BoutMetadataForm } from "@/components/bout-metadata-form";
+import { NewBoutDialog } from "@/components/new-bout-dialog";
 import { ExportButton } from "@/components/export-button";
 import { useVideo } from "@/hooks/use-video";
 import { useSessions, type AddTagParams } from "@/hooks/use-sessions";
 import { useVideoContext } from "@/contexts/video-context";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BoutAnalysis } from "@/components/bout-analysis";
-import { Upload, Library, AlertCircle } from "lucide-react";
+import { Upload, Library, AlertCircle, Edit2 } from "lucide-react";
 
 export default function BoutPage() {
   const params = useParams<{ id: string }>();
   const { videoUrl, fileName, setVideo } = useVideoContext();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const tagFormRef = useRef<TagFormHandle>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   const video = useVideo();
   const {
@@ -36,6 +37,8 @@ export default function BoutPage() {
   const session = getSessionById(params.id);
   const tags = session?.tags ?? [];
 
+  const hasVideo = videoUrl && fileName === session?.fileName;
+
   const handleFileSelect = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -47,7 +50,7 @@ export default function BoutPage() {
       setVideo(url, file.name);
 
       if (session && !session.boutDate) {
-        updateSession(session.fileName, {
+        updateSession(session.id, {
           boutDate: new Date(file.lastModified).toISOString().split("T")[0],
         });
       }
@@ -58,7 +61,7 @@ export default function BoutPage() {
   const handleAddTag = useCallback(
     (params: AddTagParams) => {
       if (!session) return;
-      addTag(session.fileName, params);
+      addTag(session.id, params);
     },
     [session, addTag],
   );
@@ -66,7 +69,7 @@ export default function BoutPage() {
   const handleDeleteTag = useCallback(
     (tagId: string) => {
       if (!session) return;
-      deleteTag(session.fileName, tagId);
+      deleteTag(session.id, tagId);
     },
     [session, deleteTag],
   );
@@ -76,9 +79,10 @@ export default function BoutPage() {
       leftFencer?: string;
       rightFencer?: string;
       boutDate?: string;
+      externalSource?: string;
     }) => {
       if (!session) return;
-      updateSession(session.fileName, updates);
+      updateSession(session.id, updates);
     },
     [session, updateSession],
   );
@@ -153,7 +157,7 @@ export default function BoutPage() {
   const boutLabel =
     session.leftFencer && session.rightFencer
       ? `${session.leftFencer} vs ${session.rightFencer}`
-      : session.fileName;
+      : session.fileName ?? "Untitled Bout";
 
   return (
     <Tabs defaultValue="tagging" className="h-screen flex flex-col bg-background">
@@ -167,7 +171,12 @@ export default function BoutPage() {
             </Button>
           </Link>
           <span className="text-muted-foreground">/</span>
-          <span className="text-sm truncate max-w-[200px]">{boutLabel}</span>
+          <button
+            onClick={() => setIsEditDialogOpen(true)}
+            className="text-sm truncate max-w-[200px] hover:underline text-foreground"
+          >
+            {boutLabel}
+          </button>
         </div>
 
         <div className="flex items-center gap-2">
@@ -194,7 +203,23 @@ export default function BoutPage() {
             <Upload className="h-4 w-4 mr-1.5" />
             Select Video
           </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setIsEditDialogOpen(true)}
+          >
+            <Edit2 className="h-4 w-4 mr-1.5" />
+            Edit
+          </Button>
         </div>
+
+        <NewBoutDialog
+          isOpen={isEditDialogOpen}
+          onOpenChange={setIsEditDialogOpen}
+          editSession={session}
+          onUpdateSession={handleUpdateSession}
+          fencerNames={allFencerNames}
+        />
       </header>
 
       {/* Tagging tab */}
@@ -202,46 +227,36 @@ export default function BoutPage() {
         <div className="h-full grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-2">
           {/* Left: Video + Forms */}
           <div className="flex flex-col min-h-0 gap-2">
-            {/* Video Player */}
-            <div className="flex-1 min-h-0 bg-card rounded-lg border overflow-hidden p-2">
-              {videoUrl && fileName === session.fileName ? (
+            {/* Video Player or Videoless Banner */}
+            {hasVideo ? (
+              <div className="flex-1 min-h-0 bg-card rounded-lg border overflow-hidden p-2">
                 <VideoPlayer videoUrl={videoUrl} video={video} maximized />
-              ) : (
-                <div className="h-full flex flex-col items-center justify-center gap-3 text-muted-foreground">
-                  <Upload className="h-10 w-10" />
-                  <p className="text-sm">
-                    Select the video file to start tagging
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    Select Video
-                  </Button>
-                </div>
-              )}
-            </div>
-
-            {/* Below Video: Tag Form + Bout Info */}
-            <div className="shrink-0 bg-card rounded-lg p-2 border">
-              <div className="flex flex-col lg:flex-row gap-3">
-                <div className="flex-1">
-                  <TagForm
-                    ref={tagFormRef}
-                    currentTime={video.currentTime}
-                    onAddTag={handleAddTag}
-                    disabled={!videoUrl || fileName !== session.fileName}
-                  />
-                </div>
-                <div className="lg:border-l lg:pl-3">
-                  <BoutMetadataForm
-                    session={session}
-                    onUpdate={handleUpdateSession}
-                    fencerNames={allFencerNames}
-                  />
-                </div>
               </div>
+            ) : (
+              <div className="flex-none h-[120px] bg-card rounded-lg border p-2 flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                <p className="text-sm">
+                  {session.fileName
+                    ? "Select the video file to start tagging"
+                    : "No video — tag events manually"}
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="h-4 w-4 mr-1.5" />
+                  {session.fileName ? "Select Different Video" : "Attach Video"}
+                </Button>
+              </div>
+            )}
+
+            {/* Tag Form */}
+            <div className="shrink-0 bg-card rounded-lg p-2 border">
+              <TagForm
+                ref={tagFormRef}
+                currentTime={hasVideo ? video.currentTime : undefined}
+                onAddTag={handleAddTag}
+              />
             </div>
           </div>
 
@@ -256,7 +271,7 @@ export default function BoutPage() {
             <div className="flex-1 min-h-0 overflow-hidden p-2">
               <TagList
                 tags={tags}
-                onSeek={video.seek}
+                onSeek={hasVideo ? video.seek : undefined}
                 onDelete={handleDeleteTag}
                 fillHeight
               />

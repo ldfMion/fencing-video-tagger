@@ -1,24 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import { Button } from "@/components/ui/button";
-import { Check, ChevronsUpDown } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { ExternalLink } from "lucide-react";
+import { FencerCombobox } from "@/components/fencer-combobox";
 import type { VideoSession } from "@/lib/types";
 
 interface BoutMetadataFormProps {
@@ -27,124 +12,10 @@ interface BoutMetadataFormProps {
     leftFencer?: string;
     rightFencer?: string;
     boutDate?: string;
+    externalSource?: string;
   }) => void;
   fencerNames?: string[];
   disabled?: boolean;
-}
-
-function FencerCombobox({
-  id,
-  label,
-  placeholder,
-  value,
-  onChange,
-  names,
-  disabled,
-}: {
-  id: string;
-  label: string;
-  placeholder: string;
-  value: string;
-  onChange: (value: string) => void;
-  names: string[];
-  disabled?: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
-
-  const filtered = useMemo(() => {
-    if (!search) return names;
-    const q = search.toLowerCase();
-    return names.filter((n) => n.toLowerCase().includes(q));
-  }, [names, search]);
-
-  if (!names.length) {
-    return (
-      <div className="flex items-center gap-1.5">
-        <Label htmlFor={id} className="text-xs shrink-0">
-          {label}
-        </Label>
-        <Input
-          id={id}
-          placeholder={placeholder}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          disabled={disabled}
-          className="h-7 text-xs w-28"
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex items-center gap-1.5">
-      <Label className="text-xs shrink-0">{label}</Label>
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            role="combobox"
-            aria-expanded={open}
-            disabled={disabled}
-            className="h-7 w-28 justify-between text-xs font-normal px-2"
-          >
-            <span className="truncate">{value || placeholder}</span>
-            <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-[200px] p-0" align="start">
-          <Command>
-            <CommandInput
-              placeholder="Search name..."
-              value={search}
-              onValueChange={setSearch}
-              className="text-xs"
-            />
-            <CommandList>
-              <CommandEmpty>
-                {search.trim() ? (
-                  <button
-                    type="button"
-                    className="w-full px-2 py-1.5 text-xs text-left hover:bg-accent rounded-sm"
-                    onClick={() => {
-                      onChange(search.trim());
-                      setSearch("");
-                      setOpen(false);
-                    }}
-                  >
-                    Use &ldquo;{search.trim()}&rdquo;
-                  </button>
-                ) : (
-                  <span className="text-xs">No names found.</span>
-                )}
-              </CommandEmpty>
-              <CommandGroup>
-                {filtered.map((name) => (
-                  <CommandItem
-                    key={name}
-                    value={name}
-                    onSelect={() => {
-                      onChange(name === value ? "" : name);
-                      setSearch("");
-                      setOpen(false);
-                    }}
-                  >
-                    <Check
-                      className={cn(
-                        "mr-2 h-3 w-3",
-                        value === name ? "opacity-100" : "opacity-0",
-                      )}
-                    />
-                    {name}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
-    </div>
-  );
 }
 
 export function BoutMetadataForm({
@@ -153,6 +24,18 @@ export function BoutMetadataForm({
   fencerNames = [],
   disabled,
 }: BoutMetadataFormProps) {
+  const isValidUrl = (str: string): boolean => {
+    try {
+      const url = new URL(str);
+      return url.protocol === "http:" || url.protocol === "https:";
+    } catch {
+      return false;
+    }
+  };
+
+  const externalSource = session?.externalSource ?? "";
+  const isUrl = externalSource.trim() && isValidUrl(externalSource);
+
   return (
     <div className="space-y-2">
       <Label className="text-xs text-muted-foreground">Bout Info</Label>
@@ -187,6 +70,31 @@ export function BoutMetadataForm({
             disabled={disabled}
             className="h-7 text-xs w-32"
           />
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Label htmlFor="source" className="text-xs shrink-0">
+            Source:
+          </Label>
+          <div className="flex items-center gap-1 flex-1 min-w-[150px]">
+            <Input
+              id="source"
+              placeholder="Video URL or reference..."
+              value={externalSource}
+              onChange={(e) => onUpdate({ externalSource: e.target.value })}
+              disabled={disabled}
+              className="h-7 text-xs"
+            />
+            {isUrl && (
+              <a
+                href={externalSource}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="shrink-0"
+              >
+                <ExternalLink className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+              </a>
+            )}
+          </div>
         </div>
       </div>
     </div>

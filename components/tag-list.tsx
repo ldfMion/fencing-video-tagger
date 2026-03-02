@@ -7,13 +7,13 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Trash2 } from "lucide-react";
 import { SIDE_COLORS } from "@/lib/constants";
 import type { Tag } from "@/lib/types";
-import { formatTime } from "@/lib/utils";
+import { formatTime, sortTags } from "@/lib/utils";
 
 const SEEK_BUFFER = 3;
 
 interface TagListProps {
   tags: Tag[];
-  onSeek: (time: number) => void;
+  onSeek?: (time: number) => void;
   onDelete: (tagId: string) => void;
   fillHeight?: boolean;
 }
@@ -24,10 +24,7 @@ export function TagList({
   onDelete,
   fillHeight = false,
 }: TagListProps) {
-  const sortedTags = useMemo(
-    () => [...tags].sort((a, b) => a.timestamp - b.timestamp),
-    [tags],
-  );
+  const sortedTags = useMemo(() => sortTags(tags), [tags]);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const prevTagCountRef = useRef(tags.length);
@@ -42,7 +39,7 @@ export function TagList({
   if (tags.length === 0) {
     return (
       <div className="text-center py-8 text-muted-foreground">
-        No tags yet. Add your first tag while watching the video.
+        No tags yet.
       </div>
     );
   }
@@ -50,17 +47,24 @@ export function TagList({
   return (
     <ScrollArea className={fillHeight ? "h-full" : "h-[300px]"}>
       <div className="space-y-2 pr-4">
-        {sortedTags.map((tag) => (
+        {sortedTags.map((tag, index) => (
           <div key={tag.id} className="group p-2 rounded-lg hover:bg-muted">
             <div className="flex items-start justify-between gap-2">
               <button
-                // seek to SEEK_BUFFER seconds before the tag
-                onClick={() => onSeek(tag.timestamp - SEEK_BUFFER)}
+                // seek to SEEK_BUFFER seconds before the tag (only if timestamp exists)
+                onClick={() => {
+                  if (tag.timestamp != null && onSeek) {
+                    onSeek(tag.timestamp - SEEK_BUFFER);
+                  }
+                }}
                 className="text-left"
+                disabled={tag.timestamp == null && !onSeek}
               >
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-mono text-sm text-primary">
-                    {formatTime(tag.timestamp)}
+                    {tag.timestamp != null
+                      ? formatTime(tag.timestamp)
+                      : `#${index + 1}`}
                   </span>
                   {tag.side && (
                     <Badge
@@ -101,9 +105,16 @@ export function TagList({
             </div>
             {tag.comment && (
               <p
-                className="text-sm text-muted-foreground mt-1 cursor-pointer"
-                // seek to SEEK_BUFFER seconds before the tag
-                onClick={() => onSeek(tag.timestamp - SEEK_BUFFER)}
+                className="text-sm text-muted-foreground mt-1"
+                style={{
+                  cursor:
+                    tag.timestamp != null && onSeek ? "pointer" : "default",
+                }}
+                onClick={() => {
+                  if (tag.timestamp != null && onSeek) {
+                    onSeek(tag.timestamp - SEEK_BUFFER);
+                  }
+                }}
               >
                 {tag.comment}
               </p>

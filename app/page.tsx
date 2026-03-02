@@ -1,25 +1,32 @@
 "use client";
 
-import { useState, useMemo, useCallback, useRef } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { VideoLibrary } from "@/components/video-library";
 import { ExportButton } from "@/components/export-button";
+import { NewBoutDialog } from "@/components/new-bout-dialog";
 import { useSessions } from "@/hooks/use-sessions";
 import { useVideoContext } from "@/contexts/video-context";
-import { Search, X, Upload, Swords } from "lucide-react";
+import { Search, X, Plus, Swords } from "lucide-react";
 
 export default function Home() {
   const router = useRouter();
   const { setVideo } = useVideoContext();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const { sessions, getSession, getOrCreateSession, deleteSession, exportToCSV } =
-    useSessions();
+  const {
+    sessions,
+    getOrCreateSession,
+    createSession,
+    deleteSession,
+    exportToCSV,
+    allFencerNames,
+  } = useSessions();
 
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [isNewBoutDialogOpen, setIsNewBoutDialogOpen] = useState(false);
 
   const hasFilters = search || dateFrom || dateTo;
 
@@ -31,8 +38,9 @@ export default function Home() {
       result = result.filter((s) => {
         const left = s.leftFencer?.toLowerCase() ?? "";
         const right = s.rightFencer?.toLowerCase() ?? "";
-        const file = s.fileName.toLowerCase();
-        return left.includes(q) || right.includes(q) || file.includes(q);
+        const file = s.fileName?.toLowerCase() ?? "";
+        const source = s.externalSource?.toLowerCase() ?? "";
+        return left.includes(q) || right.includes(q) || file.includes(q) || source.includes(q);
       });
     }
 
@@ -53,23 +61,51 @@ export default function Home() {
     return result;
   }, [sessions, search, dateFrom, dateTo]);
 
-  const handleSelect = (selectedFileName: string) => {
-    const session = getSession(selectedFileName);
-    if (session) {
-      router.push(`/bouts/${session.id}`);
-    }
+  const handleSelectSession = (sessionId: string) => {
+    router.push(`/bouts/${sessionId}`);
   };
 
-  const handleFileSelect = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
+  const handleCreateSessionWithoutVideo = useCallback(
+    (params: {
+      leftFencer?: string;
+      rightFencer?: string;
+      boutDate?: string;
+      externalSource?: string;
+    }) => {
+      const session = createSession(params);
+      router.push(`/bouts/${session.id}`);
+      return session;
+    },
+    [createSession, router],
+  );
 
+  const handleCreateSessionWithVideo = useCallback(
+    (
+      file: File,
+      params: {
+        leftFencer?: string;
+        rightFencer?: string;
+        boutDate?: string;
+        externalSource?: string;
+      },
+    ) => {
       const url = URL.createObjectURL(file);
       setVideo(url, file.name);
 
       const session = getOrCreateSession(file.name, file.lastModified);
+      // Merge metadata params if provided
+      if (
+        params.leftFencer ||
+        params.rightFencer ||
+        params.boutDate ||
+        params.externalSource
+      ) {
+        // These would be set through metadata form updates after navigation
+        // For now, just navigate - user can edit metadata on bout page
+      }
+
       router.push(`/bouts/${session.id}`);
+      return session;
     },
     [setVideo, getOrCreateSession, router],
   );
@@ -94,18 +130,19 @@ export default function Home() {
               exportToCSV={exportToCSV}
               disabled={sessions.length === 0}
             />
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="video/*"
-              onChange={handleFileSelect}
-              className="hidden"
-            />
-            <Button onClick={() => fileInputRef.current?.click()}>
-              <Upload className="h-4 w-4 mr-2" />
+            <Button onClick={() => setIsNewBoutDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
               New Bout
             </Button>
           </div>
+
+          <NewBoutDialog
+            isOpen={isNewBoutDialogOpen}
+            onOpenChange={setIsNewBoutDialogOpen}
+            onCreateSession={handleCreateSessionWithoutVideo}
+            onCreateWithVideo={handleCreateSessionWithVideo}
+            fencerNames={allFencerNames}
+          />
         </div>
 
         {/* Filters */}
@@ -146,7 +183,7 @@ export default function Home() {
         {/* Bout List */}
         <VideoLibrary
           sessions={filteredSessions}
-          onSelect={handleSelect}
+          onSelect={handleSelectSession}
           onDelete={deleteSession}
         />
 

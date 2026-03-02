@@ -51,7 +51,8 @@ export type MistakeType = z.infer<typeof MistakeTypeSchema>;
 
 export const TagSchema = z.object({
   id: z.string(),
-  timestamp: z.number(), // seconds into video
+  timestamp: z.number().optional(), // seconds into video (optional for videoless tags)
+  seq: z.number().optional(), // insertion order for videoless tags or tiebreaker for video tags
   createdAt: z.number(), // unix timestamp
   comment: z.string(), // replaces 'text' field
   // Optional fields for statistics
@@ -64,13 +65,14 @@ export type Tag = z.infer<typeof TagSchema>;
 
 export const VideoSessionSchema = z.object({
   id: z.string(), // serves as bout_id
-  fileName: z.string(),
+  fileName: z.string().optional(), // optional for videoless bouts
   tags: z.array(TagSchema),
   lastModified: z.number(), // unix timestamp
   // Bout metadata
   leftFencer: z.string().optional(),
   rightFencer: z.string().optional(),
   boutDate: z.string().optional(), // ISO date string
+  externalSource: z.string().optional(), // URL or reference note
 });
 
 export type VideoSession = z.infer<typeof VideoSessionSchema>;

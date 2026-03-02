@@ -31,7 +31,7 @@ function getBoutTitle(session: VideoSession): string {
   if (session.rightFencer) {
     return `? vs ${session.rightFencer}`;
   }
-  return session.fileName;
+  return session.fileName ?? "Untitled Bout";
 }
 
 function hasFencerNames(session: VideoSession): boolean {
@@ -41,8 +41,8 @@ function hasFencerNames(session: VideoSession): boolean {
 interface VideoLibraryProps {
   sessions: VideoSession[];
   currentFileName?: string | null;
-  onSelect: (fileName: string) => void;
-  onDelete: (fileName: string) => void;
+  onSelect: (sessionId: string) => void;
+  onDelete: (sessionId: string) => void;
 }
 
 export function VideoLibrary({
@@ -86,7 +86,7 @@ export function VideoLibrary({
             return (
               <tr
                 key={session.id}
-                onClick={() => onSelect(session.fileName)}
+                onClick={() => onSelect(session.id)}
                 className={`border-b last:border-b-0 cursor-pointer transition-colors hover:bg-muted ${isActive ? "bg-muted" : ""}`}
               >
                 <td className="py-2 px-3">
@@ -100,11 +100,15 @@ export function VideoLibrary({
                       <p className="font-medium truncate">
                         {getBoutTitle(session)}
                       </p>
-                      {hasFencerNames(session) && (
+                      {session.fileName ? (
                         <p className="text-xs text-muted-foreground truncate">
                           {session.fileName}
                         </p>
-                      )}
+                      ) : session.externalSource ? (
+                        <p className="text-xs text-muted-foreground truncate">
+                          {session.externalSource}
+                        </p>
+                      ) : null}
                     </div>
                   </div>
                 </td>
@@ -136,7 +140,7 @@ export function VideoLibrary({
                     className="h-7 w-7"
                     onClick={(e) => {
                       e.stopPropagation();
-                      onDelete(session.fileName);
+                      onDelete(session.id);
                     }}
                   >
                     <Trash2 className="h-3.5 w-3.5 text-destructive" />

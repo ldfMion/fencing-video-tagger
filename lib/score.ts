@@ -1,4 +1,5 @@
 import type { Tag } from "@/lib/types";
+import { sortTags } from "@/lib/utils";
 
 export interface ScoringEvent {
   tag: Tag;
@@ -7,9 +8,7 @@ export interface ScoringEvent {
 }
 
 export function computeRunningScore(tags: Tag[]): ScoringEvent[] {
-  const withAction = tags
-    .filter((t) => t.side && t.action)
-    .sort((a, b) => a.timestamp - b.timestamp);
+  const withAction = sortTags(tags).filter((t) => t.side && t.action);
 
   let left = 0;
   let right = 0;

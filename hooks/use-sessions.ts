@@ -150,7 +150,7 @@ function escapeCSV(value: string): string {
 
 export interface AddTagParams {
   comment: string;
-  timestamp: number;
+  timestamp?: number;
   side?: Side;
   action?: ActionCode;
   mistake?: MistakeType;
@@ -160,6 +160,7 @@ export interface UpdateSessionParams {
   leftFencer?: string;
   rightFencer?: string;
   boutDate?: string;
+  externalSource?: string;
 }
 
 export function useSessions() {
@@ -204,7 +205,39 @@ export function useSessions() {
     [currentSessions],
   );
 
-  const addTag = useCallback((fileName: string, params: AddTagParams): Tag => {
+  const createSession = useCallback(
+    (
+      params?: Partial<
+        Pick<
+          VideoSession,
+          "leftFencer" | "rightFencer" | "boutDate" | "externalSource"
+        >
+      >
+    ): VideoSession => {
+      const newSession: VideoSession = {
+        id: generateId(),
+        tags: [],
+        lastModified: Date.now(),
+        ...params,
+      };
+
+      updateSessions((prev) => [...prev, newSession]);
+      return newSession;
+    },
+    []
+  );
+
+  const addTag = useCallback((sessionId: string, params: AddTagParams): Tag => {
+    // Compute seq from existing tags
+    const computeSeq = (session: VideoSession) => {
+      const existingSeqs = session.tags
+        .map((t) => t.seq)
+        .filter((s) => s != null) as number[];
+      return existingSeqs.length > 0 ? Math.max(...existingSeqs) + 1 : 1;
+    };
+
+    let newSeq: number | undefined;
+
     const tag: Tag = {
       id: generateId(),
       timestamp: params.timestamp,
@@ -216,17 +249,15 @@ export function useSessions() {
     };
 
     updateSessions((prev) => {
-      const sessionIndex = prev.findIndex((s) => s.fileName === fileName);
+      const sessionIndex = prev.findIndex((s) => s.id === sessionId);
 
       if (sessionIndex === -1) {
-        const newSession: VideoSession = {
-          id: generateId(),
-          fileName,
-          tags: [tag],
-          lastModified: Date.now(),
-        };
-        return [...prev, newSession];
+        return prev; // Session not found, no-op
       }
+
+      const session = prev[sessionIndex];
+      newSeq = computeSeq(session);
+      tag.seq = newSeq;
 
       return prev.map((s, i) =>
         i === sessionIndex
@@ -240,13 +271,13 @@ export function useSessions() {
 
   const updateTag = useCallback(
     (
-      fileName: string,
+      sessionId: string,
       tagId: string,
       updates: Partial<Omit<Tag, "id" | "createdAt">>,
     ): void => {
       updateSessions((prev) =>
         prev.map((s) =>
-          s.fileName === fileName
+          s.id === sessionId
             ? {
                 ...s,
                 tags: s.tags.map((t) =>
@@ -261,10 +292,10 @@ export function useSessions() {
     [],
   );
 
-  const deleteTag = useCallback((fileName: string, tagId: string): void => {
+  const deleteTag = useCallback((sessionId: string, tagId: string): void => {
     updateSessions((prev) =>
       prev.map((s) =>
-        s.fileName === fileName
+        s.id === sessionId
           ? {
               ...s,
               tags: s.tags.filter((t) => t.id !== tagId),
@@ -275,31 +306,19 @@ export function useSessions() {
     );
   }, []);
 
-  const deleteSession = useCallback((fileName: string): void => {
-    updateSessions((prev) => prev.filter((s) => s.fileName !== fileName));
+  const deleteSession = useCallback((sessionId: string): void => {
+    updateSessions((prev) => prev.filter((s) => s.id !== sessionId));
   }, []);
 
   const updateSession = useCallback(
-    (fileName: string, updates: UpdateSessionParams): void => {
-      updateSessions((prev) => {
-        const exists = prev.some((s) => s.fileName === fileName);
-        if (!exists) {
-          // Create new session with the metadata
-          const newSession: VideoSession = {
-            id: generateId(),
-            fileName,
-            tags: [],
-            lastModified: Date.now(),
-            ...updates,
-          };
-          return [...prev, newSession];
-        }
-        return prev.map((s) =>
-          s.fileName === fileName
+    (sessionId: string, updates: UpdateSessionParams): void => {
+      updateSessions((prev) =>
+        prev.map((s) =>
+          s.id === sessionId
             ? { ...s, ...updates, lastModified: Date.now() }
             : s,
-        );
-      });
+        ),
+      );
     },
     [],
   );
@@ -308,6 +327,7 @@ export function useSessions() {
     const headers = [
       "bout_id",
       "file_name",
+      "external_source",
       "left_fencer",
       "right_fencer",
       "bout_date",
@@ -327,13 +347,14 @@ export function useSessions() {
       for (const tag of session.tags) {
         rows.push([
           escapeCSV(session.id),
-          escapeCSV(session.fileName),
+          escapeCSV(session.fileName ?? ""),
+          escapeCSV(session.externalSource ?? ""),
           escapeCSV(session.leftFencer ?? ""),
           escapeCSV(session.rightFencer ?? ""),
           escapeCSV(session.boutDate ?? ""),
           escapeCSV(tag.id),
-          escapeCSV(String(tag.timestamp)),
-          escapeCSV(formatTime(tag.timestamp)),
+          escapeCSV(tag.timestamp != null ? String(tag.timestamp) : ""),
+          escapeCSV(tag.timestamp != null ? formatTime(tag.timestamp) : ""),
           escapeCSV(tag.side ?? ""),
           escapeCSV(tag.action ?? ""),
           escapeCSV(tag.comment),
@@ -363,6 +384,7 @@ export function useSessions() {
     getSession,
     getSessionById,
     getOrCreateSession,
+    createSession,
     addTag,
     updateTag,
     deleteTag,

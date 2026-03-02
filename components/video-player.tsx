@@ -30,13 +30,7 @@ import {
   type PlaybackSpeed,
   type UseVideoReturn,
 } from "@/hooks/use-video";
-
-function formatTime(seconds: number): string {
-  if (!isFinite(seconds)) return "0:00";
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, "0")}`;
-}
+import { formatTime } from "@/lib/utils";
 
 // Map keyboard numbers to speed values
 const SPEED_KEY_MAP: Record<string, PlaybackSpeed> = {

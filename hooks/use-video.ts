@@ -185,38 +185,11 @@ export function useVideo(options: UseVideoOptions = {}): UseVideoReturn {
     };
   }, [videoElementTrigger, playbackSpeed, isSeeking]);
 
-  const play = useCallback(() => {
-    const videoElement = videoElementRef.current;
-    if (!videoElement) return;
-
-    videoElement.play().catch((err) => {
-      if (err.name === "AbortError") {
-        // Retry play after a short delay - this happens when play is interrupted by seek
-        setTimeout(() => {
-          videoElement.play().catch((retryErr) => {
-            if (retryErr.name !== "AbortError") {
-              setError(`Failed to play video: ${retryErr.message}`);
-            }
-          });
-        }, 100);
-      } else {
-        setError(`Failed to play video: ${err.message}`);
-      }
-    });
-  }, []);
-
-  const pause = useCallback(() => {
-    videoElementRef.current?.pause();
-  }, []);
-
-  const togglePlay = useCallback(() => {
-    const videoElement = videoElementRef.current;
-    if (!videoElement) return;
-
-    if (videoElement.paused) {
+  const playWithRetry = useCallback(
+    (videoElement: HTMLVideoElement) => {
       videoElement.play().catch((err) => {
         if (err.name === "AbortError") {
-          // Retry play after a short delay
+          // Retry play after a short delay - this happens when play is interrupted by seek
           setTimeout(() => {
             videoElement.play().catch((retryErr) => {
               if (retryErr.name !== "AbortError") {
@@ -228,39 +201,69 @@ export function useVideo(options: UseVideoOptions = {}): UseVideoReturn {
           setError(`Failed to play video: ${err.message}`);
         }
       });
+    },
+    [],
+  );
+
+  const play = useCallback(() => {
+    const videoElement = videoElementRef.current;
+    if (!videoElement) return;
+    playWithRetry(videoElement);
+  }, [playWithRetry]);
+
+  const pause = useCallback(() => {
+    videoElementRef.current?.pause();
+  }, []);
+
+  const togglePlay = useCallback(() => {
+    const videoElement = videoElementRef.current;
+    if (!videoElement) return;
+
+    if (videoElement.paused) {
+      playWithRetry(videoElement);
     } else {
       videoElement.pause();
     }
-  }, []);
+  }, [playWithRetry]);
 
-  const seek = useCallback((time: number) => {
-    const videoElement = videoElementRef.current;
-    if (videoElement) {
+  const clampToVideoDuration = useCallback(
+    (videoElement: HTMLVideoElement, time: number) => {
       const videoDuration = isFinite(videoElement.duration)
         ? videoElement.duration
         : Infinity;
-      const targetTime = Math.max(0, Math.min(time, videoDuration));
+      return Math.max(0, Math.min(time, videoDuration));
+    },
+    [],
+  );
 
-      // Clear any existing seek timeout
-      if (seekTimeoutRef.current) {
-        clearTimeout(seekTimeoutRef.current);
+  const seek = useCallback(
+    (time: number) => {
+      const videoElement = videoElementRef.current;
+      if (videoElement) {
+        const targetTime = clampToVideoDuration(videoElement, time);
+
+        // Clear any existing seek timeout
+        if (seekTimeoutRef.current) {
+          clearTimeout(seekTimeoutRef.current);
+        }
+
+        // Use fastSeek if available - it seeks to nearest keyframe which is more reliable
+        // for videos with sparse keyframes or when using blob URLs
+        if (typeof videoElement.fastSeek === "function") {
+          videoElement.fastSeek(targetTime);
+        } else {
+          videoElement.currentTime = targetTime;
+        }
+
+        // Set a timeout to clear seeking state if seeked event never fires
+        // This can happen with certain video files/codecs (e.g., Firefox with some files)
+        seekTimeoutRef.current = setTimeout(() => {
+          setIsSeeking(false);
+        }, 3000);
       }
-
-      // Use fastSeek if available - it seeks to nearest keyframe which is more reliable
-      // for videos with sparse keyframes or when using blob URLs
-      if (typeof videoElement.fastSeek === "function") {
-        videoElement.fastSeek(targetTime);
-      } else {
-        videoElement.currentTime = targetTime;
-      }
-
-      // Set a timeout to clear seeking state if seeked event never fires
-      // This can happen with certain video files/codecs (e.g., Firefox with some files)
-      seekTimeoutRef.current = setTimeout(() => {
-        setIsSeeking(false);
-      }, 3000);
-    }
-  }, []);
+    },
+    [clampToVideoDuration],
+  );
 
   const setPlaybackSpeed = useCallback((speed: PlaybackSpeed) => {
     if (videoElementRef.current) {
@@ -277,32 +280,29 @@ export function useVideo(options: UseVideoOptions = {}): UseVideoReturn {
         videoElement.pause();
         isFrameSteppingRef.current = true;
         const delta = direction === "forward" ? frameDuration : -frameDuration;
-        const videoDuration = isFinite(videoElement.duration)
-          ? videoElement.duration
-          : Infinity;
-        videoElement.currentTime = Math.max(
-          0,
-          Math.min(videoElement.currentTime + delta, videoDuration),
+        videoElement.currentTime = clampToVideoDuration(
+          videoElement,
+          videoElement.currentTime + delta,
         );
       }
     },
-    [frameDuration],
+    [frameDuration, clampToVideoDuration],
   );
 
-  const skip = useCallback((direction: "forward" | "backward") => {
-    const videoElement = videoElementRef.current;
-    if (videoElement) {
-      isFrameSteppingRef.current = true;
-      const delta = direction === "forward" ? SKIP_DURATION : -SKIP_DURATION;
-      const videoDuration = isFinite(videoElement.duration)
-        ? videoElement.duration
-        : Infinity;
-      videoElement.currentTime = Math.max(
-        0,
-        Math.min(videoElement.currentTime + delta, videoDuration),
-      );
-    }
-  }, []);
+  const skip = useCallback(
+    (direction: "forward" | "backward") => {
+      const videoElement = videoElementRef.current;
+      if (videoElement) {
+        isFrameSteppingRef.current = true;
+        const delta = direction === "forward" ? SKIP_DURATION : -SKIP_DURATION;
+        videoElement.currentTime = clampToVideoDuration(
+          videoElement,
+          videoElement.currentTime + delta,
+        );
+      }
+    },
+    [clampToVideoDuration],
+  );
 
   // Calculate max pan distance for a given zoom level
   const getMaxPanForZoom = useCallback((zoom: number) => {
@@ -363,25 +363,23 @@ export function useVideo(options: UseVideoOptions = {}): UseVideoReturn {
     [panX, panY, clampPan],
   );
 
-  const panUp = useCallback(() => {
-    const maxPan = getMaxPanForZoom(zoomLevel);
-    setPanY((prev) => Math.min(maxPan, prev + PAN_STEP));
-  }, [getMaxPanForZoom, zoomLevel]);
+  const panBy = useCallback(
+    (axis: "x" | "y", direction: 1 | -1) => {
+      const maxPan = getMaxPanForZoom(zoomLevel);
+      const setter = axis === "x" ? setPanX : setPanY;
+      setter((prev) =>
+        direction === 1
+          ? Math.min(maxPan, prev + PAN_STEP)
+          : Math.max(-maxPan, prev - PAN_STEP),
+      );
+    },
+    [getMaxPanForZoom, zoomLevel],
+  );
 
-  const panDown = useCallback(() => {
-    const maxPan = getMaxPanForZoom(zoomLevel);
-    setPanY((prev) => Math.max(-maxPan, prev - PAN_STEP));
-  }, [getMaxPanForZoom, zoomLevel]);
-
-  const panLeft = useCallback(() => {
-    const maxPan = getMaxPanForZoom(zoomLevel);
-    setPanX((prev) => Math.min(maxPan, prev + PAN_STEP));
-  }, [getMaxPanForZoom, zoomLevel]);
-
-  const panRight = useCallback(() => {
-    const maxPan = getMaxPanForZoom(zoomLevel);
-    setPanX((prev) => Math.max(-maxPan, prev - PAN_STEP));
-  }, [getMaxPanForZoom, zoomLevel]);
+  const panUp = useCallback(() => panBy("y", 1), [panBy]);
+  const panDown = useCallback(() => panBy("y", -1), [panBy]);
+  const panLeft = useCallback(() => panBy("x", 1), [panBy]);
+  const panRight = useCallback(() => panBy("x", -1), [panBy]);
 
   const centerPan = useCallback(() => {
     setPanX(0);

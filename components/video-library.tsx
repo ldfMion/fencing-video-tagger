@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Trash2, Swords, FileVideo } from "lucide-react";
+import { SIDE_COLORS } from "@/lib/constants";
 import { computeScore } from "@/lib/score";
 import type { VideoSession } from "@/lib/types";
 
@@ -110,11 +111,11 @@ export function VideoLibrary({
                 <td className="py-2 px-3 text-center tabular-nums">
                   {hasScore ? (
                     <>
-                      <span className={`${leftWins ? "font-bold" : ""} text-red-700 dark:text-red-400`}>
+                      <span className={`${leftWins ? "font-bold" : ""} ${SIDE_COLORS.left.text}`}>
                         {score.left}
                       </span>
                       <span className="text-muted-foreground mx-1">-</span>
-                      <span className={`${rightWins ? "font-bold" : ""} text-green-700 dark:text-green-400`}>
+                      <span className={`${rightWins ? "font-bold" : ""} ${SIDE_COLORS.right.text}`}>
                         {score.right}
                       </span>
                     </>

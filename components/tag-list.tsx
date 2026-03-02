@@ -5,16 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Trash2 } from "lucide-react";
+import { SIDE_COLORS } from "@/lib/constants";
 import type { Tag } from "@/lib/types";
+import { formatTime } from "@/lib/utils";
 
 const SEEK_BUFFER = 3;
-
-function formatTime(seconds: number): string {
-  if (!isFinite(seconds)) return "0:00";
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, "0")}`;
-}
 
 interface TagListProps {
   tags: Tag[];
@@ -72,8 +67,8 @@ export function TagList({
                       variant="outline"
                       className={`text-xs px-1.5 py-0 ${
                         tag.side === "L"
-                          ? "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800"
-                          : "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800"
+                          ? SIDE_COLORS.left.badge
+                          : SIDE_COLORS.right.badge
                       }`}
                     >
                       {tag.side}

@@ -13,6 +13,7 @@ import {
   StorageEnvelopeSchema,
   CURRENT_SCHEMA_VERSION,
 } from "@/lib/types";
+import { formatTime } from "@/lib/utils";
 
 const STORAGE_KEY = "fencing-tags-sessions";
 
@@ -140,13 +141,6 @@ function updateSessions(updater: (prev: VideoSession[]) => VideoSession[]) {
   sessions = updater(sessions);
   saveToStorage(sessions);
   emitChange();
-}
-
-// Helper to format time for CSV
-function formatTime(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
 // Helper to escape CSV values

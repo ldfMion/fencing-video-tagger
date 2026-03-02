@@ -3,15 +3,9 @@
 import { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { computeScore } from "@/lib/score";
+import { SIDE_COLORS } from "@/lib/constants";
+import { computeScore, computeRunningScore } from "@/lib/score";
 import type { Tag } from "@/lib/types";
-
-function formatTime(seconds: number): string {
-  if (!isFinite(seconds)) return "0:00";
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, "0")}`;
-}
 
 interface BoutAnalysisProps {
   tags: Tag[];
@@ -19,48 +13,22 @@ interface BoutAnalysisProps {
   rightFencer?: string;
 }
 
-interface ScoringEvent {
-  tag: Tag;
-  leftScore: number;
-  rightScore: number;
-}
-
 export function BoutAnalysis({
   tags,
   leftFencer = "Left",
   rightFencer = "Right",
 }: BoutAnalysisProps) {
-  const scoringEvents = useMemo(() => {
-    const withAction = tags
-      .filter((t) => t.side && t.action)
-      .sort((a, b) => a.timestamp - b.timestamp);
-
-    let left = 0;
-    let right = 0;
-    return withAction.map<ScoringEvent>((tag) => {
-      if (tag.action === "yc") {
-        // Yellow card: no points awarded
-      } else if (tag.action === "rc") {
-        // Red card: point awarded to opponent
-        if (tag.side === "L") right++;
-        else left++;
-      } else {
-        if (tag.side === "L") left++;
-        else right++;
-      }
-      return { tag, leftScore: left, rightScore: right };
-    });
-  }, [tags]);
+  const scoringEvents = useMemo(() => computeRunningScore(tags), [tags]);
 
   const { left: finalLeft, right: finalRight } = computeScore(tags);
 
   const leftWins = finalLeft > finalRight;
   const rightWins = finalRight > finalLeft;
 
-  const leftColor = "text-red-700 dark:text-red-400";
-  const rightColor = "text-green-700 dark:text-green-400";
-  const leftBadge = "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800";
-  const rightBadge = "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800";
+  const leftColor = SIDE_COLORS.left.text;
+  const rightColor = SIDE_COLORS.right.text;
+  const leftBadge = SIDE_COLORS.left.badge;
+  const rightBadge = SIDE_COLORS.right.badge;
 
   return (
     <div className="space-y-6 p-4 max-w-2xl mx-auto">

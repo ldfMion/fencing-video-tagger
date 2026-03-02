@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { z } from "zod";
 import {
   type Tag,
@@ -151,10 +151,7 @@ function formatTime(seconds: number): string {
 
 // Helper to escape CSV values
 function escapeCSV(value: string): string {
-  if (value.includes(",") || value.includes('"') || value.includes("\n")) {
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-  return value;
+  return `"${value.replace(/"/g, '""')}"`;
 }
 
 export interface AddTagParams {
@@ -327,6 +324,7 @@ export function useSessions() {
       "action",
       "comment",
       "mistake",
+      "created_at",
     ];
 
     const rows: string[][] = [headers];
@@ -334,18 +332,19 @@ export function useSessions() {
     for (const session of currentSessions) {
       for (const tag of session.tags) {
         rows.push([
-          session.id,
+          escapeCSV(session.id),
           escapeCSV(session.fileName),
           escapeCSV(session.leftFencer ?? ""),
           escapeCSV(session.rightFencer ?? ""),
-          session.boutDate ?? "",
-          tag.id,
-          String(tag.timestamp),
-          formatTime(tag.timestamp),
-          tag.side ?? "",
-          tag.action ?? "",
+          escapeCSV(session.boutDate ?? ""),
+          escapeCSV(tag.id),
+          escapeCSV(String(tag.timestamp)),
+          escapeCSV(formatTime(tag.timestamp)),
+          escapeCSV(tag.side ?? ""),
+          escapeCSV(tag.action ?? ""),
           escapeCSV(tag.comment),
-          tag.mistake ?? "",
+          escapeCSV(tag.mistake ?? ""),
+          escapeCSV(tag.createdAt ? new Date(tag.createdAt).toISOString() : ""),
         ]);
       }
     }
@@ -353,8 +352,20 @@ export function useSessions() {
     return rows.map((row) => row.join(",")).join("\n");
   }, [currentSessions]);
 
+  const allFencerNames = useMemo(() => {
+    const names = new Set<string>();
+    for (const session of currentSessions) {
+      if (session.leftFencer?.trim()) names.add(session.leftFencer.trim());
+      if (session.rightFencer?.trim()) names.add(session.rightFencer.trim());
+    }
+    return Array.from(names).sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: "base" }),
+    );
+  }, [currentSessions]);
+
   return {
     sessions: currentSessions,
+    allFencerNames,
     getSession,
     getSessionById,
     getOrCreateSession,

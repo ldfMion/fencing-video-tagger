@@ -30,6 +30,7 @@ export default function BoutPage() {
     deleteTag,
     updateSession,
     exportToCSV,
+    allFencerNames,
   } = useSessions();
 
   const session = getSessionById(params.id);
@@ -237,6 +238,7 @@ export default function BoutPage() {
                   <BoutMetadataForm
                     session={session}
                     onUpdate={handleUpdateSession}
+                    fencerNames={allFencerNames}
                   />
                 </div>
               </div>

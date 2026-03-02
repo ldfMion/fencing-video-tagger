@@ -31,7 +31,8 @@ export default function Home() {
       result = result.filter((s) => {
         const left = s.leftFencer?.toLowerCase() ?? "";
         const right = s.rightFencer?.toLowerCase() ?? "";
-        return left.includes(q) || right.includes(q);
+        const file = s.fileName.toLowerCase();
+        return left.includes(q) || right.includes(q) || file.includes(q);
       });
     }
 
@@ -112,7 +113,7 @@ export default function Home() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search fencer name..."
+              placeholder="Search fencer or filename..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9"

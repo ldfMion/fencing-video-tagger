@@ -7,6 +7,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Trash2 } from "lucide-react";
 import type { Tag } from "@/lib/types";
 
+const SEEK_BUFFER = 3;
+
 function formatTime(seconds: number): string {
   if (!isFinite(seconds)) return "0:00";
   const mins = Math.floor(seconds / 60);
@@ -57,7 +59,8 @@ export function TagList({
           <div key={tag.id} className="group p-2 rounded-lg hover:bg-muted">
             <div className="flex items-start justify-between gap-2">
               <button
-                onClick={() => onSeek(tag.timestamp)}
+                // seek to SEEK_BUFFER seconds before the tag
+                onClick={() => onSeek(tag.timestamp - SEEK_BUFFER)}
                 className="text-left"
               >
                 <div className="flex items-center gap-2 flex-wrap">
@@ -104,7 +107,8 @@ export function TagList({
             {tag.comment && (
               <p
                 className="text-sm text-muted-foreground mt-1 cursor-pointer"
-                onClick={() => onSeek(tag.timestamp)}
+                // seek to SEEK_BUFFER seconds before the tag
+                onClick={() => onSeek(tag.timestamp - SEEK_BUFFER)}
               >
                 {tag.comment}
               </p>

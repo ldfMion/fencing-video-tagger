@@ -184,11 +184,8 @@ export function useSessions() {
     [currentSessions],
   );
 
-  const getOrCreateSession = useCallback(
+  const createSessionWithVideo = useCallback(
     (fileName: string, fileLastModified?: number): VideoSession => {
-      const existing = currentSessions.find((s) => s.fileName === fileName);
-      if (existing) return existing;
-
       const newSession: VideoSession = {
         id: generateId(),
         fileName,
@@ -202,7 +199,7 @@ export function useSessions() {
       updateSessions((prev) => [...prev, newSession]);
       return newSession;
     },
-    [currentSessions],
+    [],
   );
 
   const createSession = useCallback(
@@ -383,7 +380,7 @@ export function useSessions() {
     allFencerNames,
     getSession,
     getSessionById,
-    getOrCreateSession,
+    createSessionWithVideo,
     createSession,
     addTag,
     updateTag,

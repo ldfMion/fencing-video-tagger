@@ -16,7 +16,7 @@ export default function Home() {
   const { setVideo } = useVideoContext();
   const {
     sessions,
-    getOrCreateSession,
+    createSessionWithVideo,
     createSession,
     deleteSession,
     exportToCSV,
@@ -92,7 +92,7 @@ export default function Home() {
       const url = URL.createObjectURL(file);
       setVideo(url, file.name);
 
-      const session = getOrCreateSession(file.name, file.lastModified);
+      const session = createSessionWithVideo(file.name, file.lastModified);
       // Merge metadata params if provided
       if (
         params.leftFencer ||
@@ -107,7 +107,7 @@ export default function Home() {
       router.push(`/bouts/${session.id}`);
       return session;
     },
-    [setVideo, getOrCreateSession, router],
+    [setVideo, createSessionWithVideo, router],
   );
 
   const clearFilters = () => {

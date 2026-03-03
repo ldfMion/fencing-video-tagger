@@ -3,6 +3,7 @@ import { z } from "zod";
 // Action codes for fencing touches (sorted alphabetically)
 export const ACTION_CODES = [
   "A,R",
+  "A,R,R",
   "A,R-P",
   "A-A",
   "A-AP",

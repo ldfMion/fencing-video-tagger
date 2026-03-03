@@ -201,7 +201,7 @@ export default function BoutPage() {
           />
           <Button size="sm" onClick={() => fileInputRef.current?.click()}>
             <Upload className="h-4 w-4 mr-1.5" />
-            Select Video
+            {hasVideo ? "Change Video" : session.fileName ? "Load Video" : "Attach Video"}
           </Button>
           <Button
             size="sm"
@@ -234,19 +234,41 @@ export default function BoutPage() {
               </div>
             ) : (
               <div className="flex-none h-[120px] bg-card rounded-lg border p-2 flex flex-col items-center justify-center gap-2 text-muted-foreground">
-                <p className="text-sm">
-                  {session.fileName
-                    ? "Select the video file to start tagging"
-                    : "No video — tag events manually"}
-                </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Upload className="h-4 w-4 mr-1.5" />
-                  {session.fileName ? "Select Different Video" : "Attach Video"}
-                </Button>
+                {session.fileName ? (
+                  <>
+                    <p className="text-sm">
+                      Video: <span className="font-medium text-foreground">{session.fileName}</span>
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <Upload className="h-4 w-4 mr-1.5" />
+                        Load Video
+                      </Button>
+                      <button
+                        className="text-xs underline hover:text-foreground"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        Use a different file
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm">No video — tag events manually</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Upload className="h-4 w-4 mr-1.5" />
+                      Attach Video
+                    </Button>
+                  </>
+                )}
               </div>
             )}
 

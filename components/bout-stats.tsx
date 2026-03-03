@@ -3,13 +3,68 @@
 import { useMemo, useState } from "react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { SIDE_COLORS } from "@/lib/constants";
-import { computeTacticalStats } from "@/lib/stats";
+import { computeTacticalStats, computeDefMatchupStats, type StatRow } from "@/lib/stats";
 import type { Tag, Side } from "@/lib/types";
 
 interface BoutStatsProps {
   tags: Tag[];
   leftFencer?: string;
   rightFencer?: string;
+}
+
+function StatsTable({ rows }: { rows: StatRow[] }) {
+  return (
+    <div className="rounded-lg border overflow-hidden">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b bg-muted/50">
+            <th className="text-left px-3 py-2 font-medium">Category</th>
+            <th className="text-right px-3 py-2 font-medium">For</th>
+            <th className="text-right px-3 py-2 font-medium">Against</th>
+            <th className="text-right px-3 py-2 font-medium">Diff</th>
+            <th className="text-right px-3 py-2 font-medium">Win %</th>
+            <th className="text-right px-3 py-2 font-medium">EV</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.category} className="border-b last:border-b-0">
+              <td className="px-3 py-2">{row.label}</td>
+              <td className="text-right px-3 py-2 tabular-nums">{row.hitsFor}</td>
+              <td className="text-right px-3 py-2 tabular-nums">{row.hitsAgainst}</td>
+              <td className="text-right px-3 py-2 tabular-nums">
+                <span className={
+                  row.differential > 0
+                    ? "text-green-600 dark:text-green-400"
+                    : row.differential < 0
+                      ? "text-red-600 dark:text-red-400"
+                      : ""
+                }>
+                  {row.differential > 0 ? "+" : ""}{row.differential}
+                </span>
+              </td>
+              <td className="text-right px-3 py-2 tabular-nums">
+                {row.winRate != null ? `${Math.round(row.winRate * 100)}%` : "–"}
+              </td>
+              <td className="text-right px-3 py-2 tabular-nums">
+                {row.expectedValue != null ? (
+                  <span className={
+                    row.expectedValue > 0
+                      ? "text-green-600 dark:text-green-400"
+                      : row.expectedValue < 0
+                        ? "text-red-600 dark:text-red-400"
+                        : ""
+                  }>
+                    {row.expectedValue > 0 ? "+" : ""}{row.expectedValue.toFixed(2)}
+                  </span>
+                ) : "–"}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 export function BoutStats({
@@ -19,12 +74,18 @@ export function BoutStats({
 }: BoutStatsProps) {
   const [perspective, setPerspective] = useState<Side>("L");
 
-  const stats = useMemo(
+  const tacticalStats = useMemo(
     () => computeTacticalStats(tags, perspective),
     [tags, perspective],
   );
 
-  const hasData = stats.some((r) => r.hitsFor > 0 || r.hitsAgainst > 0);
+  const defMatchupStats = useMemo(
+    () => computeDefMatchupStats(tags, perspective),
+    [tags, perspective],
+  );
+
+  const allRows = [...tacticalStats, ...defMatchupStats];
+  const hasData = allRows.some((r) => r.hitsFor > 0 || r.hitsAgainst > 0);
 
   return (
     <div>
@@ -57,55 +118,9 @@ export function BoutStats({
           No scoring events yet.
         </p>
       ) : (
-        <div className="rounded-lg border overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-muted/50">
-                <th className="text-left px-3 py-2 font-medium">Category</th>
-                <th className="text-right px-3 py-2 font-medium">For</th>
-                <th className="text-right px-3 py-2 font-medium">Against</th>
-                <th className="text-right px-3 py-2 font-medium">Diff</th>
-                <th className="text-right px-3 py-2 font-medium">Win %</th>
-                <th className="text-right px-3 py-2 font-medium">EV</th>
-              </tr>
-            </thead>
-            <tbody>
-              {stats.map((row) => (
-                <tr key={row.category} className="border-b last:border-b-0">
-                  <td className="px-3 py-2 capitalize">{row.category}</td>
-                  <td className="text-right px-3 py-2 tabular-nums">{row.hitsFor}</td>
-                  <td className="text-right px-3 py-2 tabular-nums">{row.hitsAgainst}</td>
-                  <td className="text-right px-3 py-2 tabular-nums">
-                    <span className={
-                      row.differential > 0
-                        ? "text-green-600 dark:text-green-400"
-                        : row.differential < 0
-                          ? "text-red-600 dark:text-red-400"
-                          : ""
-                    }>
-                      {row.differential > 0 ? "+" : ""}{row.differential}
-                    </span>
-                  </td>
-                  <td className="text-right px-3 py-2 tabular-nums">
-                    {row.winRate != null ? `${Math.round(row.winRate * 100)}%` : "–"}
-                  </td>
-                  <td className="text-right px-3 py-2 tabular-nums">
-                    {row.expectedValue != null ? (
-                      <span className={
-                        row.expectedValue > 0
-                          ? "text-green-600 dark:text-green-400"
-                          : row.expectedValue < 0
-                            ? "text-red-600 dark:text-red-400"
-                            : ""
-                      }>
-                        {row.expectedValue > 0 ? "+" : ""}{row.expectedValue.toFixed(2)}
-                      </span>
-                    ) : "–"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="space-y-4">
+          <StatsTable rows={tacticalStats} />
+          <StatsTable rows={defMatchupStats} />
         </div>
       )}
     </div>

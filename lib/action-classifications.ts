@@ -1,59 +1,71 @@
 import type { ActionCode } from "@/lib/types";
 
 export type TacticalIntent = "offense" | "defense";
+export type DefAlternative = "P" | "C" | "AP";
+
+interface ActionClassification {
+  tacticalIntent: TacticalIntent | null;
+  scoringDefAlt?: DefAlternative;
+  receivingDefAlt?: DefAlternative;
+}
 
 /**
- * Maps each ActionCode to its tactical intent.
- * Actions with no tactical intent (cards, blood) map to null.
+ * All classification dimensions for each ActionCode in a single lookup,
+ * sorted alphabetically to match ACTION_CODES in types.ts.
+ *
+ * - tacticalIntent: offense or defense (null for cards/blood)
+ * - scoringDefAlt: for defensive actions, what defense the scoring fencer used
+ * - receivingDefAlt: for offensive actions, what defense the non-scoring fencer attempted
  */
-const TACTICAL_INTENT: Record<ActionCode, TacticalIntent | null> = {
-  // Offensive actions (attacks, attack preparations, counter-attacks)
-  "A,R": "offense",
-  "A,R,R": "offense",
-  "A,R-P": "offense",
-  "A-A": "offense",
-  "A-AP": "offense",
-  "A-Cc": "offense",
-  "A-Csh": "offense",
-  "A-D": "offense",
-  "A-L": "offense",
-  "A-P": "offense",
-  "AN-P": "offense",
-  "AN-R": "offense",
-  "AP-A": "offense",
-  "AP-P": "offense",
-  "AP,R": "offense",
-  "AR,R": "offense",
-  "L-A": "offense",
-
-  // Defensive actions (ripostes, counter-ripostes, counter-attacks, counter-time)
-  "Cc-A": "defense",
-  "Cc-AP": "defense",
-  "Cc-CT": "defense",
-  "CCR-R": "defense",
-  "CCR-P": "defense",
-  "CR,R": "defense",
-  "CR-P": "defense",
-  "CR-R": "defense",
-  "Csh-A": "defense",
-  "CT-R": "defense",
-  "CT-P": "defense",
-  "C,R-CT": "defense",
-  "R,R": "defense",
-  "R-AP,P": "defense",
-  "R-AP,R": "defense",
-  "R-CT,R": "defense",
-  "R-P": "defense",
-  "R-R": "defense",
-
-  // Non-scoring / no tactical intent
-  "bl": null,
-  "rc": null,
-  "yc": null,
+const CLASSIFICATIONS: Record<ActionCode, ActionClassification> = {
+  "A,R":     { tacticalIntent: "offense", receivingDefAlt: "P" },
+  "A,R,R":   { tacticalIntent: "offense", receivingDefAlt: "P" },
+  "A,R-P":   { tacticalIntent: "offense", receivingDefAlt: "P" },
+  "A-A":     { tacticalIntent: "offense" },
+  "A-AP":    { tacticalIntent: "offense", receivingDefAlt: "AP" },
+  "A-Cc":    { tacticalIntent: "offense", receivingDefAlt: "C" },
+  "A-Csh":   { tacticalIntent: "offense", receivingDefAlt: "C" },
+  "A-D":     { tacticalIntent: "offense", receivingDefAlt: "P" },
+  "A-L":     { tacticalIntent: "offense", receivingDefAlt: "AP" },
+  "A-P":     { tacticalIntent: "offense", receivingDefAlt: "P" },
+  "AN-P":    { tacticalIntent: "defense", scoringDefAlt: "P" },
+  "AN-R":    { tacticalIntent: "defense", scoringDefAlt: "P" },
+  "AP-A":    { tacticalIntent: "defense", scoringDefAlt: "AP" },
+  "AP-P":    { tacticalIntent: "defense", scoringDefAlt: "AP" },
+  "AP,R":    { tacticalIntent: "defense", scoringDefAlt: "AP" },
+  "AR,R":    { tacticalIntent: "offense", receivingDefAlt: "P" },
+  "bl":      { tacticalIntent: null },
+  "Cc-A":    { tacticalIntent: "defense", scoringDefAlt: "C" },
+  "Cc-AP":   { tacticalIntent: "defense", scoringDefAlt: "C" },
+  "Cc-CT":   { tacticalIntent: "defense", scoringDefAlt: "C" },
+  "CCR-R":   { tacticalIntent: "defense", scoringDefAlt: "P" },
+  "CCR-P":   { tacticalIntent: "defense", scoringDefAlt: "P" },
+  "CR,R":    { tacticalIntent: "offense", receivingDefAlt: "P" },
+  "CR-P":    { tacticalIntent: "offense", receivingDefAlt: "P" },
+  "CR-R":    { tacticalIntent: "offense", receivingDefAlt: "P" },
+  "Csh-A":   { tacticalIntent: "defense", scoringDefAlt: "C" },
+  "CT-R":    { tacticalIntent: "offense", receivingDefAlt: "C" },
+  "CT-P":    { tacticalIntent: "offense", receivingDefAlt: "C" },
+  "C,R-CT":  { tacticalIntent: "defense", scoringDefAlt: "C" },
+  "L-A":     { tacticalIntent: "defense", scoringDefAlt: "AP" },
+  "R,R":     { tacticalIntent: "defense", scoringDefAlt: "P" },
+  "R-AP,P":  { tacticalIntent: "offense", receivingDefAlt: "AP" },
+  "R-AP,R":  { tacticalIntent: "offense", receivingDefAlt: "AP" },
+  "R-CT,R":  { tacticalIntent: "defense" },
+  "R-P":     { tacticalIntent: "defense", scoringDefAlt: "P" },
+  "R-R":     { tacticalIntent: "defense", scoringDefAlt: "P" },
+  "rc":      { tacticalIntent: null },
+  "yc":      { tacticalIntent: null },
 };
 
-export function getTacticalIntent(
-  action: ActionCode,
-): TacticalIntent | null {
-  return TACTICAL_INTENT[action];
+export function getTacticalIntent(action: ActionCode): TacticalIntent | null {
+  return CLASSIFICATIONS[action].tacticalIntent;
+}
+
+export function getScoringDefAlternative(action: ActionCode): DefAlternative | undefined {
+  return CLASSIFICATIONS[action].scoringDefAlt;
+}
+
+export function getReceivingDefAlternative(action: ActionCode): DefAlternative | undefined {
+  return CLASSIFICATIONS[action].receivingDefAlt;
 }

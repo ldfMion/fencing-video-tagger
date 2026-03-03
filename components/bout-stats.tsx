@@ -2,6 +2,14 @@
 
 import { useMemo, useState } from "react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { SIDE_COLORS } from "@/lib/constants";
 import { computeTacticalStats, computeDefMatchupStats, type StatRow } from "@/lib/stats";
 import type { Tag, Side } from "@/lib/types";
@@ -14,56 +22,62 @@ interface BoutStatsProps {
 
 function StatsTable({ rows }: { rows: StatRow[] }) {
   return (
-    <div className="rounded-lg border overflow-hidden">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b bg-muted/50">
-            <th className="text-left px-3 py-2 font-medium">Category</th>
-            <th className="text-right px-3 py-2 font-medium">For</th>
-            <th className="text-right px-3 py-2 font-medium">Against</th>
-            <th className="text-right px-3 py-2 font-medium">Diff</th>
-            <th className="text-right px-3 py-2 font-medium">Win %</th>
-            <th className="text-right px-3 py-2 font-medium">EV</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.category} className="border-b last:border-b-0">
-              <td className="px-3 py-2">{row.label}</td>
-              <td className="text-right px-3 py-2 tabular-nums">{row.hitsFor}</td>
-              <td className="text-right px-3 py-2 tabular-nums">{row.hitsAgainst}</td>
-              <td className="text-right px-3 py-2 tabular-nums">
-                <span className={
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead className="text-left">Category</TableHead>
+          <TableHead className="text-right">For</TableHead>
+          <TableHead className="text-right">Against</TableHead>
+          <TableHead className="text-right">Diff</TableHead>
+          <TableHead className="text-right">Win %</TableHead>
+          <TableHead className="text-right">EV</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((row) => (
+          <TableRow key={row.category}>
+            <TableCell>{row.label}</TableCell>
+            <TableCell className="text-right tabular-nums">{row.hitsFor}</TableCell>
+            <TableCell className="text-right tabular-nums">{row.hitsAgainst}</TableCell>
+            <TableCell className="text-right tabular-nums">
+              <span
+                className={
                   row.differential > 0
                     ? "text-green-600 dark:text-green-400"
                     : row.differential < 0
                       ? "text-red-600 dark:text-red-400"
                       : ""
-                }>
-                  {row.differential > 0 ? "+" : ""}{row.differential}
-                </span>
-              </td>
-              <td className="text-right px-3 py-2 tabular-nums">
-                {row.winRate != null ? `${Math.round(row.winRate * 100)}%` : "–"}
-              </td>
-              <td className="text-right px-3 py-2 tabular-nums">
-                {row.expectedValue != null ? (
-                  <span className={
+                }
+              >
+                {row.differential > 0 ? "+" : ""}
+                {row.differential}
+              </span>
+            </TableCell>
+            <TableCell className="text-right tabular-nums">
+              {row.winRate != null ? `${Math.round(row.winRate * 100)}%` : "–"}
+            </TableCell>
+            <TableCell className="text-right tabular-nums">
+              {row.expectedValue != null ? (
+                <span
+                  className={
                     row.expectedValue > 0
                       ? "text-green-600 dark:text-green-400"
                       : row.expectedValue < 0
                         ? "text-red-600 dark:text-red-400"
                         : ""
-                  }>
-                    {row.expectedValue > 0 ? "+" : ""}{row.expectedValue.toFixed(2)}
-                  </span>
-                ) : "–"}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+                  }
+                >
+                  {row.expectedValue > 0 ? "+" : ""}
+                  {row.expectedValue.toFixed(2)}
+                </span>
+              ) : (
+                "–"
+              )}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 }
 

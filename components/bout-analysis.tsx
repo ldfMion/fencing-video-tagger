@@ -32,22 +32,30 @@ export function BoutAnalysis({
   const rightBadge = SIDE_COLORS.right.badge;
 
   return (
-    <div className="space-y-6 p-4 max-w-4xl mx-auto">
+    <div className="space-y-6 p-4 max-w-6xl mx-auto">
       {/* Score Card */}
       <div className="rounded-lg border bg-card p-6">
         <div className="flex items-center justify-center gap-6">
           <div className="text-right flex-1">
-            <p className={`text-sm mb-1 ${leftWins ? `font-semibold ${leftColor}` : "text-muted-foreground"}`}>
+            <p
+              className={`text-sm mb-1 ${leftWins ? `font-semibold ${leftColor}` : "text-muted-foreground"}`}
+            >
               {leftFencer}
             </p>
-            <p className={`text-4xl font-bold tabular-nums ${leftColor}`}>{finalLeft}</p>
+            <p className={`text-4xl font-bold tabular-nums ${leftColor}`}>
+              {finalLeft}
+            </p>
           </div>
           <span className="text-2xl text-muted-foreground">–</span>
           <div className="text-left flex-1">
-            <p className={`text-sm mb-1 ${rightWins ? `font-semibold ${rightColor}` : "text-muted-foreground"}`}>
+            <p
+              className={`text-sm mb-1 ${rightWins ? `font-semibold ${rightColor}` : "text-muted-foreground"}`}
+            >
               {rightFencer}
             </p>
-            <p className={`text-4xl font-bold tabular-nums ${rightColor}`}>{finalRight}</p>
+            <p className={`text-4xl font-bold tabular-nums ${rightColor}`}>
+              {finalRight}
+            </p>
           </div>
         </div>
       </div>
@@ -72,12 +80,21 @@ export function BoutAnalysis({
             <ScrollArea className="h-[calc(100vh-320px)]">
               <div className="space-y-1">
                 {scoringEvents.map((event) => {
-                  const isCard = event.tag.action === "yc" || event.tag.action === "rc";
+                  const isCard =
+                    event.tag.action === "yc" || event.tag.action === "rc";
                   const isRedCard = event.tag.action === "rc";
                   const isYellowCard = event.tag.action === "yc";
 
-                  const highlightLeft = isYellowCard ? false : isRedCard ? event.tag.side === "R" : event.tag.side === "L";
-                  const highlightRight = isYellowCard ? false : isRedCard ? event.tag.side === "L" : event.tag.side === "R";
+                  const highlightLeft = isYellowCard
+                    ? false
+                    : isRedCard
+                      ? event.tag.side === "R"
+                      : event.tag.side === "L";
+                  const highlightRight = isYellowCard
+                    ? false
+                    : isRedCard
+                      ? event.tag.side === "L"
+                      : event.tag.side === "R";
 
                   const badgeClass = isCard
                     ? "text-xs px-1.5 py-0"
@@ -99,11 +116,19 @@ export function BoutAnalysis({
 
                       {/* Center: score */}
                       <span className="text-sm tabular-nums text-center mx-4">
-                        <span className={highlightLeft ? `font-bold ${leftColor}` : ""}>
+                        <span
+                          className={
+                            highlightLeft ? `font-bold ${leftColor}` : ""
+                          }
+                        >
                           {event.leftScore}
                         </span>
                         <span className="text-muted-foreground"> - </span>
-                        <span className={highlightRight ? `font-bold ${rightColor}` : ""}>
+                        <span
+                          className={
+                            highlightRight ? `font-bold ${rightColor}` : ""
+                          }
+                        >
                           {event.rightScore}
                         </span>
                       </span>

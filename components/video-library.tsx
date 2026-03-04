@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Trash2, Swords, FileVideo } from "lucide-react";
 import { SIDE_COLORS } from "@/lib/constants";
@@ -21,15 +23,40 @@ function formatBoutDate(session: VideoSession): string {
   });
 }
 
-function getBoutTitle(session: VideoSession): string {
+function FencerLink({ name }: { name: string }) {
+  return (
+    <Link
+      href={`/fencers/${encodeURIComponent(name)}`}
+      onClick={(e) => e.stopPropagation()}
+      className="hover:underline"
+    >
+      {name}
+    </Link>
+  );
+}
+
+function getBoutTitle(session: VideoSession): ReactNode {
   if (session.leftFencer && session.rightFencer) {
-    return `${session.leftFencer} vs ${session.rightFencer}`;
+    return (
+      <>
+        <FencerLink name={session.leftFencer} /> vs{" "}
+        <FencerLink name={session.rightFencer} />
+      </>
+    );
   }
   if (session.leftFencer) {
-    return `${session.leftFencer} vs ?`;
+    return (
+      <>
+        <FencerLink name={session.leftFencer} /> vs ?
+      </>
+    );
   }
   if (session.rightFencer) {
-    return `? vs ${session.rightFencer}`;
+    return (
+      <>
+        ? vs <FencerLink name={session.rightFencer} />
+      </>
+    );
   }
   return session.fileName ?? "Untitled Bout";
 }

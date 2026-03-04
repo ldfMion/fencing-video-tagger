@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { VideoLibrary } from "@/components/video-library";
 import { ExportButton } from "@/components/export-button";
+import { ImportButton } from "@/components/import-button";
 import { NewBoutDialog } from "@/components/new-bout-dialog";
 import { useSessions } from "@/hooks/use-sessions";
 import { useVideoContext } from "@/contexts/video-context";
@@ -126,6 +127,7 @@ export default function Home() {
             <h1 className="text-2xl font-bold">Fencing Video Tagger</h1>
           </div>
           <div className="flex items-center gap-2">
+            <ImportButton />
             <ExportButton
               exportToCSV={exportToCSV}
               disabled={sessions.length === 0}

@@ -108,7 +108,7 @@ export function VideoLibrary({
             const hasScore = session.tags.some((t) => t.side && t.action);
             const leftWins = score.left > score.right;
             const rightWins = score.right > score.left;
-            const isActive = session.fileName === currentFileName;
+            const isActive = currentFileName != null && session.fileName === currentFileName;
 
             return (
               <tr

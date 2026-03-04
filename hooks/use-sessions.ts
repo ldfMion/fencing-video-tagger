@@ -375,6 +375,23 @@ export function useSessions() {
     );
   }, [currentSessions]);
 
+  const importSessions = useCallback(
+    (
+      incoming: VideoSession[]
+    ): { imported: number; skipped: number } => {
+      const existingIds = new Set(currentSessions.map((s) => s.id));
+      const newSessions = incoming.filter((s) => !existingIds.has(s.id));
+      const skipped = incoming.length - newSessions.length;
+
+      if (newSessions.length > 0) {
+        updateSessions((prev) => [...prev, ...newSessions]);
+      }
+
+      return { imported: newSessions.length, skipped };
+    },
+    [currentSessions]
+  );
+
   return {
     sessions: currentSessions,
     allFencerNames,
@@ -388,5 +405,6 @@ export function useSessions() {
     deleteSession,
     updateSession,
     exportToCSV,
+    importSessions,
   };
 }

@@ -25,11 +25,14 @@ export const ACTION_CODES = [
   "CCR-R",
   "CCR-P",
   "CR,R",
+  "CR,R,R,R",
   "CR-P",
   "CR-R",
   "Csh-A",
   "CT-R",
   "CT-P",
+  "C,R",
+  "C,R,R",
   "C,R-CT",
   "L-A",
   "R,R",
@@ -73,6 +76,7 @@ export const VideoSessionSchema = z.object({
   leftFencer: z.string().optional(),
   rightFencer: z.string().optional(),
   boutDate: z.string().optional(), // ISO date string
+  boutType: z.string().optional(), // e.g. "pool", "DE", "team"
   externalSource: z.string().optional(), // URL or reference note
 });
 

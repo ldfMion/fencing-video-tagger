@@ -3,9 +3,10 @@
 import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Swords } from "lucide-react";
+import { ArrowLeft, Swords, ChevronDown, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { StatsTable } from "@/components/stats-table";
 import { useSessions } from "@/hooks/use-sessions";
 import { getSessionsForFencer, normalizeTagsForFencer } from "@/lib/fencer-stats";
@@ -13,6 +14,7 @@ import { computeScore } from "@/lib/score";
 import { computeTacticalStats, computeDefMatchupStats } from "@/lib/stats";
 import { SIDE_COLORS } from "@/lib/constants";
 import { X } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export default function FencerPage() {
   const params = useParams<{ name: string }>();
@@ -21,11 +23,22 @@ export default function FencerPage() {
 
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [selectedOpponents, setSelectedOpponents] = useState<string[]>([]);
 
   const fencerSessions = useMemo(
     () => getSessionsForFencer(sessions, fencerName),
     [sessions, fencerName],
   );
+
+  const uniqueOpponents = useMemo(() => {
+    const names = new Set<string>();
+    for (const s of fencerSessions) {
+      const isLeft = s.leftFencer?.toLowerCase() === fencerName.toLowerCase();
+      const opponent = isLeft ? s.rightFencer : s.leftFencer;
+      if (opponent) names.add(opponent);
+    }
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }, [fencerSessions, fencerName]);
 
   const filteredSessions = useMemo(() => {
     let result = fencerSessions;
@@ -35,8 +48,15 @@ export default function FencerPage() {
     if (dateTo) {
       result = result.filter((s) => s.boutDate && s.boutDate <= dateTo);
     }
+    if (selectedOpponents.length > 0) {
+      result = result.filter((s) => {
+        const isLeft = s.leftFencer?.toLowerCase() === fencerName.toLowerCase();
+        const opponent = isLeft ? s.rightFencer : s.leftFencer;
+        return opponent != null && selectedOpponents.includes(opponent);
+      });
+    }
     return result;
-  }, [fencerSessions, dateFrom, dateTo]);
+  }, [fencerSessions, dateFrom, dateTo, selectedOpponents, fencerName]);
 
   const normalizedTags = useMemo(
     () => normalizeTagsForFencer(filteredSessions, fencerName),
@@ -84,7 +104,7 @@ export default function FencerPage() {
     };
   }, [filteredSessions, fencerName]);
 
-  const hasFilters = dateFrom || dateTo;
+  const hasFilters = dateFrom || dateTo || selectedOpponents.length > 0;
 
   const sortedBouts = useMemo(
     () =>
@@ -141,7 +161,7 @@ export default function FencerPage() {
           )}
         </div>
 
-        {/* Date filter */}
+        {/* Filters */}
         <div className="flex gap-2 items-center mb-6">
           <Input
             type="date"
@@ -158,6 +178,39 @@ export default function FencerPage() {
             className="w-[150px]"
             aria-label="To date"
           />
+          {uniqueOpponents.length > 1 && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="gap-1.5 text-sm font-normal">
+                  {selectedOpponents.length === 0
+                    ? "All opponents"
+                    : selectedOpponents.length === 1
+                      ? selectedOpponents[0]
+                      : `${selectedOpponents.length} opponents`}
+                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="p-1 w-48" align="start">
+                {uniqueOpponents.map((name) => {
+                  const selected = selectedOpponents.includes(name);
+                  return (
+                    <button
+                      key={name}
+                      className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-muted text-left"
+                      onClick={() =>
+                        setSelectedOpponents((prev) =>
+                          selected ? prev.filter((n) => n !== name) : [...prev, name]
+                        )
+                      }
+                    >
+                      <Check className={cn("h-3.5 w-3.5 shrink-0", selected ? "opacity-100" : "opacity-0")} />
+                      {name}
+                    </button>
+                  );
+                })}
+              </PopoverContent>
+            </Popover>
+          )}
           {hasFilters && (
             <Button
               variant="ghost"
@@ -165,6 +218,7 @@ export default function FencerPage() {
               onClick={() => {
                 setDateFrom("");
                 setDateTo("");
+                setSelectedOpponents([]);
               }}
             >
               <X className="h-4 w-4" />

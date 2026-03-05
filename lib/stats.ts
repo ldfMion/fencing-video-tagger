@@ -11,6 +11,7 @@ export interface StatRow<C extends string = string> {
   label: string;
   hitsFor: number;
   hitsAgainst: number;
+  total: number;
   differential: number;
   winRate: number | null;
   expectedValue: number | null;
@@ -91,6 +92,7 @@ export function computeStats<C extends string>(
       label: labelOf.get(cat) ?? cat,
       hitsFor,
       hitsAgainst,
+      total,
       differential,
       winRate,
       expectedValue,

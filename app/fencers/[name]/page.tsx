@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowLeft, Swords, ChevronDown, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { StatsTable } from "@/components/stats-table";
 import { useSessions } from "@/hooks/use-sessions";
@@ -24,6 +25,7 @@ export default function FencerPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [selectedOpponents, setSelectedOpponents] = useState<string[]>([]);
+  const [opponentSearch, setOpponentSearch] = useState("");
 
   const fencerSessions = useMemo(
     () => getSessionsForFencer(sessions, fencerName),
@@ -115,6 +117,42 @@ export default function FencerPage() {
     [filteredSessions],
   );
 
+  const commentedTags = useMemo(() => {
+    const result: {
+      comment: string;
+      side?: string;
+      action?: string;
+      boutId: string;
+      boutOpponent: string;
+      boutDate?: string;
+    }[] = [];
+
+    for (const session of filteredSessions) {
+      const isLeft = session.leftFencer?.toLowerCase() === fencerName.toLowerCase();
+      const opponent = isLeft ? session.rightFencer ?? "?" : session.leftFencer ?? "?";
+
+      for (const tag of session.tags) {
+        if (!tag.comment?.trim()) continue;
+
+        // Normalize side so fencer is always "L"
+        let normalizedSide = tag.side;
+        if (!isLeft && normalizedSide === "L") normalizedSide = "R";
+        else if (!isLeft && normalizedSide === "R") normalizedSide = "L";
+
+        result.push({
+          comment: tag.comment.trim(),
+          side: normalizedSide,
+          action: tag.action,
+          boutId: session.id,
+          boutOpponent: opponent,
+          boutDate: session.boutDate,
+        });
+      }
+    }
+
+    return result;
+  }, [filteredSessions, fencerName]);
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto py-6 px-4 max-w-4xl">
@@ -191,23 +229,35 @@ export default function FencerPage() {
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="p-1 w-48" align="start">
-                {uniqueOpponents.map((name) => {
-                  const selected = selectedOpponents.includes(name);
-                  return (
-                    <button
-                      key={name}
-                      className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-muted text-left"
-                      onClick={() =>
-                        setSelectedOpponents((prev) =>
-                          selected ? prev.filter((n) => n !== name) : [...prev, name]
-                        )
-                      }
-                    >
-                      <Check className={cn("h-3.5 w-3.5 shrink-0", selected ? "opacity-100" : "opacity-0")} />
-                      {name}
-                    </button>
-                  );
-                })}
+                <Input
+                  placeholder="Search..."
+                  value={opponentSearch}
+                  onChange={(e) => setOpponentSearch(e.target.value)}
+                  className="h-8 mb-1 text-sm"
+                />
+                <div className="max-h-[250px] overflow-y-auto">
+                  {uniqueOpponents
+                    .filter((name) =>
+                      name.toLowerCase().includes(opponentSearch.toLowerCase())
+                    )
+                    .map((name) => {
+                      const selected = selectedOpponents.includes(name);
+                      return (
+                        <button
+                          key={name}
+                          className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-muted text-left"
+                          onClick={() =>
+                            setSelectedOpponents((prev) =>
+                              selected ? prev.filter((n) => n !== name) : [...prev, name]
+                            )
+                          }
+                        >
+                          <Check className={cn("h-3.5 w-3.5 shrink-0", selected ? "opacity-100" : "opacity-0")} />
+                          {name}
+                        </button>
+                      );
+                    })}
+                </div>
               </PopoverContent>
             </Popover>
           )}
@@ -241,7 +291,7 @@ export default function FencerPage() {
 
         {/* Bout list */}
         {sortedBouts.length > 0 && (
-          <div>
+          <div className="mb-8">
             <h3 className="text-sm font-medium mb-3">Bouts</h3>
             <div className="rounded-lg border overflow-hidden">
               <table className="w-full text-sm">
@@ -311,6 +361,58 @@ export default function FencerPage() {
                   })}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+        {/* Comments section */}
+        {commentedTags.length > 0 && (
+          <div>
+            <h3 className="text-sm font-medium mb-3">Comments</h3>
+            <div className="rounded-lg border overflow-hidden">
+              {commentedTags.map((item, i) => (
+                <div
+                  key={i}
+                  className="flex items-start gap-3 px-3 py-2.5 border-b last:border-b-0 text-sm hover:bg-muted/50 transition-colors"
+                >
+                  <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
+                    {item.side && (
+                      <Badge
+                        variant="secondary"
+                        className={cn(
+                          "text-xs px-1.5 py-0",
+                          item.side === "L"
+                            ? SIDE_COLORS.left.badge
+                            : SIDE_COLORS.right.badge,
+                        )}
+                      >
+                        {item.side === "L" ? "Scored" : "Received"}
+                      </Badge>
+                    )}
+                    {item.action && (
+                      <span className="font-mono text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                        {item.action}
+                      </span>
+                    )}
+                  </div>
+                  <span className="flex-1 text-foreground">{item.comment}</span>
+                  <Link
+                    href={`/bouts/${item.boutId}`}
+                    className="shrink-0 text-xs text-muted-foreground hover:underline text-right"
+                  >
+                    vs {item.boutOpponent}
+                    {item.boutDate && (
+                      <>
+                        <br />
+                        {new Date(item.boutDate).toLocaleDateString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
+                      </>
+                    )}
+                  </Link>
+                </div>
+              ))}
             </div>
           </div>
         )}

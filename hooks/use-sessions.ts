@@ -157,6 +157,7 @@ export interface AddTagParams {
 }
 
 export interface UpdateSessionParams {
+  fileName?: string;
   leftFencer?: string;
   rightFencer?: string;
   boutDate?: string;
@@ -185,7 +186,14 @@ export function useSessions() {
   );
 
   const createSessionWithVideo = useCallback(
-    (fileName: string, fileLastModified?: number): VideoSession => {
+    (
+      fileName: string,
+      fileLastModified?: number,
+      params?: Partial<Pick<VideoSession, "leftFencer" | "rightFencer" | "boutDate" | "externalSource">>
+    ): VideoSession => {
+      const definedParams = Object.fromEntries(
+        Object.entries(params ?? {}).filter(([, v]) => v !== undefined),
+      );
       const newSession: VideoSession = {
         id: generateId(),
         fileName,
@@ -194,6 +202,7 @@ export function useSessions() {
         ...(fileLastModified != null && {
           boutDate: new Date(fileLastModified).toISOString().split("T")[0],
         }),
+        ...definedParams,
       };
 
       updateSessions((prev) => [...prev, newSession]);

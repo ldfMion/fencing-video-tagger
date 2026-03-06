@@ -93,18 +93,7 @@ export default function Home() {
       const url = URL.createObjectURL(file);
       setVideo(url, file.name);
 
-      const session = createSessionWithVideo(file.name, file.lastModified);
-      // Merge metadata params if provided
-      if (
-        params.leftFencer ||
-        params.rightFencer ||
-        params.boutDate ||
-        params.externalSource
-      ) {
-        // These would be set through metadata form updates after navigation
-        // For now, just navigate - user can edit metadata on bout page
-      }
-
+      const session = createSessionWithVideo(file.name, file.lastModified, params);
       router.push(`/bouts/${session.id}`);
       return session;
     },

@@ -49,6 +49,10 @@ export default function BoutPage() {
       const url = URL.createObjectURL(file);
       setVideo(url, file.name);
 
+      if (session && !session.fileName) {
+        updateSession(session.id, { fileName: file.name });
+      }
+
       if (session && !session.boutDate) {
         updateSession(session.id, {
           boutDate: new Date(file.lastModified).toISOString().split("T")[0],

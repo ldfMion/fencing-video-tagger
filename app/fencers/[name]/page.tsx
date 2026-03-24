@@ -7,8 +7,11 @@ import { ArrowLeft, Swords, ChevronDown, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { StatsTable } from "@/components/stats-table";
+import { FencerCharts } from "@/components/fencer-charts";
 import { useSessions } from "@/hooks/use-sessions";
 import { getSessionsForFencer, normalizeTagsForFencer } from "@/lib/fencer-stats";
 import { computeScore } from "@/lib/score";
@@ -106,6 +109,8 @@ export default function FencerPage() {
     };
   }, [filteredSessions, fencerName]);
 
+  const winRate = wins + losses > 0 ? Math.round((wins / (wins + losses)) * 100) : null;
+
   const hasFilters = dateFrom || dateTo || selectedOpponents.length > 0;
 
   const sortedBouts = useMemo(
@@ -167,40 +172,53 @@ export default function FencerPage() {
           <h1 className="text-2xl font-bold">{fencerName}</h1>
         </div>
 
-        {/* Summary */}
-        <div className="flex flex-wrap gap-4 mb-6 text-sm">
-          <div>
-            <span className="text-muted-foreground">Bouts:</span>{" "}
-            <span className="font-medium">{filteredSessions.length}</span>
-          </div>
-          <div>
-            <span className="text-muted-foreground">Record:</span>{" "}
-            <span className="font-medium">
-              {wins}W - {losses}L
-            </span>
-          </div>
-          {dateRange && (
-            <div>
-              <span className="text-muted-foreground">Range:</span>{" "}
-              <span className="font-medium">
-                {new Date(dateRange.from).toLocaleDateString(undefined, {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                })}
-                {" \u2013 "}
-                {new Date(dateRange.to).toLocaleDateString(undefined, {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                })}
-              </span>
-            </div>
-          )}
+        {/* Summary Cards */}
+        <div className="grid grid-cols-3 gap-3 mb-6">
+          <Card className="py-4 gap-2">
+            <CardHeader className="px-4 pb-0">
+              <CardDescription>Bouts</CardDescription>
+            </CardHeader>
+            <CardContent className="px-4">
+              <CardTitle className="text-2xl">{filteredSessions.length}</CardTitle>
+            </CardContent>
+          </Card>
+          <Card className="py-4 gap-2">
+            <CardHeader className="px-4 pb-0">
+              <CardDescription>Record</CardDescription>
+            </CardHeader>
+            <CardContent className="px-4">
+              <CardTitle className="text-2xl tabular-nums">
+                {wins}W – {losses}L
+              </CardTitle>
+            </CardContent>
+          </Card>
+          <Card className="py-4 gap-2">
+            <CardHeader className="px-4 pb-0">
+              <CardDescription>Win Rate</CardDescription>
+            </CardHeader>
+            <CardContent className="px-4">
+              <CardTitle className="text-2xl tabular-nums">
+                {winRate != null ? `${winRate}%` : "—"}
+              </CardTitle>
+              {dateRange && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {new Date(dateRange.from).toLocaleDateString(undefined, {
+                    month: "short",
+                    year: "numeric",
+                  })}
+                  {" – "}
+                  {new Date(dateRange.to).toLocaleDateString(undefined, {
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </p>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         {/* Filters */}
-        <div className="flex gap-2 items-center mb-6">
+        <div className="flex gap-2 items-center mb-6 flex-wrap">
           <Input
             type="date"
             value={dateFrom}
@@ -276,146 +294,181 @@ export default function FencerPage() {
           )}
         </div>
 
-        {/* Stats tables */}
-        {!hasStatsData ? (
-          <p className="text-sm text-muted-foreground text-center py-4">
-            No scoring events yet.
-          </p>
-        ) : (
-          <div className="space-y-4 mb-8">
-            <h3 className="text-sm font-medium">Statistics</h3>
-            <StatsTable rows={tacticalStats} />
-            <StatsTable rows={defMatchupStats} />
-          </div>
-        )}
+        {/* Tabs */}
+        <Tabs defaultValue="statistics">
+          <TabsList className="mb-4">
+            <TabsTrigger value="statistics">Statistics</TabsTrigger>
+            <TabsTrigger value="bouts">
+              Bouts
+              {filteredSessions.length > 0 && (
+                <span className="ml-1 text-xs text-muted-foreground">
+                  ({filteredSessions.length})
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="comments">
+              Comments
+              {commentedTags.length > 0 && (
+                <span className="ml-1 text-xs text-muted-foreground">
+                  ({commentedTags.length})
+                </span>
+              )}
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Bout list */}
-        {sortedBouts.length > 0 && (
-          <div className="mb-8">
-            <h3 className="text-sm font-medium mb-3">Bouts</h3>
-            <div className="rounded-lg border overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/50 text-muted-foreground text-xs">
-                    <th className="text-left font-medium py-2 px-3">Opponent</th>
-                    <th className="text-center font-medium py-2 px-3 w-[100px]">Score</th>
-                    <th className="text-right font-medium py-2 px-3 w-[120px]">Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedBouts.map((session) => {
-                    const isLeft =
-                      session.leftFencer?.toLowerCase() === fencerName.toLowerCase();
-                    const opponent = isLeft
-                      ? session.rightFencer ?? "?"
-                      : session.leftFencer ?? "?";
-                    const score = computeScore(session.tags);
-                    const fencerScore = isLeft ? score.left : score.right;
-                    const opponentScore = isLeft ? score.right : score.left;
-                    const hasScore = session.tags.some((t) => t.side && t.action);
-                    const fencerWins = fencerScore > opponentScore;
-
-                    return (
-                      <tr
-                        key={session.id}
-                        className="border-b last:border-b-0 hover:bg-muted transition-colors"
-                      >
-                        <td className="py-2 px-3">
-                          <Link
-                            href={`/bouts/${session.id}`}
-                            className="hover:underline font-medium"
-                          >
-                            {opponent}
-                          </Link>
-                        </td>
-                        <td className="py-2 px-3 text-center tabular-nums">
-                          {hasScore ? (
-                            <>
-                              <span className={fencerWins ? "font-bold" : ""}>
-                                {fencerScore}
-                              </span>
-                              <span className="text-muted-foreground mx-1">-</span>
-                              <span className={!fencerWins && opponentScore > fencerScore ? "font-bold" : ""}>
-                                {opponentScore}
-                              </span>
-                            </>
-                          ) : (
-                            <span className="text-muted-foreground">--</span>
-                          )}
-                        </td>
-                        <td className="py-2 px-3 text-right text-muted-foreground text-xs">
-                          {session.boutDate
-                            ? new Date(session.boutDate).toLocaleDateString(undefined, {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              })
-                            : new Date(session.lastModified).toLocaleDateString(undefined, {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              })}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-        {/* Comments section */}
-        {commentedTags.length > 0 && (
-          <div>
-            <h3 className="text-sm font-medium mb-3">Comments</h3>
-            <div className="rounded-lg border overflow-hidden">
-              {commentedTags.map((item, i) => (
-                <div
-                  key={i}
-                  className="flex items-start gap-3 px-3 py-2.5 border-b last:border-b-0 text-sm hover:bg-muted/50 transition-colors"
-                >
-                  <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
-                    {item.side && (
-                      <Badge
-                        variant="secondary"
-                        className={cn(
-                          "text-xs px-1.5 py-0",
-                          item.side === "L"
-                            ? SIDE_COLORS.left.badge
-                            : SIDE_COLORS.right.badge,
-                        )}
-                      >
-                        {item.side === "L" ? "Scored" : "Received"}
-                      </Badge>
-                    )}
-                    {item.action && (
-                      <span className="font-mono text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                        {item.action}
-                      </span>
-                    )}
-                  </div>
-                  <span className="flex-1 text-foreground">{item.comment}</span>
-                  <Link
-                    href={`/bouts/${item.boutId}`}
-                    className="shrink-0 text-xs text-muted-foreground hover:underline text-right"
-                  >
-                    vs {item.boutOpponent}
-                    {item.boutDate && (
-                      <>
-                        <br />
-                        {new Date(item.boutDate).toLocaleDateString(undefined, {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })}
-                      </>
-                    )}
-                  </Link>
+          {/* Statistics Tab */}
+          <TabsContent value="statistics">
+            {!hasStatsData ? (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                No scoring events yet.
+              </p>
+            ) : (
+              <>
+                <FencerCharts
+                  tacticalStats={tacticalStats}
+                  defMatchupStats={defMatchupStats}
+                />
+                <div className="space-y-4">
+                  <StatsTable rows={tacticalStats} />
+                  <StatsTable rows={defMatchupStats} />
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
+              </>
+            )}
+          </TabsContent>
+
+          {/* Bouts Tab */}
+          <TabsContent value="bouts">
+            {sortedBouts.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">No bouts.</p>
+            ) : (
+              <div className="rounded-lg border overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/50 text-muted-foreground text-xs">
+                      <th className="text-left font-medium py-2 px-3">Opponent</th>
+                      <th className="text-center font-medium py-2 px-3 w-[100px]">Score</th>
+                      <th className="text-right font-medium py-2 px-3 w-[120px]">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedBouts.map((session) => {
+                      const isLeft =
+                        session.leftFencer?.toLowerCase() === fencerName.toLowerCase();
+                      const opponent = isLeft
+                        ? session.rightFencer ?? "?"
+                        : session.leftFencer ?? "?";
+                      const score = computeScore(session.tags);
+                      const fencerScore = isLeft ? score.left : score.right;
+                      const opponentScore = isLeft ? score.right : score.left;
+                      const hasScore = session.tags.some((t) => t.side && t.action);
+                      const fencerWins = fencerScore > opponentScore;
+
+                      return (
+                        <tr
+                          key={session.id}
+                          className="border-b last:border-b-0 hover:bg-muted transition-colors"
+                        >
+                          <td className="py-2 px-3">
+                            <Link
+                              href={`/bouts/${session.id}`}
+                              className="hover:underline font-medium"
+                            >
+                              {opponent}
+                            </Link>
+                          </td>
+                          <td className="py-2 px-3 text-center tabular-nums">
+                            {hasScore ? (
+                              <>
+                                <span className={fencerWins ? "font-bold" : ""}>
+                                  {fencerScore}
+                                </span>
+                                <span className="text-muted-foreground mx-1">-</span>
+                                <span className={!fencerWins && opponentScore > fencerScore ? "font-bold" : ""}>
+                                  {opponentScore}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="text-muted-foreground">--</span>
+                            )}
+                          </td>
+                          <td className="py-2 px-3 text-right text-muted-foreground text-xs">
+                            {session.boutDate
+                              ? new Date(session.boutDate).toLocaleDateString(undefined, {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                })
+                              : new Date(session.lastModified).toLocaleDateString(undefined, {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                })}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Comments Tab */}
+          <TabsContent value="comments">
+            {commentedTags.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                No comments yet.
+              </p>
+            ) : (
+              <div className="rounded-lg border overflow-hidden">
+                {commentedTags.map((item, i) => (
+                  <div
+                    key={i}
+                    className="flex items-start gap-3 px-3 py-2.5 border-b last:border-b-0 text-sm hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
+                      {item.side && (
+                        <Badge
+                          variant="secondary"
+                          className={cn(
+                            "text-xs px-1.5 py-0",
+                            item.side === "L"
+                              ? SIDE_COLORS.left.badge
+                              : SIDE_COLORS.right.badge,
+                          )}
+                        >
+                          {item.side === "L" ? "Scored" : "Received"}
+                        </Badge>
+                      )}
+                      {item.action && (
+                        <span className="font-mono text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                          {item.action}
+                        </span>
+                      )}
+                    </div>
+                    <span className="flex-1 text-foreground">{item.comment}</span>
+                    <Link
+                      href={`/bouts/${item.boutId}`}
+                      className="shrink-0 text-xs text-muted-foreground hover:underline text-right"
+                    >
+                      vs {item.boutOpponent}
+                      {item.boutDate && (
+                        <>
+                          <br />
+                          {new Date(item.boutDate).toLocaleDateString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
+                        </>
+                      )}
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

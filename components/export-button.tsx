@@ -3,6 +3,7 @@
 import { useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
+import { getTodayIsoDate } from "@/lib/date-utils";
 
 interface ExportButtonProps {
   exportToCSV: () => string;
@@ -15,9 +16,8 @@ export function ExportButton({ exportToCSV, disabled }: ExportButtonProps) {
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    const date = new Date().toISOString().split("T")[0];
     link.href = url;
-    link.download = `fencing-data-${date}.csv`;
+    link.download = `fencing-data-${getTodayIsoDate()}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

@@ -7,21 +7,12 @@ import { Trash2, Swords, FileVideo } from "lucide-react";
 import { SIDE_COLORS } from "@/lib/constants";
 import { computeScore } from "@/lib/score";
 import type { VideoSession } from "@/lib/types";
-
-function formatBoutDate(session: VideoSession): string {
-  if (session.boutDate) {
-    return new Date(session.boutDate).toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  }
-  return new Date(session.lastModified).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
+import {
+  getBoutDisplayDateLabel,
+  getBoutDisplayLabel,
+  hasBoutFencerNames,
+  sortSessionsByLastModified,
+} from "@/lib/session-selectors";
 
 function FencerLink({ name }: { name: string }) {
   return (
@@ -58,11 +49,7 @@ function getBoutTitle(session: VideoSession): ReactNode {
       </>
     );
   }
-  return session.fileName ?? "Untitled Bout";
-}
-
-function hasFencerNames(session: VideoSession): boolean {
-  return Boolean(session.leftFencer || session.rightFencer);
+  return getBoutDisplayLabel(session);
 }
 
 interface VideoLibraryProps {
@@ -78,9 +65,7 @@ export function VideoLibrary({
   onSelect,
   onDelete,
 }: VideoLibraryProps) {
-  const sortedSessions = [...sessions].sort(
-    (a, b) => b.lastModified - a.lastModified,
-  );
+  const sortedSessions = sortSessionsByLastModified(sessions);
 
   if (sessions.length === 0) {
     return (
@@ -118,7 +103,7 @@ export function VideoLibrary({
               >
                 <td className="py-2 px-3">
                   <div className="flex items-center gap-2 min-w-0">
-                    {hasFencerNames(session) ? (
+                    {hasBoutFencerNames(session) ? (
                       <Swords className="h-4 w-4 text-muted-foreground shrink-0" />
                     ) : (
                       <FileVideo className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -158,7 +143,7 @@ export function VideoLibrary({
                   {session.tags.length}
                 </td>
                 <td className="py-2 px-3 text-right text-muted-foreground text-xs">
-                  {formatBoutDate(session)}
+                  {getBoutDisplayDateLabel(session)}
                 </td>
                 <td className="py-2 px-1">
                   <Button

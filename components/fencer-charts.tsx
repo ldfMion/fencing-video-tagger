@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import {
   RadarChart,
   Radar,
@@ -32,6 +33,9 @@ interface FencerChartsProps {
   tacticalStats: StatRow<TacticalIntent>[];
   defMatchupStats: StatRow<DefMatchup>[];
 }
+
+type TooltipValue = string | number | Array<string | number>;
+type TooltipFormatterResult = [ReactNode, ReactNode];
 
 // Short labels for radar spokes
 const SPOKE_LABELS: Record<string, string> = {
@@ -75,7 +79,7 @@ function DonutChart({
   config: ChartConfig;
   centerPct: number;
   centerLabel: string;
-  tooltipFormatter: (value: number | string, name: string) => [string, string];
+  tooltipFormatter: (value: TooltipValue, name: string) => TooltipFormatterResult;
 }) {
   return (
     <div className="relative">
@@ -199,8 +203,11 @@ export function FencerCharts({ tacticalStats, defMatchupStats }: FencerChartsPro
   const hasRadarData = defMatchupStats.some((r) => r.total > 0);
   const hasPieData = totalVol > 0;
 
-  const offDefTooltipFormatter = (value: number | string, name: string): [string, string] => [
-    `${value} touches`,
+  const offDefTooltipFormatter = (
+    value: TooltipValue,
+    name: string,
+  ): TooltipFormatterResult => [
+    `${Array.isArray(value) ? value.join(", ") : value} touches`,
     offenseDefenseConfig[name]?.label ?? name,
   ];
 

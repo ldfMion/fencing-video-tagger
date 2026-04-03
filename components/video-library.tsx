@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Trash2, Swords, FileVideo } from "lucide-react";
 import { SIDE_COLORS } from "@/lib/constants";
@@ -94,6 +95,11 @@ export function VideoLibrary({
             const leftWins = score.left > score.right;
             const rightWins = score.right > score.left;
             const isActive = currentFileName != null && session.fileName === currentFileName;
+            const videoStatus = session.videoRelativePath
+              ? "Library video"
+              : session.videoSourceType === "temporary"
+                ? "Temporary only"
+                : null;
 
             return (
               <tr
@@ -109,9 +115,16 @@ export function VideoLibrary({
                       <FileVideo className="h-4 w-4 text-muted-foreground shrink-0" />
                     )}
                     <div className="min-w-0">
-                      <p className="font-medium truncate">
-                        {getBoutTitle(session)}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium truncate">
+                          {getBoutTitle(session)}
+                        </p>
+                        {videoStatus ? (
+                          <Badge variant="outline" className="shrink-0">
+                            {videoStatus}
+                          </Badge>
+                        ) : null}
+                      </div>
                       {session.fileName ? (
                         <p className="text-xs text-muted-foreground truncate">
                           {session.fileName}

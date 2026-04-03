@@ -1,6 +1,28 @@
-import type { Tag, VideoSession, Side, ActionCode, MistakeType } from "@/lib/types";
+import type {
+  Tag,
+  VideoSession,
+  Side,
+  ActionCode,
+  MistakeType,
+  VideoSourceType,
+} from "@/lib/types";
 import { deriveBoutDateFromFileMetadata } from "@/lib/date-utils";
 import { getSessionStoreSnapshot, updateSessionStore } from "@/lib/session-store";
+import type { VideoLibraryItem } from "@/lib/video-library";
+
+type SessionMetadataParams = Partial<
+  Pick<
+    VideoSession,
+    | "fileName"
+    | "videoRelativePath"
+    | "videoMimeType"
+    | "videoSourceType"
+    | "leftFencer"
+    | "rightFencer"
+    | "boutDate"
+    | "externalSource"
+  >
+>;
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -12,14 +34,7 @@ function withDefinedValues<T extends Record<string, unknown>>(value: T): Partial
   ) as Partial<T>;
 }
 
-function createSessionRecord(
-  params?: Partial<
-    Pick<
-      VideoSession,
-      "fileName" | "leftFencer" | "rightFencer" | "boutDate" | "externalSource"
-    >
-  >,
-): VideoSession {
+function createSessionRecord(params?: SessionMetadataParams): VideoSession {
   return {
     id: generateId(),
     tags: [],
@@ -28,22 +43,31 @@ function createSessionRecord(
   };
 }
 
-function createSessionRecordWithVideo(
+function createSessionRecordWithTemporaryVideo(
   fileName: string,
   fileLastModified?: number,
-  params?: Partial<
-    Pick<
-      VideoSession,
-      "fileName" | "leftFencer" | "rightFencer" | "boutDate" | "externalSource"
-    >
-  >,
+  params?: SessionMetadataParams,
 ): VideoSession {
   const derivedBoutDate = deriveBoutDateFromFileMetadata(fileLastModified);
 
   return createSessionRecord({
     ...params,
     fileName,
+    videoSourceType: "temporary",
     boutDate: params?.boutDate ?? derivedBoutDate,
+  });
+}
+
+function createSessionRecordWithLibraryVideo(
+  video: VideoLibraryItem,
+  params?: SessionMetadataParams,
+): VideoSession {
+  return createSessionRecord({
+    ...params,
+    fileName: video.fileName,
+    videoRelativePath: video.relativePath,
+    videoMimeType: video.mimeType,
+    videoSourceType: "library",
   });
 }
 
@@ -64,20 +88,18 @@ export interface AddTagParams {
 }
 
 export interface UpdateSessionParams {
-  fileName?: string;
-  leftFencer?: string;
-  rightFencer?: string;
-  boutDate?: string;
-  externalSource?: string;
+  fileName?: string | null;
+  videoRelativePath?: string | null;
+  videoMimeType?: string | null;
+  videoSourceType?: VideoSourceType | null;
+  leftFencer?: string | null;
+  rightFencer?: string | null;
+  boutDate?: string | null;
+  externalSource?: string | null;
 }
 
 export function createSession(
-  params?: Partial<
-    Pick<
-      VideoSession,
-      "leftFencer" | "rightFencer" | "boutDate" | "externalSource"
-    >
-  >,
+  params?: SessionMetadataParams,
 ): VideoSession {
   const session = createSessionRecord(params);
 
@@ -86,22 +108,34 @@ export function createSession(
   return session;
 }
 
-export function createSessionWithVideo(
+export function createSessionWithTemporaryVideo(
   fileName: string,
   fileLastModified?: number,
-  params?: Partial<
-    Pick<
-      VideoSession,
-      "leftFencer" | "rightFencer" | "boutDate" | "externalSource"
-    >
-  >,
+  params?: SessionMetadataParams,
 ): VideoSession {
-  const session = createSessionRecordWithVideo(fileName, fileLastModified, params);
+  const session = createSessionRecordWithTemporaryVideo(
+    fileName,
+    fileLastModified,
+    params,
+  );
 
   updateSessionStore((previousSessions) => [...previousSessions, session]);
 
   return session;
 }
+
+export function createSessionWithLibraryVideo(
+  video: VideoLibraryItem,
+  params?: SessionMetadataParams,
+): VideoSession {
+  const session = createSessionRecordWithLibraryVideo(video, params);
+
+  updateSessionStore((previousSessions) => [...previousSessions, session]);
+
+  return session;
+}
+
+export const createSessionWithVideo = createSessionWithTemporaryVideo;
 
 export function addTag(sessionId: string, params: AddTagParams): Tag {
   let newTag: Tag = {
@@ -187,15 +221,73 @@ export function updateSession(
 ): void {
   updateSessionStore((previousSessions) =>
     previousSessions.map((session) =>
-      session.id === sessionId
-        ? {
-            ...session,
-            ...updates,
-            lastModified: Date.now(),
-          }
-        : session,
+      session.id === sessionId ? applySessionUpdates(session, updates) : session,
     ),
   );
+}
+
+function applySessionUpdates(
+  session: VideoSession,
+  updates: UpdateSessionParams,
+): VideoSession {
+  const nextSession = {
+    ...session,
+    lastModified: Date.now(),
+  } as VideoSession & Record<string, unknown>;
+
+  for (const [key, value] of Object.entries(updates)) {
+    if (value === undefined) {
+      continue;
+    }
+
+    if (value === null) {
+      delete nextSession[key];
+      continue;
+    }
+
+    nextSession[key] = value;
+  }
+
+  return nextSession;
+}
+
+export function attachLibraryVideo(
+  sessionId: string,
+  video: VideoLibraryItem,
+): void {
+  updateSession(sessionId, {
+    fileName: video.fileName,
+    videoRelativePath: video.relativePath,
+    videoMimeType: video.mimeType,
+    videoSourceType: "library",
+  });
+}
+
+export function clearLibraryVideo(sessionId: string): void {
+  updateSession(sessionId, {
+    fileName: null,
+    videoRelativePath: null,
+    videoMimeType: null,
+    videoSourceType: null,
+  });
+}
+
+export function setTemporaryVideoMetadata(
+  sessionId: string,
+  fileName: string,
+  fileLastModified?: number,
+): void {
+  const session = getSessionStoreSnapshot().find((current) => current.id === sessionId);
+
+  if (!session || session.videoRelativePath) {
+    return;
+  }
+
+  updateSession(sessionId, {
+    fileName,
+    videoSourceType: "temporary",
+    boutDate: session.boutDate ?? deriveBoutDateFromFileMetadata(fileLastModified),
+  });
 }
 
 export function importSessions(

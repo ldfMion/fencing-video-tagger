@@ -50,10 +50,12 @@ export const ACTION_CODES = [
 export const ActionCodeSchema = z.enum(ACTION_CODES);
 export const SideSchema = z.enum(["L", "R"]);
 export const MistakeTypeSchema = z.enum(["tactical", "execution"]);
+export const VideoSourceTypeSchema = z.enum(["library", "temporary"]);
 
 export type ActionCode = z.infer<typeof ActionCodeSchema>;
 export type Side = z.infer<typeof SideSchema>;
 export type MistakeType = z.infer<typeof MistakeTypeSchema>;
+export type VideoSourceType = z.infer<typeof VideoSourceTypeSchema>;
 
 export const TagSchema = z.object({
   id: z.string(),
@@ -72,6 +74,9 @@ export type Tag = z.infer<typeof TagSchema>;
 export const VideoSessionSchema = z.object({
   id: z.string(), // serves as bout_id
   fileName: z.string().optional(), // optional for videoless bouts
+  videoRelativePath: z.string().optional(),
+  videoMimeType: z.string().optional(),
+  videoSourceType: VideoSourceTypeSchema.optional(),
   tags: z.array(TagSchema),
   lastModified: z.number(), // unix timestamp
   // Bout metadata

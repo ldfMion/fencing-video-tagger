@@ -9,13 +9,19 @@ import {
 } from "react";
 
 interface VideoState {
+  sessionId: string | null;
   videoUrl: string | null;
   fileName: string | null;
+  urlSource: "blob" | "server" | null;
 }
 
 interface VideoContextType extends VideoState {
-  setVideo: (url: string, fileName: string) => void;
-  setFileName: (fileName: string) => void;
+  setVideo: (
+    sessionId: string,
+    url: string,
+    fileName: string,
+    urlSource?: "blob" | "server",
+  ) => void;
   clearVideo: () => void;
 }
 
@@ -23,30 +29,37 @@ const VideoContext = createContext<VideoContextType | null>(null);
 
 export function VideoProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<VideoState>({
+    sessionId: null,
     videoUrl: null,
     fileName: null,
+    urlSource: null,
   });
 
-  const setVideo = useCallback((url: string, fileName: string) => {
-    setState((prev) => {
-      // Revoke previous URL to avoid memory leak
-      if (prev.videoUrl) {
-        URL.revokeObjectURL(prev.videoUrl);
-      }
-      return { videoUrl: url, fileName };
-    });
-  }, []);
+  const setVideo = useCallback(
+    (
+      sessionId: string,
+      url: string,
+      fileName: string,
+      urlSource: "blob" | "server" = "blob",
+    ) => {
+      setState((prev) => {
+        if (prev.videoUrl && prev.urlSource === "blob") {
+          URL.revokeObjectURL(prev.videoUrl);
+        }
 
-  const setFileName = useCallback((fileName: string) => {
-    setState((prev) => ({ ...prev, fileName }));
-  }, []);
+        return { sessionId, videoUrl: url, fileName, urlSource };
+      });
+    },
+    [],
+  );
 
   const clearVideo = useCallback(() => {
     setState((prev) => {
-      if (prev.videoUrl) {
+      if (prev.videoUrl && prev.urlSource === "blob") {
         URL.revokeObjectURL(prev.videoUrl);
       }
-      return { videoUrl: null, fileName: null };
+
+      return { sessionId: null, videoUrl: null, fileName: null, urlSource: null };
     });
   }, []);
 
@@ -55,7 +68,6 @@ export function VideoProvider({ children }: { children: ReactNode }) {
       value={{
         ...state,
         setVideo,
-        setFileName,
         clearVideo,
       }}
     >

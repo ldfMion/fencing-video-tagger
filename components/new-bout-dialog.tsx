@@ -1,19 +1,23 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
-import { Upload } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { Upload, Video } from "lucide-react";
 import { FencerCombobox } from "@/components/fencer-combobox";
+import { VideoLibraryPicker } from "@/components/video-library-picker";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import type { UpdateSessionParams } from "@/hooks/use-sessions";
 import type { VideoSession } from "@/lib/types";
+import type { VideoLibraryItem } from "@/lib/video-library";
 
 interface SessionFormParams {
   leftFencer?: string;
@@ -22,12 +26,18 @@ interface SessionFormParams {
   externalSource?: string;
 }
 
+type VideoSelectionMode = "none" | "library" | "temporary";
+
 interface NewBoutDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   onCreateSession?: (params: SessionFormParams) => VideoSession;
   onCreateWithVideo?: (file: File, params: SessionFormParams) => VideoSession;
-  onUpdateSession?: (params: SessionFormParams) => void;
+  onCreateWithLibraryVideo?: (
+    video: VideoLibraryItem,
+    params: SessionFormParams,
+  ) => VideoSession;
+  onUpdateSession?: (params: UpdateSessionParams) => void;
   editSession?: VideoSession;
   fencerNames?: string[];
 }
@@ -37,8 +47,42 @@ interface DialogFormContentsProps {
   fencerNames: string[];
   onCreateSession?: (params: SessionFormParams) => VideoSession;
   onCreateWithVideo?: (file: File, params: SessionFormParams) => VideoSession;
-  onUpdateSession?: (params: SessionFormParams) => void;
+  onCreateWithLibraryVideo?: (
+    video: VideoLibraryItem,
+    params: SessionFormParams,
+  ) => VideoSession;
+  onUpdateSession?: (params: UpdateSessionParams) => void;
   onOpenChange: (open: boolean) => void;
+}
+
+function SourceModeButton({
+  active,
+  description,
+  disabled = false,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  description: string;
+  disabled?: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={`rounded-lg border px-3 py-2 text-left transition-colors ${
+        active
+          ? "border-foreground bg-muted"
+          : "border-border hover:bg-muted/50"
+      } ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
+    >
+      <div className="font-medium">{label}</div>
+      <div className="text-xs text-muted-foreground">{description}</div>
+    </button>
+  );
 }
 
 function DialogFormContents({
@@ -46,6 +90,7 @@ function DialogFormContents({
   fencerNames,
   onCreateSession,
   onCreateWithVideo,
+  onCreateWithLibraryVideo,
   onUpdateSession,
   onOpenChange,
 }: DialogFormContentsProps) {
@@ -57,9 +102,45 @@ function DialogFormContents({
     editSession?.externalSource ?? "",
   );
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isLibraryPickerOpen, setIsLibraryPickerOpen] = useState(false);
+  const [selectedLibraryVideo, setSelectedLibraryVideo] =
+    useState<VideoLibraryItem | null>(
+      editSession?.videoRelativePath
+        ? {
+            relativePath: editSession.videoRelativePath,
+            fileName: editSession.fileName ?? editSession.videoRelativePath,
+            size: 0,
+            modifiedAt: 0,
+            mimeType: editSession.videoMimeType ?? "application/octet-stream",
+          }
+        : null,
+    );
+  const [videoMode, setVideoMode] = useState<VideoSelectionMode>(() => {
+    if (editSession?.videoRelativePath) {
+      return "library";
+    }
+
+    return "none";
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleSubmit = useCallback(() => {
+  const selectedVideoSummary = useMemo(() => {
+    if (videoMode === "library" && selectedLibraryVideo) {
+      return selectedLibraryVideo.fileName;
+    }
+
+    if (videoMode === "temporary" && selectedFile) {
+      return `${selectedFile.name} (temporary)`;
+    }
+
+    return null;
+  }, [selectedFile, selectedLibraryVideo, videoMode]);
+
+  const isSubmitDisabled =
+    (videoMode === "library" && !selectedLibraryVideo) ||
+    (videoMode === "temporary" && !selectedFile);
+
+  function handleSubmit() {
     const params = {
       leftFencer: leftFencer.trim() || undefined,
       rightFencer: rightFencer.trim() || undefined,
@@ -68,34 +149,45 @@ function DialogFormContents({
     };
 
     if (isEditMode) {
-      onUpdateSession?.(params);
-    } else if (selectedFile && onCreateWithVideo) {
+      const updates: UpdateSessionParams = {
+        ...params,
+      };
+
+      if (videoMode === "library" && selectedLibraryVideo) {
+        updates.fileName = selectedLibraryVideo.fileName;
+        updates.videoRelativePath = selectedLibraryVideo.relativePath;
+        updates.videoMimeType = selectedLibraryVideo.mimeType;
+        updates.videoSourceType = "library";
+      } else if (videoMode === "none" && editSession?.videoRelativePath) {
+        updates.fileName = null;
+        updates.videoRelativePath = null;
+        updates.videoMimeType = null;
+        updates.videoSourceType = null;
+      }
+
+      onUpdateSession?.(updates);
+    } else if (videoMode === "library" && selectedLibraryVideo) {
+      onCreateWithLibraryVideo?.(selectedLibraryVideo, params);
+    } else if (videoMode === "temporary" && selectedFile && onCreateWithVideo) {
       onCreateWithVideo(selectedFile, params);
     } else {
       onCreateSession?.(params);
     }
 
     onOpenChange(false);
-  }, [
-    boutDate,
-    externalSource,
-    isEditMode,
-    leftFencer,
-    onCreateSession,
-    onCreateWithVideo,
-    onOpenChange,
-    onUpdateSession,
-    rightFencer,
-    selectedFile,
-  ]);
+  }
 
   return (
     <>
       <DialogHeader>
         <DialogTitle>{isEditMode ? "Edit Bout" : "New Bout"}</DialogTitle>
+        <DialogDescription>
+          Choose bout details, then decide whether this video should be attached
+          from the local library or loaded only for the current browser session.
+        </DialogDescription>
       </DialogHeader>
 
-      <div className="grid gap-4 py-4">
+      <div className="grid gap-4 py-2">
         <div className="grid grid-cols-2 gap-4">
           <FencerCombobox
             id="left-fencer"
@@ -143,9 +235,101 @@ function DialogFormContents({
           />
         </div>
 
-        {!isEditMode ? (
+        <div className="space-y-2">
+          <Label className="text-sm">Video source</Label>
+          <div className="grid gap-2">
+            <SourceModeButton
+              active={videoMode === "none"}
+              label="No video"
+              description="Create or update the bout without a persisted video attachment."
+              onClick={() => {
+                setVideoMode("none");
+                setIsLibraryPickerOpen(false);
+              }}
+            />
+            <SourceModeButton
+              active={videoMode === "library"}
+              label="Attach from library"
+              description="Persist a server-backed video from VIDEO_LIBRARY_ROOT."
+              onClick={() => {
+                setVideoMode("library");
+                setIsLibraryPickerOpen(true);
+              }}
+            />
+            <SourceModeButton
+              active={videoMode === "temporary"}
+              disabled={isEditMode}
+              label="Temporary local file"
+              description={
+                isEditMode
+                  ? "Temporary files can be loaded from the bout workspace."
+                  : "Use a local file only for this browser session."
+              }
+              onClick={() => {
+                setVideoMode("temporary");
+                setIsLibraryPickerOpen(false);
+              }}
+            />
+          </div>
+        </div>
+
+        {selectedVideoSummary ? (
+          <div className="rounded-lg border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+            Selected video:{" "}
+            <span className="font-medium text-foreground">
+              {selectedVideoSummary}
+            </span>
+          </div>
+        ) : null}
+
+        {videoMode === "library" ? (
           <div className="space-y-2">
-            <Label className="text-sm">Video file (optional)</Label>
+            <div className="flex items-center justify-between">
+              <Label className="text-sm">Library picker</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsLibraryPickerOpen((open) => !open)}
+              >
+                {isLibraryPickerOpen ? "Hide picker" : "Browse library"}
+              </Button>
+            </div>
+
+            {isLibraryPickerOpen ? (
+              <VideoLibraryPicker
+                key={selectedLibraryVideo?.relativePath ?? "library-picker"}
+                open={isLibraryPickerOpen}
+                confirmLabel={selectedLibraryVideo ? "Replace Selection" : "Select Video"}
+                selectedRelativePath={selectedLibraryVideo?.relativePath}
+                onCancel={() => setIsLibraryPickerOpen(false)}
+                onConfirm={(item) => {
+                  setSelectedLibraryVideo(item);
+                  setIsLibraryPickerOpen(false);
+                }}
+              />
+            ) : null}
+
+            {isEditMode && editSession?.videoRelativePath ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSelectedLibraryVideo(null);
+                  setVideoMode("none");
+                  setIsLibraryPickerOpen(false);
+                }}
+              >
+                Remove Attached Video
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+
+        {!isEditMode && videoMode === "temporary" ? (
+          <div className="space-y-2">
+            <Label className="text-sm">Temporary local file</Label>
             <div className="flex items-center gap-2">
               <input
                 ref={fileInputRef}
@@ -163,17 +347,22 @@ function DialogFormContents({
               <Button
                 variant="outline"
                 size="sm"
+                type="button"
                 onClick={() => fileInputRef.current?.click()}
                 className="h-8 text-sm"
               >
                 <Upload className="mr-2 h-3 w-3" />
-                Select Video
+                Select Temporary Video
               </Button>
               {selectedFile ? (
                 <span className="flex-1 truncate text-xs text-muted-foreground">
                   {selectedFile.name}
                 </span>
               ) : null}
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Video className="h-3.5 w-3.5" />
+              Temporary files are not available after refresh.
             </div>
           </div>
         ) : null}
@@ -187,7 +376,11 @@ function DialogFormContents({
         >
           Cancel
         </Button>
-        <Button onClick={handleSubmit} className="h-8 text-sm">
+        <Button
+          onClick={handleSubmit}
+          className="h-8 text-sm"
+          disabled={isSubmitDisabled}
+        >
           {isEditMode ? "Save Changes" : "Create Bout"}
         </Button>
       </DialogFooter>
@@ -200,6 +393,7 @@ export function NewBoutDialog({
   onOpenChange,
   onCreateSession,
   onCreateWithVideo,
+  onCreateWithLibraryVideo,
   onUpdateSession,
   editSession,
   fencerNames = [],
@@ -208,13 +402,14 @@ export function NewBoutDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[560px]">
         <DialogFormContents
           key={dialogKey}
           editSession={editSession}
           fencerNames={fencerNames}
           onCreateSession={onCreateSession}
           onCreateWithVideo={onCreateWithVideo}
+          onCreateWithLibraryVideo={onCreateWithLibraryVideo}
           onUpdateSession={onUpdateSession}
           onOpenChange={onOpenChange}
         />

@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useVideoContext } from "@/contexts/video-context";
 import { filterSessionsBySearchAndDate } from "@/lib/session-selectors";
+import type { VideoLibraryItem } from "@/lib/video-library";
 import { useSessions } from "@/hooks/use-sessions";
 
 export function LibraryPageShell() {
@@ -19,6 +20,7 @@ export function LibraryPageShell() {
   const {
     sessions,
     createSession,
+    createSessionWithLibraryVideo,
     createSessionWithVideo,
     deleteSession,
     exportToCSV,
@@ -66,14 +68,30 @@ export function LibraryPageShell() {
         externalSource?: string;
       },
     ) => {
-      const url = URL.createObjectURL(file);
-      setVideo(url, file.name);
-
       const session = createSessionWithVideo(file.name, file.lastModified, params);
+      const url = URL.createObjectURL(file);
+      setVideo(session.id, url, file.name, "blob");
       router.push(`/bouts/${session.id}`);
       return session;
     },
     [createSessionWithVideo, router, setVideo],
+  );
+
+  const handleCreateSessionWithLibraryVideo = useCallback(
+    (
+      video: VideoLibraryItem,
+      params: {
+        leftFencer?: string;
+        rightFencer?: string;
+        boutDate?: string;
+        externalSource?: string;
+      },
+    ) => {
+      const session = createSessionWithLibraryVideo(video, params);
+      router.push(`/bouts/${session.id}`);
+      return session;
+    },
+    [createSessionWithLibraryVideo, router],
   );
 
   return (
@@ -101,6 +119,7 @@ export function LibraryPageShell() {
             onOpenChange={setIsNewBoutDialogOpen}
             onCreateSession={handleCreateSessionWithoutVideo}
             onCreateWithVideo={handleCreateSessionWithVideo}
+            onCreateWithLibraryVideo={handleCreateSessionWithLibraryVideo}
             fencerNames={allFencerNames}
           />
         </div>

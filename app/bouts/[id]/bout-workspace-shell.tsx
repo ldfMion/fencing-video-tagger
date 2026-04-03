@@ -2,71 +2,226 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { AlertCircle, Edit2, Library, Upload } from "lucide-react";
+import { AlertCircle, Edit2, Library, Loader2, Upload, Video } from "lucide-react";
 import { BoutAnalysis } from "@/components/bout-analysis";
 import { ExportButton } from "@/components/export-button";
 import { NewBoutDialog } from "@/components/new-bout-dialog";
 import { TagForm, type TagFormHandle } from "@/components/tag-form";
 import { TagList } from "@/components/tag-list";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
+import { VideoLibraryPicker } from "@/components/video-library-picker";
 import { VideoPlayer } from "@/components/video-player";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useVideoContext } from "@/contexts/video-context";
 import { useSessions, type AddTagParams } from "@/hooks/use-sessions";
 import { useVideo } from "@/hooks/use-video";
-import { deriveBoutDateFromFileMetadata } from "@/lib/date-utils";
 import { getBoutDisplayLabel } from "@/lib/session-selectors";
+import { buildSessionVideoUrl, type VideoLibraryItem } from "@/lib/video-library";
 
 interface BoutWorkspaceShellProps {
   boutId: string;
 }
 
+type LibraryVideoState = "idle" | "checking" | "available" | "missing";
+
 export function BoutWorkspaceShell({ boutId }: BoutWorkspaceShellProps) {
-  const { videoUrl, fileName, setVideo } = useVideoContext();
+  const {
+    sessionId: contextSessionId,
+    videoUrl,
+    fileName,
+    urlSource,
+    setVideo,
+    clearVideo,
+  } = useVideoContext();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const tagFormRef = useRef<TagFormHandle>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isLibraryPickerOpen, setIsLibraryPickerOpen] = useState(false);
+  const [libraryVideoCheck, setLibraryVideoCheck] = useState<{
+    relativePath: string;
+    status: Exclude<LibraryVideoState, "idle" | "checking">;
+  } | null>(null);
 
   const video = useVideo();
   const {
     sessions,
     getSessionById,
     addTag,
+    attachLibraryVideo,
+    clearLibraryVideo,
     deleteTag,
-    updateSession,
     exportToCSV,
+    setTemporaryVideoMetadata,
+    updateSession,
     allFencerNames,
   } = useSessions();
 
   const session = getSessionById(boutId);
   const tags = session?.tags ?? [];
-  const hasVideo = videoUrl && fileName === session?.fileName;
+  const sessionFileName = session?.fileName ?? null;
+  const sessionVideoRelativePath = session?.videoRelativePath ?? null;
+  const sessionVideoUrl =
+    session && sessionVideoRelativePath
+      ? buildSessionVideoUrl({
+          id: session.id,
+          videoRelativePath: sessionVideoRelativePath,
+        })
+      : null;
+  const contextMatchesSession = contextSessionId === session?.id;
+  const hasTemporaryOverride =
+    Boolean(videoUrl) && contextMatchesSession && urlSource === "blob";
+  const libraryVideoState: LibraryVideoState = !sessionVideoRelativePath
+    ? "idle"
+    : libraryVideoCheck?.relativePath === sessionVideoRelativePath
+      ? libraryVideoCheck.status
+      : "checking";
+
+  useEffect(() => {
+    if (!session?.id || !sessionVideoRelativePath || !sessionVideoUrl) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    fetch(sessionVideoUrl, {
+      method: "HEAD",
+      cache: "no-store",
+    })
+      .then((response) => {
+        if (!isCancelled) {
+          setLibraryVideoCheck({
+            relativePath: sessionVideoRelativePath,
+            status: response.ok ? "available" : "missing",
+          });
+        }
+      })
+      .catch(() => {
+        if (!isCancelled) {
+          setLibraryVideoCheck({
+            relativePath: sessionVideoRelativePath,
+            status: "missing",
+          });
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [session?.id, sessionVideoRelativePath, sessionVideoUrl]);
+
+  useEffect(() => {
+    if (!session?.id || !sessionVideoUrl) {
+      if (contextMatchesSession && urlSource === "server") {
+        clearVideo();
+      }
+      return;
+    }
+
+    if (hasTemporaryOverride || libraryVideoState !== "available") {
+      return;
+    }
+
+    if (
+      contextMatchesSession &&
+      urlSource === "server" &&
+      videoUrl === sessionVideoUrl &&
+      fileName === sessionFileName
+    ) {
+      return;
+    }
+
+    setVideo(session.id, sessionVideoUrl, sessionFileName ?? "Attached video", "server");
+  }, [
+    clearVideo,
+    contextMatchesSession,
+    fileName,
+    hasTemporaryOverride,
+    libraryVideoState,
+    session?.id,
+    sessionFileName,
+    sessionVideoUrl,
+    setVideo,
+    urlSource,
+    videoUrl,
+  ]);
+
+  const activeVideoUrl = hasTemporaryOverride
+    ? videoUrl
+    : libraryVideoState === "available"
+      ? sessionVideoUrl
+      : null;
+
+  const activeVideoFileName = hasTemporaryOverride
+    ? fileName
+    : sessionFileName;
+
+  const activeVideoBadge = hasTemporaryOverride ? "Temporary file" : "Library video";
+  const isTemporaryOnly =
+    !sessionVideoRelativePath && session?.videoSourceType === "temporary";
+  const hasAttachedLibraryVideo = Boolean(session?.videoRelativePath);
+  const showUnavailableState =
+    hasAttachedLibraryVideo &&
+    libraryVideoState === "missing" &&
+    !hasTemporaryOverride;
+  const showLibraryLoadingState =
+    hasAttachedLibraryVideo &&
+    libraryVideoState === "checking" &&
+    !hasTemporaryOverride;
 
   const handleFileSelect = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
 
-      if (!file) {
+      if (!file || !session) {
         return;
       }
 
       video.resetZoom();
 
       const url = URL.createObjectURL(file);
-      setVideo(url, file.name);
+      setVideo(session.id, url, file.name, "blob");
 
-      if (session && !session.fileName) {
-        updateSession(session.id, { fileName: file.name });
+      if (!session.videoRelativePath) {
+        setTemporaryVideoMetadata(session.id, file.name, file.lastModified);
       }
 
-      if (session && !session.boutDate) {
-        updateSession(session.id, {
-          boutDate: deriveBoutDateFromFileMetadata(file.lastModified),
-        });
-      }
+      event.target.value = "";
     },
-    [session, setVideo, updateSession, video],
+    [session, setTemporaryVideoMetadata, setVideo, video],
   );
+
+  const handleAttachLibraryVideo = useCallback(
+    (selectedVideo: VideoLibraryItem) => {
+      if (!session) {
+        return;
+      }
+
+      attachLibraryVideo(session.id, selectedVideo);
+      video.resetZoom();
+      setIsLibraryPickerOpen(false);
+    },
+    [attachLibraryVideo, session, video],
+  );
+
+  const handleRemoveAttachedVideo = useCallback(() => {
+    if (!session) {
+      return;
+    }
+
+    clearLibraryVideo(session.id);
+
+    if (contextMatchesSession && urlSource === "server") {
+      clearVideo();
+    }
+  }, [clearLibraryVideo, clearVideo, contextMatchesSession, session, urlSource]);
 
   const handleAddTag = useCallback(
     (params: AddTagParams) => {
@@ -156,148 +311,229 @@ export function BoutWorkspaceShell({ boutId }: BoutWorkspaceShellProps) {
   }
 
   return (
-    <Tabs defaultValue="tagging" className="flex h-screen flex-col bg-background">
-      <header className="flex h-12 shrink-0 items-center justify-between border-b px-3">
-        <div className="flex items-center gap-1">
-          <Link href="/">
-            <Button variant="ghost" size="sm">
-              <Library className="mr-1.5 h-4 w-4" />
-              Bouts
+    <>
+      <Tabs defaultValue="tagging" className="flex h-screen flex-col bg-background">
+        <header className="flex h-12 shrink-0 items-center justify-between border-b px-3">
+          <div className="flex items-center gap-1">
+            <Link href="/">
+              <Button variant="ghost" size="sm">
+                <Library className="mr-1.5 h-4 w-4" />
+                Bouts
+              </Button>
+            </Link>
+            <span className="text-muted-foreground">/</span>
+            <button
+              onClick={() => setIsEditDialogOpen(true)}
+              className="max-w-[200px] truncate text-sm text-foreground hover:underline"
+            >
+              {getBoutDisplayLabel(session)}
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <TabsList className="h-8">
+              <TabsTrigger value="tagging" className="h-6 px-3 text-xs">
+                Tagging
+              </TabsTrigger>
+              <TabsTrigger value="analysis" className="h-6 px-3 text-xs">
+                Analysis
+              </TabsTrigger>
+            </TabsList>
+            <ExportButton
+              exportToCSV={exportToCSV}
+              disabled={sessions.length === 0}
+            />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="video/*"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setIsLibraryPickerOpen(true)}
+            >
+              <Video className="mr-1.5 h-4 w-4" />
+              {hasAttachedLibraryVideo ? "Replace From Library" : "Attach From Library"}
             </Button>
-          </Link>
-          <span className="text-muted-foreground">/</span>
-          <button
-            onClick={() => setIsEditDialogOpen(true)}
-            className="max-w-[200px] truncate text-sm text-foreground hover:underline"
-          >
-            {getBoutDisplayLabel(session)}
-          </button>
-        </div>
+            <Button size="sm" onClick={() => fileInputRef.current?.click()}>
+              <Upload className="mr-1.5 h-4 w-4" />
+              Load Temporary File
+            </Button>
+            {hasAttachedLibraryVideo ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={handleRemoveAttachedVideo}
+              >
+                Remove Attached Video
+              </Button>
+            ) : null}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setIsEditDialogOpen(true)}
+            >
+              <Edit2 className="mr-1.5 h-4 w-4" />
+              Edit
+            </Button>
+          </div>
 
-        <div className="flex items-center gap-2">
-          <TabsList className="h-8">
-            <TabsTrigger value="tagging" className="h-6 px-3 text-xs">
-              Tagging
-            </TabsTrigger>
-            <TabsTrigger value="analysis" className="h-6 px-3 text-xs">
-              Analysis
-            </TabsTrigger>
-          </TabsList>
-          <ExportButton
-            exportToCSV={exportToCSV}
-            disabled={sessions.length === 0}
+          <NewBoutDialog
+            isOpen={isEditDialogOpen}
+            onOpenChange={setIsEditDialogOpen}
+            editSession={session}
+            onUpdateSession={(updates) => updateSession(session.id, updates)}
+            fencerNames={allFencerNames}
           />
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="video/*"
-            onChange={handleFileSelect}
-            className="hidden"
-          />
-          <Button size="sm" onClick={() => fileInputRef.current?.click()}>
-            <Upload className="mr-1.5 h-4 w-4" />
-            {hasVideo
-              ? "Change Video"
-              : session.fileName
-                ? "Load Video"
-                : "Attach Video"}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setIsEditDialogOpen(true)}
-          >
-            <Edit2 className="mr-1.5 h-4 w-4" />
-            Edit
-          </Button>
-        </div>
+        </header>
 
-        <NewBoutDialog
-          isOpen={isEditDialogOpen}
-          onOpenChange={setIsEditDialogOpen}
-          editSession={session}
-          onUpdateSession={(updates) => updateSession(session.id, updates)}
-          fencerNames={allFencerNames}
-        />
-      </header>
-
-      <TabsContent value="tagging" className="mt-0 flex-1 overflow-hidden p-2">
-        <div className="grid h-full grid-cols-1 gap-2 lg:grid-cols-[1fr_280px]">
-          <div className="flex min-h-0 flex-col gap-2">
-            {hasVideo ? (
-              <div className="min-h-0 flex-1 overflow-hidden rounded-lg border bg-card p-2">
-                <VideoPlayer videoUrl={videoUrl} video={video} maximized />
-              </div>
-            ) : (
-              <div className="flex h-[120px] flex-none flex-col items-center justify-center gap-2 rounded-lg border bg-card p-2 text-muted-foreground">
-                {session.fileName ? (
-                  <>
-                    <p className="text-sm">
-                      Video:{" "}
-                      <span className="font-medium text-foreground">
-                        {session.fileName}
+        <TabsContent value="tagging" className="mt-0 flex-1 overflow-hidden p-2">
+          <div className="grid h-full grid-cols-1 gap-2 lg:grid-cols-[1fr_280px]">
+            <div className="flex min-h-0 flex-col gap-2">
+              {activeVideoUrl ? (
+                <div className="min-h-0 flex-1 overflow-hidden rounded-lg border bg-card p-2">
+                  <div className="mb-2 flex flex-wrap items-center gap-2 px-1">
+                    <Badge variant={hasTemporaryOverride ? "secondary" : "outline"}>
+                      {activeVideoBadge}
+                    </Badge>
+                    {activeVideoFileName ? (
+                      <span className="max-w-[320px] truncate text-sm text-muted-foreground">
+                        {activeVideoFileName}
                       </span>
+                    ) : null}
+                    {hasTemporaryOverride ? (
+                      <span className="text-xs text-muted-foreground">
+                        Temporary file will be lost on refresh.
+                      </span>
+                    ) : null}
+                  </div>
+                  <VideoPlayer videoUrl={activeVideoUrl} video={video} maximized />
+                </div>
+              ) : showLibraryLoadingState ? (
+                <div className="flex h-[140px] flex-none flex-col items-center justify-center gap-2 rounded-lg border bg-card p-2 text-muted-foreground">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <p className="text-sm">Checking attached video...</p>
+                </div>
+              ) : showUnavailableState ? (
+                <div className="flex h-[160px] flex-none flex-col items-center justify-center gap-3 rounded-lg border bg-card p-3 text-center">
+                  <AlertCircle className="h-6 w-6 text-destructive" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-foreground">
+                      Attached video is unavailable
                     </p>
-                    <div className="flex items-center gap-3">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        <Upload className="mr-1.5 h-4 w-4" />
-                        Load Video
-                      </Button>
-                      <button
-                        className="text-xs underline hover:text-foreground"
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        Use a different file
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-sm">No video attached to this bout</p>
+                    {session.fileName ? (
+                      <p className="text-xs text-muted-foreground">
+                        Stored filename: {session.fileName}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsLibraryPickerOpen(true)}
+                    >
+                      Replace From Library
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => fileInputRef.current?.click()}
                     >
-                      <Upload className="mr-1.5 h-4 w-4" />
-                      Attach Video
+                      Load Temporary File
                     </Button>
-                  </>
-                )}
-              </div>
-            )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRemoveAttachedVideo}
+                    >
+                      Remove Attached Video
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex h-[160px] flex-none flex-col items-center justify-center gap-3 rounded-lg border bg-card p-3 text-center">
+                  <p className="text-sm">
+                    {isTemporaryOnly
+                      ? "Temporary video metadata exists for this bout, but the file is not loaded."
+                      : "No video attached to this bout"}
+                  </p>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsLibraryPickerOpen(true)}
+                    >
+                      Attach From Library
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      Load Temporary File
+                    </Button>
+                  </div>
+                  {isTemporaryOnly ? (
+                    <p className="text-xs text-muted-foreground">
+                      Temporary files need to be loaded again after refresh.
+                    </p>
+                  ) : null}
+                </div>
+              )}
 
-            <div className="rounded-lg border bg-card p-3">
-              <TagForm
-                ref={tagFormRef}
-                onAddTag={handleAddTag}
-                currentTime={hasVideo ? video.currentTime : undefined}
+              <div className="rounded-lg border bg-card p-3">
+                <TagForm
+                  ref={tagFormRef}
+                  onAddTag={handleAddTag}
+                  currentTime={activeVideoUrl ? video.currentTime : undefined}
+                />
+              </div>
+            </div>
+
+            <div className="min-h-0">
+              <TagList
+                tags={tags}
+                onDelete={handleDeleteTag}
+                onSeek={activeVideoUrl ? video.seek : undefined}
+                fillHeight
               />
             </div>
           </div>
+        </TabsContent>
 
-          <div className="min-h-0">
-            <TagList
-              tags={tags}
-              onDelete={handleDeleteTag}
-              onSeek={hasVideo ? video.seek : undefined}
-              fillHeight
-            />
-          </div>
-        </div>
-      </TabsContent>
+        <TabsContent value="analysis" className="mt-0 flex-1 overflow-auto p-4">
+          <BoutAnalysis
+            tags={tags}
+            leftFencer={session.leftFencer}
+            rightFencer={session.rightFencer}
+          />
+        </TabsContent>
+      </Tabs>
 
-      <TabsContent value="analysis" className="mt-0 flex-1 overflow-auto p-4">
-        <BoutAnalysis
-          tags={tags}
-          leftFencer={session.leftFencer}
-          rightFencer={session.rightFencer}
-        />
-      </TabsContent>
-    </Tabs>
+      <Dialog open={isLibraryPickerOpen} onOpenChange={setIsLibraryPickerOpen}>
+        <DialogContent className="sm:max-w-[680px]">
+          <DialogHeader>
+            <DialogTitle>
+              {hasAttachedLibraryVideo ? "Replace Attached Video" : "Attach Video From Library"}
+            </DialogTitle>
+            <DialogDescription>
+              Choose a video from your local `VIDEO_LIBRARY_ROOT`. This attachment
+              persists across refreshes and navigation.
+            </DialogDescription>
+          </DialogHeader>
+          <VideoLibraryPicker
+            open={isLibraryPickerOpen}
+            confirmLabel={hasAttachedLibraryVideo ? "Replace Video" : "Attach Video"}
+            selectedRelativePath={session.videoRelativePath}
+            onCancel={() => setIsLibraryPickerOpen(false)}
+            onConfirm={handleAttachLibraryVideo}
+          />
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

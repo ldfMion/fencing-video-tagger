@@ -34,7 +34,7 @@ interface FencerChartsProps {
   defMatchupStats: StatRow<DefMatchup>[];
 }
 
-type TooltipValue = string | number | Array<string | number>;
+type TooltipValue = string | number | ReadonlyArray<string | number>;
 type TooltipFormatterResult = [ReactNode, ReactNode];
 
 // Short labels for radar spokes
@@ -106,7 +106,7 @@ function DonutChart({
             content={
               <ChartTooltipContent
                 formatter={(value, name) =>
-                  tooltipFormatter(value, name as string)
+                  tooltipFormatter(value ?? "", name as string)
                 }
               />
             }
@@ -306,7 +306,7 @@ export function FencerCharts({ tacticalStats, defMatchupStats }: FencerChartsPro
                 cx="50%"
                 cy="50%"
                 outerRadius={90}
-                label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                label={({ percent = 0 }) => `${(percent * 100).toFixed(0)}%`}
                 labelLine={false}
               >
                 {exchangeTypeData.map((entry) => (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Upload, Video } from "lucide-react";
 import { FencerCombobox } from "@/components/fencer-combobox";
 import { VideoLibraryPicker } from "@/components/video-library-picker";
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import type {
   PersistedSessionVideoSelection,
   SessionDraftParams,
@@ -51,6 +52,7 @@ interface DialogFormContentsProps {
     params: SessionDraftParams,
     videoSelection: PersistedSessionVideoSelection,
   ) => void;
+  onLibraryPanelChange?: (open: boolean) => void;
   onOpenChange: (open: boolean) => void;
 }
 
@@ -89,6 +91,7 @@ function DialogFormContents({
   fencerNames,
   onCreateSession,
   onUpdateSession,
+  onLibraryPanelChange,
   onOpenChange,
 }: DialogFormContentsProps) {
   const isEditMode = Boolean(editSession && onUpdateSession);
@@ -122,6 +125,11 @@ function DialogFormContents({
     return "none";
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isLibraryPanelVisible = videoMode === "library" && isLibraryPickerOpen;
+
+  useEffect(() => {
+    onLibraryPanelChange?.(isLibraryPanelVisible);
+  }, [isLibraryPanelVisible, onLibraryPanelChange]);
 
   const selectedVideoSummary = useMemo(() => {
     if (videoMode === "library" && selectedLibraryVideo) {
@@ -187,103 +195,151 @@ function DialogFormContents({
         </DialogDescription>
       </DialogHeader>
 
-      <div className="grid gap-4 py-2">
-        <div className="grid grid-cols-2 gap-4">
-          <FencerCombobox
-            id="left-fencer"
-            label="Left fencer"
-            placeholder="Name..."
-            value={leftFencer}
-            onChange={setLeftFencer}
-            names={fencerNames}
-            inline={false}
-          />
-          <FencerCombobox
-            id="right-fencer"
-            label="Right fencer"
-            placeholder="Name..."
-            value={rightFencer}
-            onChange={setRightFencer}
-            names={fencerNames}
-            inline={false}
-          />
-        </div>
+      <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+        <div
+          className={cn(
+            "grid gap-4 py-2",
+            isLibraryPanelVisible && "md:grid-cols-[minmax(0,1fr)_380px] md:items-start",
+          )}
+        >
+          <div className="grid gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FencerCombobox
+                id="left-fencer"
+                label="Left fencer"
+                placeholder="Name..."
+                value={leftFencer}
+                onChange={setLeftFencer}
+                names={fencerNames}
+                inline={false}
+              />
+              <FencerCombobox
+                id="right-fencer"
+                label="Right fencer"
+                placeholder="Name..."
+                value={rightFencer}
+                onChange={setRightFencer}
+                names={fencerNames}
+                inline={false}
+              />
+            </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="bout-date" className="text-sm">
-            Date
-          </Label>
-          <Input
-            id="bout-date"
-            type="date"
-            value={boutDate}
-            onChange={(event) => setBoutDate(event.target.value)}
-            className="h-8 text-sm"
-          />
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor="bout-date" className="text-sm">
+                Date
+              </Label>
+              <Input
+                id="bout-date"
+                type="date"
+                value={boutDate}
+                onChange={(event) => setBoutDate(event.target.value)}
+                className="h-8 text-sm"
+              />
+            </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="source" className="text-sm">
-            Source (URL or note)
-          </Label>
-          <Input
-            id="source"
-            placeholder="Video URL, link, or reference..."
-            value={externalSource}
-            onChange={(event) => setExternalSource(event.target.value)}
-            className="h-8 text-sm"
-          />
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor="source" className="text-sm">
+                Source (URL or note)
+              </Label>
+              <Input
+                id="source"
+                placeholder="Video URL, link, or reference..."
+                value={externalSource}
+                onChange={(event) => setExternalSource(event.target.value)}
+                className="h-8 text-sm"
+              />
+            </div>
 
-        <div className="space-y-2">
-          <Label className="text-sm">Video source</Label>
-          <div className="grid gap-2">
-            <SourceModeButton
-              active={videoMode === "none"}
-              label="No video"
-              description="Create or update the bout without a persisted video attachment."
-              onClick={() => {
-                setVideoMode("none");
-                setIsLibraryPickerOpen(false);
-              }}
-            />
-            <SourceModeButton
-              active={videoMode === "library"}
-              label="Attach from library"
-              description="Persist a server-backed video from your local video library."
-              onClick={() => {
-                setVideoMode("library");
-                setIsLibraryPickerOpen(true);
-              }}
-            />
-            <SourceModeButton
-              active={videoMode === "temporary"}
-              disabled={isEditMode}
-              label="Temporary local file"
-              description={
-                isEditMode
-                  ? "Temporary files can be loaded from the bout workspace."
-                  : "Use a local file only for this browser session."
-              }
-              onClick={() => {
-                setVideoMode("temporary");
-                setIsLibraryPickerOpen(false);
-              }}
-            />
+            <div className="space-y-2">
+              <Label className="text-sm">Video source</Label>
+              <div className="grid gap-2">
+                <SourceModeButton
+                  active={videoMode === "none"}
+                  label="No video"
+                  description="Create or update the bout without a persisted video attachment."
+                  onClick={() => {
+                    setVideoMode("none");
+                    setIsLibraryPickerOpen(false);
+                  }}
+                />
+                <SourceModeButton
+                  active={videoMode === "library"}
+                  label="Attach from library"
+                  description="Persist a server-backed video from your local video library."
+                  onClick={() => {
+                    setVideoMode("library");
+                    setIsLibraryPickerOpen(true);
+                  }}
+                />
+                <SourceModeButton
+                  active={videoMode === "temporary"}
+                  disabled={isEditMode}
+                  label="Temporary local file"
+                  description={
+                    isEditMode
+                      ? "Temporary files can be loaded from the bout workspace."
+                      : "Use a local file only for this browser session."
+                  }
+                  onClick={() => {
+                    setVideoMode("temporary");
+                    setIsLibraryPickerOpen(false);
+                  }}
+                />
+              </div>
+            </div>
+
+            {selectedVideoSummary ? (
+              <div className="rounded-lg border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                Selected video:{" "}
+                <span className="font-medium text-foreground">
+                  {selectedVideoSummary}
+                </span>
+              </div>
+            ) : null}
+
+            {!isEditMode && videoMode === "temporary" ? (
+              <div className="space-y-2">
+                <Label className="text-sm">Temporary local file</Label>
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="video/*"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+
+                      if (file?.type.startsWith("video/")) {
+                        setSelectedFile(file);
+                      }
+                    }}
+                    className="hidden"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="h-8 text-sm"
+                  >
+                    <Upload className="mr-2 h-3 w-3" />
+                    Select Temporary Video
+                  </Button>
+                  {selectedFile ? (
+                    <span className="flex-1 truncate text-xs text-muted-foreground">
+                      {selectedFile.name}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Video className="h-3.5 w-3.5" />
+                  Temporary files are not available after refresh.
+                </div>
+              </div>
+            ) : null}
           </div>
-        </div>
 
-        {selectedVideoSummary ? (
-          <div className="rounded-lg border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-            Selected video:{" "}
-            <span className="font-medium text-foreground">
-              {selectedVideoSummary}
-            </span>
-          </div>
-        ) : null}
-
-        {videoMode === "library" ? (
-          <div className="space-y-2">
+          {videoMode === "library" ? (
+            <div className="min-h-0 space-y-2 md:sticky md:top-0">
             <div className="flex items-center justify-between">
               <Label className="text-sm">Library picker</Label>
               <Button
@@ -326,48 +382,9 @@ function DialogFormContents({
                 Remove Attached Video
               </Button>
             ) : null}
-          </div>
-        ) : null}
-
-        {!isEditMode && videoMode === "temporary" ? (
-          <div className="space-y-2">
-            <Label className="text-sm">Temporary local file</Label>
-            <div className="flex items-center gap-2">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="video/*"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-
-                  if (file?.type.startsWith("video/")) {
-                    setSelectedFile(file);
-                  }
-                }}
-                className="hidden"
-              />
-              <Button
-                variant="outline"
-                size="sm"
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="h-8 text-sm"
-              >
-                <Upload className="mr-2 h-3 w-3" />
-                Select Temporary Video
-              </Button>
-              {selectedFile ? (
-                <span className="flex-1 truncate text-xs text-muted-foreground">
-                  {selectedFile.name}
-                </span>
-              ) : null}
             </div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Video className="h-3.5 w-3.5" />
-              Temporary files are not available after refresh.
-            </div>
-          </div>
-        ) : null}
+          ) : null}
+        </div>
       </div>
 
       <DialogFooter>
@@ -399,16 +416,23 @@ export function NewBoutDialog({
   fencerNames = [],
 }: NewBoutDialogProps) {
   const dialogKey = `${isOpen ? "open" : "closed"}:${editSession?.id ?? "create"}`;
+  const [isLibraryPanelVisible, setIsLibraryPanelVisible] = useState(false);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[560px]">
+      <DialogContent
+        className={cn(
+          "flex max-h-[calc(100vh-2rem)] flex-col sm:max-w-[560px]",
+          isLibraryPanelVisible && "md:max-w-[920px]",
+        )}
+      >
         <DialogFormContents
           key={dialogKey}
           editSession={editSession}
           fencerNames={fencerNames}
           onCreateSession={onCreateSession}
           onUpdateSession={onUpdateSession}
+          onLibraryPanelChange={setIsLibraryPanelVisible}
           onOpenChange={onOpenChange}
         />
       </DialogContent>

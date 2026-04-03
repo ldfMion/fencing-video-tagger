@@ -29,6 +29,11 @@ function getVideoLibraryRoot(): string {
   return path.resolve(configuredRoot);
 }
 
+export function getVideoLibraryRootName(): string {
+  const root = getVideoLibraryRoot();
+  return path.basename(root) || root;
+}
+
 function getMimeType(filePath: string): string {
   return VIDEO_MIME_TYPES[path.extname(filePath).toLowerCase()] ?? "application/octet-stream";
 }

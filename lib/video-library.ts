@@ -8,6 +8,11 @@ export interface VideoLibraryItem {
   mimeType: string;
 }
 
+export interface VideoLibraryResponse {
+  rootName: string;
+  items: VideoLibraryItem[];
+}
+
 export function buildSessionVideoUrl(
   session: Pick<VideoSession, "id" | "videoRelativePath">,
 ): string | null {

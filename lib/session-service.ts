@@ -263,7 +263,7 @@ export function attachLibraryVideo(
   });
 }
 
-export function clearLibraryVideo(sessionId: string): void {
+export function clearSessionVideo(sessionId: string): void {
   updateSession(sessionId, {
     fileName: null,
     videoRelativePath: null,
@@ -271,6 +271,8 @@ export function clearLibraryVideo(sessionId: string): void {
     videoSourceType: null,
   });
 }
+
+export const clearLibraryVideo = clearSessionVideo;
 
 export function setTemporaryVideoMetadata(
   sessionId: string,

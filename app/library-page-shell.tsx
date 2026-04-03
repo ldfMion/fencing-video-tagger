@@ -11,17 +11,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useVideoContext } from "@/contexts/video-context";
 import { filterSessionsBySearchAndDate } from "@/lib/session-selectors";
-import type { VideoLibraryItem } from "@/lib/video-library";
-import { useSessions } from "@/hooks/use-sessions";
+import {
+  useSessions,
+  type SessionDraftParams,
+  type SessionVideoSelection,
+} from "@/hooks/use-sessions";
 
 export function LibraryPageShell() {
   const router = useRouter();
-  const { setVideo } = useVideoContext();
+  const { playTemporaryVideo } = useVideoContext();
   const {
     sessions,
-    createSession,
-    createSessionWithLibraryVideo,
-    createSessionWithVideo,
+    createSessionEntry,
     deleteSession,
     exportToCSV,
     allFencerNames,
@@ -44,54 +45,18 @@ export function LibraryPageShell() {
     [dateFrom, dateTo, search, sessions],
   );
 
-  const handleCreateSessionWithoutVideo = useCallback(
-    (params: {
-      leftFencer?: string;
-      rightFencer?: string;
-      boutDate?: string;
-      externalSource?: string;
-    }) => {
-      const session = createSession(params);
-      router.push(`/bouts/${session.id}`);
-      return session;
-    },
-    [createSession, router],
-  );
+  const handleCreateSession = useCallback(
+    (params: SessionDraftParams, videoSelection: SessionVideoSelection) => {
+      const session = createSessionEntry(params, videoSelection);
 
-  const handleCreateSessionWithVideo = useCallback(
-    (
-      file: File,
-      params: {
-        leftFencer?: string;
-        rightFencer?: string;
-        boutDate?: string;
-        externalSource?: string;
-      },
-    ) => {
-      const session = createSessionWithVideo(file.name, file.lastModified, params);
-      const url = URL.createObjectURL(file);
-      setVideo(session.id, url, file.name, "blob");
-      router.push(`/bouts/${session.id}`);
-      return session;
-    },
-    [createSessionWithVideo, router, setVideo],
-  );
+      if (videoSelection.kind === "temporary") {
+        playTemporaryVideo(session.id, videoSelection.file);
+      }
 
-  const handleCreateSessionWithLibraryVideo = useCallback(
-    (
-      video: VideoLibraryItem,
-      params: {
-        leftFencer?: string;
-        rightFencer?: string;
-        boutDate?: string;
-        externalSource?: string;
-      },
-    ) => {
-      const session = createSessionWithLibraryVideo(video, params);
       router.push(`/bouts/${session.id}`);
       return session;
     },
-    [createSessionWithLibraryVideo, router],
+    [createSessionEntry, playTemporaryVideo, router],
   );
 
   return (
@@ -117,9 +82,7 @@ export function LibraryPageShell() {
           <NewBoutDialog
             isOpen={isNewBoutDialogOpen}
             onOpenChange={setIsNewBoutDialogOpen}
-            onCreateSession={handleCreateSessionWithoutVideo}
-            onCreateWithVideo={handleCreateSessionWithVideo}
-            onCreateWithLibraryVideo={handleCreateSessionWithLibraryVideo}
+            onCreateSession={handleCreateSession}
             fencerNames={allFencerNames}
           />
         </div>

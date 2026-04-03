@@ -15,29 +15,27 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { UpdateSessionParams } from "@/hooks/use-sessions";
+import type {
+  PersistedSessionVideoSelection,
+  SessionDraftParams,
+  SessionVideoSelection,
+} from "@/hooks/use-sessions";
 import type { VideoSession } from "@/lib/types";
 import type { VideoLibraryItem } from "@/lib/video-library";
-
-interface SessionFormParams {
-  leftFencer?: string;
-  rightFencer?: string;
-  boutDate?: string;
-  externalSource?: string;
-}
 
 type VideoSelectionMode = "none" | "library" | "temporary";
 
 interface NewBoutDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreateSession?: (params: SessionFormParams) => VideoSession;
-  onCreateWithVideo?: (file: File, params: SessionFormParams) => VideoSession;
-  onCreateWithLibraryVideo?: (
-    video: VideoLibraryItem,
-    params: SessionFormParams,
+  onCreateSession?: (
+    params: SessionDraftParams,
+    videoSelection: SessionVideoSelection,
   ) => VideoSession;
-  onUpdateSession?: (params: UpdateSessionParams) => void;
+  onUpdateSession?: (
+    params: SessionDraftParams,
+    videoSelection: PersistedSessionVideoSelection,
+  ) => void;
   editSession?: VideoSession;
   fencerNames?: string[];
 }
@@ -45,13 +43,14 @@ interface NewBoutDialogProps {
 interface DialogFormContentsProps {
   editSession?: VideoSession;
   fencerNames: string[];
-  onCreateSession?: (params: SessionFormParams) => VideoSession;
-  onCreateWithVideo?: (file: File, params: SessionFormParams) => VideoSession;
-  onCreateWithLibraryVideo?: (
-    video: VideoLibraryItem,
-    params: SessionFormParams,
+  onCreateSession?: (
+    params: SessionDraftParams,
+    videoSelection: SessionVideoSelection,
   ) => VideoSession;
-  onUpdateSession?: (params: UpdateSessionParams) => void;
+  onUpdateSession?: (
+    params: SessionDraftParams,
+    videoSelection: PersistedSessionVideoSelection,
+  ) => void;
   onOpenChange: (open: boolean) => void;
 }
 
@@ -89,14 +88,14 @@ function DialogFormContents({
   editSession,
   fencerNames,
   onCreateSession,
-  onCreateWithVideo,
-  onCreateWithLibraryVideo,
   onUpdateSession,
   onOpenChange,
 }: DialogFormContentsProps) {
   const isEditMode = Boolean(editSession && onUpdateSession);
   const [leftFencer, setLeftFencer] = useState(editSession?.leftFencer ?? "");
-  const [rightFencer, setRightFencer] = useState(editSession?.rightFencer ?? "");
+  const [rightFencer, setRightFencer] = useState(
+    editSession?.rightFencer ?? "",
+  );
   const [boutDate, setBoutDate] = useState(editSession?.boutDate ?? "");
   const [externalSource, setExternalSource] = useState(
     editSession?.externalSource ?? "",
@@ -141,7 +140,7 @@ function DialogFormContents({
     (videoMode === "temporary" && !selectedFile);
 
   function handleSubmit() {
-    const params = {
+    const params: SessionDraftParams = {
       leftFencer: leftFencer.trim() || undefined,
       rightFencer: rightFencer.trim() || undefined,
       boutDate: boutDate || undefined,
@@ -149,29 +148,30 @@ function DialogFormContents({
     };
 
     if (isEditMode) {
-      const updates: UpdateSessionParams = {
-        ...params,
-      };
+      const videoSelection: PersistedSessionVideoSelection =
+        videoMode === "library" && selectedLibraryVideo
+          ? {
+              kind: "library",
+              video: selectedLibraryVideo,
+            }
+          : { kind: "none" };
 
-      if (videoMode === "library" && selectedLibraryVideo) {
-        updates.fileName = selectedLibraryVideo.fileName;
-        updates.videoRelativePath = selectedLibraryVideo.relativePath;
-        updates.videoMimeType = selectedLibraryVideo.mimeType;
-        updates.videoSourceType = "library";
-      } else if (videoMode === "none" && editSession?.videoRelativePath) {
-        updates.fileName = null;
-        updates.videoRelativePath = null;
-        updates.videoMimeType = null;
-        updates.videoSourceType = null;
-      }
-
-      onUpdateSession?.(updates);
-    } else if (videoMode === "library" && selectedLibraryVideo) {
-      onCreateWithLibraryVideo?.(selectedLibraryVideo, params);
-    } else if (videoMode === "temporary" && selectedFile && onCreateWithVideo) {
-      onCreateWithVideo(selectedFile, params);
+      onUpdateSession?.(params, videoSelection);
     } else {
-      onCreateSession?.(params);
+      const videoSelection: SessionVideoSelection =
+        videoMode === "library" && selectedLibraryVideo
+          ? {
+              kind: "library",
+              video: selectedLibraryVideo,
+            }
+          : videoMode === "temporary" && selectedFile
+            ? {
+                kind: "temporary",
+                file: selectedFile,
+              }
+            : { kind: "none" };
+
+      onCreateSession?.(params, videoSelection);
     }
 
     onOpenChange(false);
@@ -250,7 +250,7 @@ function DialogFormContents({
             <SourceModeButton
               active={videoMode === "library"}
               label="Attach from library"
-              description="Persist a server-backed video from VIDEO_LIBRARY_ROOT."
+              description="Persist a server-backed video from your local video library."
               onClick={() => {
                 setVideoMode("library");
                 setIsLibraryPickerOpen(true);
@@ -300,7 +300,9 @@ function DialogFormContents({
               <VideoLibraryPicker
                 key={selectedLibraryVideo?.relativePath ?? "library-picker"}
                 open={isLibraryPickerOpen}
-                confirmLabel={selectedLibraryVideo ? "Replace Selection" : "Select Video"}
+                confirmLabel={
+                  selectedLibraryVideo ? "Replace Selection" : "Select Video"
+                }
                 selectedRelativePath={selectedLibraryVideo?.relativePath}
                 onCancel={() => setIsLibraryPickerOpen(false)}
                 onConfirm={(item) => {
@@ -392,8 +394,6 @@ export function NewBoutDialog({
   isOpen,
   onOpenChange,
   onCreateSession,
-  onCreateWithVideo,
-  onCreateWithLibraryVideo,
   onUpdateSession,
   editSession,
   fencerNames = [],
@@ -408,8 +408,6 @@ export function NewBoutDialog({
           editSession={editSession}
           fencerNames={fencerNames}
           onCreateSession={onCreateSession}
-          onCreateWithVideo={onCreateWithVideo}
-          onCreateWithLibraryVideo={onCreateWithLibraryVideo}
           onUpdateSession={onUpdateSession}
           onOpenChange={onOpenChange}
         />

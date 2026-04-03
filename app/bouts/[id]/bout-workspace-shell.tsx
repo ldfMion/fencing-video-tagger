@@ -20,161 +20,56 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useVideoContext } from "@/contexts/video-context";
-import { useSessions, type AddTagParams } from "@/hooks/use-sessions";
+import { useBoutVideo } from "@/hooks/use-bout-video";
+import {
+  useSessions,
+  type AddTagParams,
+  type PersistedSessionVideoSelection,
+  type SessionDraftParams,
+} from "@/hooks/use-sessions";
 import { useVideo } from "@/hooks/use-video";
 import { getBoutDisplayLabel } from "@/lib/session-selectors";
-import { buildSessionVideoUrl, type VideoLibraryItem } from "@/lib/video-library";
+import type { VideoLibraryItem } from "@/lib/video-library";
 
 interface BoutWorkspaceShellProps {
   boutId: string;
 }
 
-type LibraryVideoState = "idle" | "checking" | "available" | "missing";
-
 export function BoutWorkspaceShell({ boutId }: BoutWorkspaceShellProps) {
-  const {
-    sessionId: contextSessionId,
-    videoUrl,
-    fileName,
-    urlSource,
-    setVideo,
-    clearVideo,
-  } = useVideoContext();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const tagFormRef = useRef<TagFormHandle>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isLibraryPickerOpen, setIsLibraryPickerOpen] = useState(false);
-  const [libraryVideoCheck, setLibraryVideoCheck] = useState<{
-    relativePath: string;
-    status: Exclude<LibraryVideoState, "idle" | "checking">;
-  } | null>(null);
 
   const video = useVideo();
   const {
     sessions,
     getSessionById,
     addTag,
-    attachLibraryVideo,
-    clearLibraryVideo,
     deleteTag,
     exportToCSV,
-    setTemporaryVideoMetadata,
-    updateSession,
+    updateSessionEntry,
     allFencerNames,
   } = useSessions();
 
   const session = getSessionById(boutId);
   const tags = session?.tags ?? [];
-  const sessionFileName = session?.fileName ?? null;
-  const sessionVideoRelativePath = session?.videoRelativePath ?? null;
-  const sessionVideoUrl =
-    session && sessionVideoRelativePath
-      ? buildSessionVideoUrl({
-          id: session.id,
-          videoRelativePath: sessionVideoRelativePath,
-        })
-      : null;
-  const contextMatchesSession = contextSessionId === session?.id;
-  const hasTemporaryOverride =
-    Boolean(videoUrl) && contextMatchesSession && urlSource === "blob";
-  const libraryVideoState: LibraryVideoState = !sessionVideoRelativePath
-    ? "idle"
-    : libraryVideoCheck?.relativePath === sessionVideoRelativePath
-      ? libraryVideoCheck.status
-      : "checking";
-
-  useEffect(() => {
-    if (!session?.id || !sessionVideoRelativePath || !sessionVideoUrl) {
-      return;
-    }
-
-    let isCancelled = false;
-
-    fetch(sessionVideoUrl, {
-      method: "HEAD",
-      cache: "no-store",
-    })
-      .then((response) => {
-        if (!isCancelled) {
-          setLibraryVideoCheck({
-            relativePath: sessionVideoRelativePath,
-            status: response.ok ? "available" : "missing",
-          });
-        }
-      })
-      .catch(() => {
-        if (!isCancelled) {
-          setLibraryVideoCheck({
-            relativePath: sessionVideoRelativePath,
-            status: "missing",
-          });
-        }
-      });
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [session?.id, sessionVideoRelativePath, sessionVideoUrl]);
-
-  useEffect(() => {
-    if (!session?.id || !sessionVideoUrl) {
-      if (contextMatchesSession && urlSource === "server") {
-        clearVideo();
-      }
-      return;
-    }
-
-    if (hasTemporaryOverride || libraryVideoState !== "available") {
-      return;
-    }
-
-    if (
-      contextMatchesSession &&
-      urlSource === "server" &&
-      videoUrl === sessionVideoUrl &&
-      fileName === sessionFileName
-    ) {
-      return;
-    }
-
-    setVideo(session.id, sessionVideoUrl, sessionFileName ?? "Attached video", "server");
-  }, [
-    clearVideo,
-    contextMatchesSession,
-    fileName,
+  const {
+    activeVideoBadge,
+    activeVideoFileName,
+    activeVideoUrl,
+    handlePersistedVideoSelection,
+    hasAttachedLibraryVideo,
     hasTemporaryOverride,
-    libraryVideoState,
-    session?.id,
-    sessionFileName,
-    sessionVideoUrl,
-    setVideo,
-    urlSource,
-    videoUrl,
-  ]);
-
-  const activeVideoUrl = hasTemporaryOverride
-    ? videoUrl
-    : libraryVideoState === "available"
-      ? sessionVideoUrl
-      : null;
-
-  const activeVideoFileName = hasTemporaryOverride
-    ? fileName
-    : sessionFileName;
-
-  const activeVideoBadge = hasTemporaryOverride ? "Temporary file" : "Library video";
-  const isTemporaryOnly =
-    !sessionVideoRelativePath && session?.videoSourceType === "temporary";
-  const hasAttachedLibraryVideo = Boolean(session?.videoRelativePath);
-  const showUnavailableState =
-    hasAttachedLibraryVideo &&
-    libraryVideoState === "missing" &&
-    !hasTemporaryOverride;
-  const showLibraryLoadingState =
-    hasAttachedLibraryVideo &&
-    libraryVideoState === "checking" &&
-    !hasTemporaryOverride;
+    isTemporaryOnly,
+    loadTemporaryVideo,
+    selectedLibraryRelativePath,
+    showLibraryLoadingState,
+    showUnavailableState,
+  } = useBoutVideo({
+    session,
+    onSourceChange: video.resetZoom,
+  });
 
   const handleFileSelect = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -184,18 +79,10 @@ export function BoutWorkspaceShell({ boutId }: BoutWorkspaceShellProps) {
         return;
       }
 
-      video.resetZoom();
-
-      const url = URL.createObjectURL(file);
-      setVideo(session.id, url, file.name, "blob");
-
-      if (!session.videoRelativePath) {
-        setTemporaryVideoMetadata(session.id, file.name, file.lastModified);
-      }
-
+      loadTemporaryVideo(file);
       event.target.value = "";
     },
-    [session, setTemporaryVideoMetadata, setVideo, video],
+    [loadTemporaryVideo, session],
   );
 
   const handleAttachLibraryVideo = useCallback(
@@ -204,11 +91,17 @@ export function BoutWorkspaceShell({ boutId }: BoutWorkspaceShellProps) {
         return;
       }
 
-      attachLibraryVideo(session.id, selectedVideo);
-      video.resetZoom();
+      updateSessionEntry(session.id, {}, {
+        kind: "library",
+        video: selectedVideo,
+      });
+      handlePersistedVideoSelection({
+        kind: "library",
+        video: selectedVideo,
+      });
       setIsLibraryPickerOpen(false);
     },
-    [attachLibraryVideo, session, video],
+    [handlePersistedVideoSelection, session, updateSessionEntry],
   );
 
   const handleRemoveAttachedVideo = useCallback(() => {
@@ -216,12 +109,9 @@ export function BoutWorkspaceShell({ boutId }: BoutWorkspaceShellProps) {
       return;
     }
 
-    clearLibraryVideo(session.id);
-
-    if (contextMatchesSession && urlSource === "server") {
-      clearVideo();
-    }
-  }, [clearLibraryVideo, clearVideo, contextMatchesSession, session, urlSource]);
+    updateSessionEntry(session.id, {}, { kind: "none" });
+    handlePersistedVideoSelection({ kind: "none" });
+  }, [handlePersistedVideoSelection, session, updateSessionEntry]);
 
   const handleAddTag = useCallback(
     (params: AddTagParams) => {
@@ -385,7 +275,13 @@ export function BoutWorkspaceShell({ boutId }: BoutWorkspaceShellProps) {
             isOpen={isEditDialogOpen}
             onOpenChange={setIsEditDialogOpen}
             editSession={session}
-            onUpdateSession={(updates) => updateSession(session.id, updates)}
+            onUpdateSession={(
+              params: SessionDraftParams,
+              videoSelection: PersistedSessionVideoSelection,
+            ) => {
+              updateSessionEntry(session.id, params, videoSelection);
+              handlePersistedVideoSelection(videoSelection);
+            }}
             fencerNames={allFencerNames}
           />
         </header>
@@ -521,14 +417,14 @@ export function BoutWorkspaceShell({ boutId }: BoutWorkspaceShellProps) {
               {hasAttachedLibraryVideo ? "Replace Attached Video" : "Attach Video From Library"}
             </DialogTitle>
             <DialogDescription>
-              Choose a video from your local `VIDEO_LIBRARY_ROOT`. This attachment
+              Choose a video from your local video library. This attachment
               persists across refreshes and navigation.
             </DialogDescription>
           </DialogHeader>
           <VideoLibraryPicker
             open={isLibraryPickerOpen}
             confirmLabel={hasAttachedLibraryVideo ? "Replace Video" : "Attach Video"}
-            selectedRelativePath={session.videoRelativePath}
+            selectedRelativePath={selectedLibraryRelativePath ?? undefined}
             onCancel={() => setIsLibraryPickerOpen(false)}
             onConfirm={handleAttachLibraryVideo}
           />

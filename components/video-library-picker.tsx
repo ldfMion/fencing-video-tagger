@@ -5,7 +5,7 @@ import { Loader2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import type { VideoLibraryItem } from "@/lib/video-library";
+import type { VideoLibraryItem, VideoLibraryResponse } from "@/lib/video-library";
 
 interface VideoLibraryPickerProps {
   open: boolean;
@@ -37,6 +37,7 @@ export function VideoLibraryPicker({
   onCancel,
   onConfirm,
 }: VideoLibraryPickerProps) {
+  const [rootName, setRootName] = useState<string | null>(null);
   const [items, setItems] = useState<VideoLibraryItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -62,11 +63,12 @@ export function VideoLibraryPicker({
           throw new Error(payload?.error ?? "Failed to load video library");
         }
 
-        return (await response.json()) as VideoLibraryItem[];
+        return (await response.json()) as VideoLibraryResponse;
       })
       .then((payload) => {
         if (!isCancelled) {
-          setItems(payload);
+          setRootName(payload.rootName);
+          setItems(payload.items);
         }
       })
       .catch((fetchError) => {
@@ -107,6 +109,13 @@ export function VideoLibraryPicker({
 
   return (
     <div className="space-y-3 rounded-lg border bg-muted/20 p-3">
+      {rootName ? (
+        <div className="rounded-md border bg-background px-3 py-2 text-xs text-muted-foreground">
+          Browsing library folder:{" "}
+          <span className="font-medium text-foreground">{rootName}</span>
+        </div>
+      ) : null}
+
       <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -128,7 +137,7 @@ export function VideoLibraryPicker({
         ) : filteredItems.length === 0 ? (
           <div className="px-4 py-8 text-sm text-muted-foreground">
             {items?.length === 0
-              ? "No videos found in VIDEO_LIBRARY_ROOT."
+              ? `No videos found in ${rootName ?? "the selected library folder"}.`
               : "No videos match your search."}
           </div>
         ) : (

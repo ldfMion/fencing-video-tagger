@@ -16,12 +16,8 @@ interface VideoState {
 }
 
 interface VideoContextType extends VideoState {
-  setVideo: (
-    sessionId: string,
-    url: string,
-    fileName: string,
-    urlSource?: "blob" | "server",
-  ) => void;
+  playServerVideo: (sessionId: string, url: string, fileName: string) => void;
+  playTemporaryVideo: (sessionId: string, file: File) => void;
   clearVideo: () => void;
 }
 
@@ -53,6 +49,21 @@ export function VideoProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const playServerVideo = useCallback(
+    (sessionId: string, url: string, fileName: string) => {
+      setVideo(sessionId, url, fileName, "server");
+    },
+    [setVideo],
+  );
+
+  const playTemporaryVideo = useCallback(
+    (sessionId: string, file: File) => {
+      const url = URL.createObjectURL(file);
+      setVideo(sessionId, url, file.name, "blob");
+    },
+    [setVideo],
+  );
+
   const clearVideo = useCallback(() => {
     setState((prev) => {
       if (prev.videoUrl && prev.urlSource === "blob") {
@@ -67,7 +78,8 @@ export function VideoProvider({ children }: { children: ReactNode }) {
     <VideoContext.Provider
       value={{
         ...state,
-        setVideo,
+        playServerVideo,
+        playTemporaryVideo,
         clearVideo,
       }}
     >

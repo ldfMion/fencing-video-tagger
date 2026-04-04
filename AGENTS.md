@@ -29,3 +29,21 @@ PRs should explain the user-visible behavior change, note any data-model or loca
 
 ## Security & Data Notes
 Session data is stored in browser `localStorage`. Avoid introducing secrets into client code, and document any schema changes in `lib/types.ts` so stored sessions remain migratable.
+
+## Local Video Library Notes
+`VIDEO_LIBRARY_ROOT` must point to a locally readable directory. Avoid protected macOS locations such as `~/Library/Mobile Documents/...` unless the running Node/Next.js process has permission to read them. If the route handlers cannot read the directory or file, persisted attached videos will fail after reload even if temporary blob playback worked earlier.
+
+## Media Debugging
+This app has two playback paths:
+- temporary playback: in-tab `blob:` URL only
+- persisted playback: `/api/videos/[sessionId]` route handler
+
+If a video works before reload but fails after reload, debug the persisted route path first, not the player UI. Check:
+- `GET /api/video-library`
+- `HEAD` or `GET /api/videos/[sessionId]?...`
+- `.next/dev/logs/next-development.log`
+
+Treat browser "video format not supported" as possibly meaning a bad server response or unreadable file, not only an actual codec problem.
+
+## UI Verification Notes
+For tagging-page UI changes, verify on a laptop-height viewport with a real bout that has a video loaded. Short viewports are the main failure case for overflow, clipped controls, and form/player overlap.

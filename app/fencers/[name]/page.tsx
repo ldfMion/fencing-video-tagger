@@ -1,4 +1,4 @@
-import { unstable_noStore as noStore } from "next/cache";
+import { connection } from "next/server";
 import { FencerAnalyticsShell } from "@/app/fencers/[name]/fencer-analytics-shell";
 import { listSessions } from "@/lib/server/session-service";
 
@@ -7,7 +7,7 @@ interface FencerPageProps {
 }
 
 export default async function FencerPage(props: FencerPageProps) {
-  noStore();
+  await connection();
   const { name } = await props.params;
   const initialSessions = await listSessions();
 

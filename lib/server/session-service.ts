@@ -1,6 +1,5 @@
 import "server-only";
 
-import { unstable_noStore as noStore } from "next/cache";
 import { z } from "zod";
 import {
   applySessionUpdates,
@@ -120,14 +119,12 @@ export type DeleteTagInput = z.infer<typeof DeleteTagInputSchema>;
 export type ImportSessionsInput = z.infer<typeof ImportSessionsInputSchema>;
 
 export async function listSessions(): Promise<VideoSession[]> {
-  noStore();
   return getSessionRepository().listSessions();
 }
 
 export async function getSessionById(
   sessionId: string,
 ): Promise<VideoSession | null> {
-  noStore();
   return getSessionRepository().getSessionById(z.string().parse(sessionId));
 }
 

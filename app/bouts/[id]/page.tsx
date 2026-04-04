@@ -1,4 +1,4 @@
-import { unstable_noStore as noStore } from "next/cache";
+import { connection } from "next/server";
 import { BoutWorkspaceShell } from "@/app/bouts/[id]/bout-workspace-shell";
 import { listSessions } from "@/lib/server/session-service";
 
@@ -7,7 +7,7 @@ interface BoutPageProps {
 }
 
 export default async function BoutPage(props: BoutPageProps) {
-  noStore();
+  await connection();
   const { id } = await props.params;
   const initialSessions = await listSessions();
 

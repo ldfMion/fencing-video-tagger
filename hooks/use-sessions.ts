@@ -1,6 +1,9 @@
 "use client";
 
-import { useQueryClient } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useCallback, useMemo } from "react";
 import {
   addTagAction,
@@ -11,9 +14,10 @@ import {
   updateSessionAction,
   updateTagAction,
 } from "@/app/actions/session-actions";
+import { useSessionsQuery, sessionsQueryKey } from "@/hooks/use-sessions-query";
 import { exportSessionsToCsv } from "@/lib/session-export";
 import {
-  AddTagParams,
+  type AddTagParams,
   applySessionUpdates,
   attachLibraryVideoToSession,
   clearSessionVideoFromSession,
@@ -27,14 +31,13 @@ import {
   type SessionVideoSelection,
   setTemporaryVideoMetadataOnSession,
   type ServerSessionVideoSelection,
-  UpdateSessionParams,
+  type UpdateSessionParams,
 } from "@/lib/session-service";
 import {
   getAllFencerNames,
   getSessionById as selectSessionById,
 } from "@/lib/session-selectors";
-import type { VideoSession } from "@/lib/types";
-import { useSessionsQuery, sessionsQueryKey } from "@/hooks/use-sessions-query";
+import type { Tag, VideoSession } from "@/lib/types";
 
 export type {
   AddTagParams,
@@ -48,6 +51,47 @@ const NO_VIDEO_SELECTION: PersistedSessionVideoSelection = { kind: "none" };
 
 interface CreateSessionEntryOptions {
   sessionId?: string;
+}
+
+interface CreateSessionMutationVariables {
+  params: SessionDraftParams;
+  videoSelection: SessionVideoSelection;
+  sessionId: string;
+  optimisticSession: VideoSession;
+}
+
+interface UpdateSessionMutationVariables {
+  sessionId: string;
+  updates: UpdateSessionParams;
+  optimisticSession: VideoSession;
+}
+
+interface AddTagMutationVariables {
+  sessionId: string;
+  params: AddTagParams;
+  optimisticSession: VideoSession;
+  optimisticTag: Tag;
+}
+
+interface UpdateTagMutationVariables {
+  sessionId: string;
+  tagId: string;
+  updates: Partial<Omit<Tag, "id" | "createdAt">>;
+  optimisticSession: VideoSession;
+}
+
+interface DeleteTagMutationVariables {
+  sessionId: string;
+  tagId: string;
+  optimisticSession: VideoSession;
+  deletedTag: Tag;
+  deletedTagIndex: number;
+}
+
+interface DeleteSessionMutationVariables {
+  sessionId: string;
+  previousSession: VideoSession;
+  previousIndex: number;
 }
 
 export function useSessions(initialSessions?: VideoSession[]) {
@@ -78,10 +122,197 @@ export function useSessions(initialSessions?: VideoSession[]) {
     [initialSessions, queryClient],
   );
 
+  const cancelSessionsQuery = useCallback(
+    () =>
+      queryClient.cancelQueries({
+        queryKey: sessionsQueryKey,
+      }),
+    [queryClient],
+  );
+
+  const refetchSessions = useCallback(async () => {
+    await queryClient.invalidateQueries({
+      queryKey: sessionsQueryKey,
+    });
+    await queryClient.refetchQueries({
+      queryKey: sessionsQueryKey,
+    });
+  }, [queryClient]);
+
   const getSessionById = useCallback(
     (sessionId: string) => selectSessionById(getCachedSessions(), sessionId),
     [getCachedSessions],
   );
+
+  const createSessionMutation = useMutation({
+    mutationFn: async ({
+      params,
+      videoSelection,
+      sessionId,
+    }: CreateSessionMutationVariables) =>
+      createSessionAction({
+        sessionId,
+        params,
+        videoSelection: serializeVideoSelection(videoSelection),
+      }),
+    onMutate: async ({ optimisticSession }) => {
+      await cancelSessionsQuery();
+      setCachedSessions((currentSessions) => [...currentSessions, optimisticSession]);
+    },
+    onError: (_error, { sessionId }) => {
+      setCachedSessions((currentSessions) =>
+        currentSessions.filter((session) => session.id !== sessionId),
+      );
+    },
+    onSuccess: (serverSession, { sessionId }) => {
+      setCachedSessions((currentSessions) =>
+        replaceSession(currentSessions, sessionId, serverSession),
+      );
+    },
+  });
+
+  const sessionPatchMutation = useMutation({
+    mutationFn: async ({
+      sessionId,
+      updates,
+    }: UpdateSessionMutationVariables) =>
+      updateSessionAction({
+        sessionId,
+        updates,
+      }),
+    onMutate: async ({ sessionId, optimisticSession }) => {
+      await cancelSessionsQuery();
+      setCachedSessions((currentSessions) =>
+        replaceSession(currentSessions, sessionId, optimisticSession),
+      );
+    },
+    onError: async () => {
+      await refetchSessions();
+    },
+    onSuccess: (serverSession, { sessionId }) => {
+      setCachedSessions((currentSessions) =>
+        replaceSession(currentSessions, sessionId, serverSession),
+      );
+    },
+  });
+
+  const addTagMutation = useMutation({
+    mutationFn: async ({
+      sessionId,
+      params,
+      optimisticTag,
+    }: AddTagMutationVariables) =>
+      addTagAction({
+        sessionId,
+        tagId: optimisticTag.id,
+        createdAt: optimisticTag.createdAt,
+        params,
+      }),
+    onMutate: async ({ sessionId, optimisticSession }) => {
+      await cancelSessionsQuery();
+      setCachedSessions((currentSessions) =>
+        replaceSession(currentSessions, sessionId, optimisticSession),
+      );
+    },
+    onError: (_error, { sessionId, optimisticTag }) => {
+      setCachedSessions((currentSessions) =>
+        removeTagFromSession(currentSessions, sessionId, optimisticTag.id),
+      );
+    },
+    onSuccess: (serverSession, { sessionId }) => {
+      setCachedSessions((currentSessions) =>
+        replaceSession(currentSessions, sessionId, serverSession),
+      );
+    },
+  });
+
+  const updateTagMutation = useMutation({
+    mutationFn: async ({
+      sessionId,
+      tagId,
+      updates,
+    }: UpdateTagMutationVariables) =>
+      updateTagAction({
+        sessionId,
+        tagId,
+        updates,
+      }),
+    onMutate: async ({ sessionId, optimisticSession }) => {
+      await cancelSessionsQuery();
+      setCachedSessions((currentSessions) =>
+        replaceSession(currentSessions, sessionId, optimisticSession),
+      );
+    },
+    onError: async () => {
+      await refetchSessions();
+    },
+    onSuccess: (serverSession, { sessionId }) => {
+      setCachedSessions((currentSessions) =>
+        replaceSession(currentSessions, sessionId, serverSession),
+      );
+    },
+  });
+
+  const deleteTagMutation = useMutation({
+    mutationFn: async ({ sessionId, tagId }: DeleteTagMutationVariables) =>
+      deleteTagAction({
+        sessionId,
+        tagId,
+      }),
+    onMutate: async ({ sessionId, optimisticSession }) => {
+      await cancelSessionsQuery();
+      setCachedSessions((currentSessions) =>
+        replaceSession(currentSessions, sessionId, optimisticSession),
+      );
+    },
+    onError: (_error, { sessionId, deletedTag, deletedTagIndex }) => {
+      setCachedSessions((currentSessions) =>
+        restoreDeletedTag(
+          currentSessions,
+          sessionId,
+          deletedTag,
+          deletedTagIndex,
+        ),
+      );
+    },
+    onSuccess: (serverSession, { sessionId }) => {
+      setCachedSessions((currentSessions) =>
+        replaceSession(currentSessions, sessionId, serverSession),
+      );
+    },
+  });
+
+  const deleteSessionMutation = useMutation({
+    mutationFn: async ({ sessionId }: DeleteSessionMutationVariables) =>
+      deleteSessionAction({
+        sessionId,
+      }),
+    onMutate: async ({ sessionId }) => {
+      await cancelSessionsQuery();
+      setCachedSessions((currentSessions) =>
+        currentSessions.filter((session) => session.id !== sessionId),
+      );
+    },
+    onError: (_error, { previousSession, previousIndex }) => {
+      setCachedSessions((currentSessions) =>
+        restoreDeletedSession(
+          currentSessions,
+          previousSession,
+          previousIndex,
+        ),
+      );
+    },
+  });
+
+  const importSessionsMutation = useMutation({
+    mutationFn: async (incomingSessions: VideoSession[]) =>
+      importSessionsAction({
+        sessions: incomingSessions,
+      }),
+    onSuccess: async () => {
+      await refetchSessions();
+    },
+  });
 
   const createSessionEntry = useCallback(
     async (
@@ -89,34 +320,21 @@ export function useSessions(initialSessions?: VideoSession[]) {
       videoSelection: SessionVideoSelection = NO_VIDEO_SELECTION,
       options?: CreateSessionEntryOptions,
     ) => {
-      const previousSessions = getCachedSessions();
-      const optimisticSessionId = options?.sessionId ?? crypto.randomUUID();
+      const sessionId = options?.sessionId ?? crypto.randomUUID();
       const optimisticSession = createOptimisticSession(
         params,
         videoSelection,
-        optimisticSessionId,
+        sessionId,
       );
 
-      setCachedSessions((currentSessions) => [...currentSessions, optimisticSession]);
-
-      try {
-        const serverSession = await createSessionAction({
-          sessionId: optimisticSessionId,
-          params,
-          videoSelection: serializeVideoSelection(videoSelection),
-        });
-
-        setCachedSessions((currentSessions) =>
-          replaceSession(currentSessions, optimisticSessionId, serverSession),
-        );
-
-        return serverSession;
-      } catch (mutationError) {
-        setCachedSessions(previousSessions);
-        throw mutationError;
-      }
+      return createSessionMutation.mutateAsync({
+        params,
+        videoSelection,
+        sessionId,
+        optimisticSession,
+      });
     },
-    [getCachedSessions, setCachedSessions],
+    [createSessionMutation],
   );
 
   const updateSessionEntry = useCallback(
@@ -125,8 +343,7 @@ export function useSessions(initialSessions?: VideoSession[]) {
       params: SessionDraftParams,
       videoSelection?: PersistedSessionVideoSelection,
     ) => {
-      const previousSessions = getCachedSessions();
-      const currentSession = selectSessionById(previousSessions, sessionId);
+      const currentSession = getSessionById(sessionId);
 
       if (!currentSession) {
         throw new Error(`Session ${sessionId} was not found`);
@@ -147,27 +364,13 @@ export function useSessions(initialSessions?: VideoSession[]) {
         return currentSession;
       }
 
-      setCachedSessions((currentSessions) =>
-        replaceSession(currentSessions, sessionId, optimisticSession),
-      );
-
-      try {
-        const serverSession = await updateSessionAction({
-          sessionId,
-          updates,
-        });
-
-        setCachedSessions((currentSessions) =>
-          replaceSession(currentSessions, sessionId, serverSession),
-        );
-
-        return serverSession;
-      } catch (mutationError) {
-        setCachedSessions(previousSessions);
-        throw mutationError;
-      }
+      return sessionPatchMutation.mutateAsync({
+        sessionId,
+        updates,
+        optimisticSession,
+      });
     },
-    [getCachedSessions, setCachedSessions],
+    [getSessionById, sessionPatchMutation],
   );
 
   const setSessionVideoSelection = useCallback(
@@ -175,8 +378,7 @@ export function useSessions(initialSessions?: VideoSession[]) {
       sessionId: string,
       videoSelection: SessionVideoSelection | PersistedSessionVideoSelection,
     ) => {
-      const previousSessions = getCachedSessions();
-      const currentSession = selectSessionById(previousSessions, sessionId);
+      const currentSession = getSessionById(sessionId);
 
       if (!currentSession) {
         throw new Error(`Session ${sessionId} was not found`);
@@ -189,33 +391,18 @@ export function useSessions(initialSessions?: VideoSession[]) {
         return currentSession;
       }
 
-      setCachedSessions((currentSessions) =>
-        replaceSession(currentSessions, sessionId, optimisticSession),
-      );
-
-      try {
-        const serverSession = await updateSessionAction({
-          sessionId,
-          updates,
-        });
-
-        setCachedSessions((currentSessions) =>
-          replaceSession(currentSessions, sessionId, serverSession),
-        );
-
-        return serverSession;
-      } catch (mutationError) {
-        setCachedSessions(previousSessions);
-        throw mutationError;
-      }
+      return sessionPatchMutation.mutateAsync({
+        sessionId,
+        updates,
+        optimisticSession,
+      });
     },
-    [getCachedSessions, setCachedSessions],
+    [getSessionById, sessionPatchMutation],
   );
 
   const addTag = useCallback(
     async (sessionId: string, params: AddTagParams) => {
-      const previousSessions = getCachedSessions();
-      const currentSession = selectSessionById(previousSessions, sessionId);
+      const currentSession = getSessionById(sessionId);
 
       if (!currentSession) {
         throw new Error(`Session ${sessionId} was not found`);
@@ -226,51 +413,35 @@ export function useSessions(initialSessions?: VideoSession[]) {
         createdAt: Date.now(),
         seq: computeNextTagSequence(currentSession),
       });
-      const optimisticSession: VideoSession = {
+      const optimisticSession = {
         ...currentSession,
         tags: [...currentSession.tags, optimisticTag],
         lastModified: Date.now(),
       };
 
-      setCachedSessions((currentSessions) =>
-        replaceSession(currentSessions, sessionId, optimisticSession),
-      );
-
-      try {
-        const serverSession = await addTagAction({
-          sessionId,
-          tagId: optimisticTag.id,
-          createdAt: optimisticTag.createdAt,
-          params,
-        });
-
-        setCachedSessions((currentSessions) =>
-          replaceSession(currentSessions, sessionId, serverSession),
-        );
-
-        return serverSession;
-      } catch (mutationError) {
-        setCachedSessions(previousSessions);
-        throw mutationError;
-      }
+      return addTagMutation.mutateAsync({
+        sessionId,
+        params,
+        optimisticSession,
+        optimisticTag,
+      });
     },
-    [getCachedSessions, setCachedSessions],
+    [addTagMutation, getSessionById],
   );
 
   const updateTag = useCallback(
     async (
       sessionId: string,
       tagId: string,
-      updates: Partial<Omit<VideoSession["tags"][number], "id" | "createdAt">>,
+      updates: Partial<Omit<Tag, "id" | "createdAt">>,
     ) => {
-      const previousSessions = getCachedSessions();
-      const currentSession = selectSessionById(previousSessions, sessionId);
+      const currentSession = getSessionById(sessionId);
 
       if (!currentSession) {
         throw new Error(`Session ${sessionId} was not found`);
       }
 
-      const optimisticSession: VideoSession = {
+      const optimisticSession = {
         ...currentSession,
         tags: currentSession.tags.map((tag) =>
           tag.id === tagId
@@ -283,102 +454,72 @@ export function useSessions(initialSessions?: VideoSession[]) {
         lastModified: Date.now(),
       };
 
-      setCachedSessions((currentSessions) =>
-        replaceSession(currentSessions, sessionId, optimisticSession),
-      );
-
-      try {
-        const serverSession = await updateTagAction({
-          sessionId,
-          tagId,
-          updates,
-        });
-
-        setCachedSessions((currentSessions) =>
-          replaceSession(currentSessions, sessionId, serverSession),
-        );
-
-        return serverSession;
-      } catch (mutationError) {
-        setCachedSessions(previousSessions);
-        throw mutationError;
-      }
+      return updateTagMutation.mutateAsync({
+        sessionId,
+        tagId,
+        updates,
+        optimisticSession,
+      });
     },
-    [getCachedSessions, setCachedSessions],
+    [getSessionById, updateTagMutation],
   );
 
   const deleteTag = useCallback(
     async (sessionId: string, tagId: string) => {
-      const previousSessions = getCachedSessions();
-      const currentSession = selectSessionById(previousSessions, sessionId);
+      const currentSession = getSessionById(sessionId);
 
       if (!currentSession) {
         throw new Error(`Session ${sessionId} was not found`);
       }
 
-      const optimisticSession: VideoSession = {
+      const deletedTagIndex = currentSession.tags.findIndex((tag) => tag.id === tagId);
+
+      if (deletedTagIndex === -1) {
+        throw new Error(`Tag ${tagId} was not found in session ${sessionId}`);
+      }
+
+      const deletedTag = currentSession.tags[deletedTagIndex];
+      const optimisticSession = {
         ...currentSession,
         tags: currentSession.tags.filter((tag) => tag.id !== tagId),
         lastModified: Date.now(),
       };
 
-      setCachedSessions((currentSessions) =>
-        replaceSession(currentSessions, sessionId, optimisticSession),
-      );
-
-      try {
-        const serverSession = await deleteTagAction({
-          sessionId,
-          tagId,
-        });
-
-        setCachedSessions((currentSessions) =>
-          replaceSession(currentSessions, sessionId, serverSession),
-        );
-
-        return serverSession;
-      } catch (mutationError) {
-        setCachedSessions(previousSessions);
-        throw mutationError;
-      }
+      return deleteTagMutation.mutateAsync({
+        sessionId,
+        tagId,
+        optimisticSession,
+        deletedTag,
+        deletedTagIndex,
+      });
     },
-    [getCachedSessions, setCachedSessions],
+    [deleteTagMutation, getSessionById],
   );
 
   const deleteSession = useCallback(
     async (sessionId: string) => {
-      const previousSessions = getCachedSessions();
-      setCachedSessions((currentSessions) =>
-        currentSessions.filter((session) => session.id !== sessionId),
+      const currentSessions = getCachedSessions();
+      const previousIndex = currentSessions.findIndex(
+        (session) => session.id === sessionId,
       );
 
-      try {
-        const deletedSession = await deleteSessionAction({ sessionId });
-        return deletedSession;
-      } catch (mutationError) {
-        setCachedSessions(previousSessions);
-        throw mutationError;
+      if (previousIndex === -1) {
+        throw new Error(`Session ${sessionId} was not found`);
       }
+
+      return deleteSessionMutation.mutateAsync({
+        sessionId,
+        previousSession: currentSessions[previousIndex],
+        previousIndex,
+      });
     },
-    [getCachedSessions, setCachedSessions],
+    [deleteSessionMutation, getCachedSessions],
   );
 
   const importSessions = useCallback(
-    async (incomingSessions: VideoSession[]) => {
-      const result = await importSessionsAction({
-        sessions: incomingSessions,
-      });
-
-      await queryClient.invalidateQueries({
-        queryKey: sessionsQueryKey,
-      });
-      await queryClient.refetchQueries({
-        queryKey: sessionsQueryKey,
-      });
-
-      return result;
-    },
-    [queryClient],
+    async (incomingSessions: VideoSession[]) =>
+      importSessionsMutation.mutateAsync(incomingSessions),
+    [importSessionsMutation],
   );
 
   return useMemo(
@@ -482,23 +623,84 @@ function replaceSession(
   return found ? nextSessions : [...nextSessions, nextSession];
 }
 
+function restoreDeletedSession(
+  sessions: VideoSession[],
+  deletedSession: VideoSession,
+  deletedSessionIndex: number,
+): VideoSession[] {
+  if (sessions.some((session) => session.id === deletedSession.id)) {
+    return sessions;
+  }
+
+  const nextSessions = [...sessions];
+  nextSessions.splice(
+    Math.min(deletedSessionIndex, nextSessions.length),
+    0,
+    deletedSession,
+  );
+  return nextSessions;
+}
+
+function removeTagFromSession(
+  sessions: VideoSession[],
+  sessionId: string,
+  tagId: string,
+): VideoSession[] {
+  return sessions.map((session) =>
+    session.id === sessionId
+      ? {
+          ...session,
+          tags: session.tags.filter((tag) => tag.id !== tagId),
+        }
+      : session,
+  );
+}
+
+function restoreDeletedTag(
+  sessions: VideoSession[],
+  sessionId: string,
+  deletedTag: Tag,
+  deletedTagIndex: number,
+): VideoSession[] {
+  return sessions.map((session) => {
+    if (session.id !== sessionId) {
+      return session;
+    }
+
+    if (session.tags.some((tag) => tag.id === deletedTag.id)) {
+      return session;
+    }
+
+    const nextTags = [...session.tags];
+    nextTags.splice(Math.min(deletedTagIndex, nextTags.length), 0, deletedTag);
+
+    return {
+      ...session,
+      tags: nextTags,
+    };
+  });
+}
+
 function applySessionDraftUpdates(
   session: VideoSession,
   params: SessionDraftParams,
 ): VideoSession {
   const updates: UpdateSessionParams = {};
 
-  for (const fieldKey of [
-    "leftFencer",
-    "rightFencer",
-    "boutDate",
-    "externalSource",
-  ] as const) {
-    if (!(fieldKey in params)) {
-      continue;
-    }
+  if ("leftFencer" in params) {
+    updates.leftFencer = params.leftFencer ?? null;
+  }
 
-    updates[fieldKey] = params[fieldKey] ?? null;
+  if ("rightFencer" in params) {
+    updates.rightFencer = params.rightFencer ?? null;
+  }
+
+  if ("boutDate" in params) {
+    updates.boutDate = params.boutDate ?? null;
+  }
+
+  if ("externalSource" in params) {
+    updates.externalSource = params.externalSource ?? null;
   }
 
   return Object.keys(updates).length > 0

@@ -1,7 +1,12 @@
 import "server-only";
 
 import type { VideoSession } from "@/lib/types";
-import { JsonFileSessionRepository } from "@/lib/server/json-session-repository";
+import { createJsonFileSessionRepository } from "@/lib/server/json-session-repository";
+
+export interface SessionMutationResult<T> {
+  sessions: VideoSession[];
+  result: T;
+}
 
 export interface SessionRepository {
   listSessions(): Promise<VideoSession[]>;
@@ -13,13 +18,20 @@ export interface SessionRepository {
     sessions: VideoSession[],
   ): Promise<{ imported: number; skipped: number }>;
   replaceSessions(sessions: VideoSession[]): Promise<void>;
+  mutateSessions<T>(
+    mutator: (
+      sessions: VideoSession[],
+    ) =>
+      | SessionMutationResult<T>
+      | Promise<SessionMutationResult<T>>,
+  ): Promise<T>;
 }
 
 let repository: SessionRepository | null = null;
 
 export function getSessionRepository(): SessionRepository {
   if (!repository) {
-    repository = new JsonFileSessionRepository();
+    repository = createJsonFileSessionRepository();
   }
 
   return repository;

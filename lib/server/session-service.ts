@@ -143,15 +143,27 @@ export async function updateSession(
   input: UpdateSessionInput,
 ): Promise<VideoSession> {
   const parsedInput = UpdateSessionInputSchema.parse(input);
-  const repository = getSessionRepository();
-  const existingSession = await repository.getSessionById(parsedInput.sessionId);
+  return getSessionRepository().mutateSessions((sessions) => {
+    const sessionIndex = sessions.findIndex(
+      (session) => session.id === parsedInput.sessionId,
+    );
 
-  if (!existingSession) {
-    throw new Error(`Session ${parsedInput.sessionId} was not found`);
-  }
+    if (sessionIndex === -1) {
+      throw new Error(`Session ${parsedInput.sessionId} was not found`);
+    }
 
-  const nextSession = applySessionUpdates(existingSession, parsedInput.updates);
-  return repository.updateSession(nextSession);
+    const nextSession = applySessionUpdates(
+      sessions[sessionIndex],
+      parsedInput.updates,
+    );
+
+    return {
+      sessions: sessions.map((session, index) =>
+        index === sessionIndex ? nextSession : session,
+      ),
+      result: nextSession,
+    };
+  });
 }
 
 export async function deleteSession(
@@ -171,84 +183,114 @@ export async function deleteSession(
 
 export async function addTag(input: AddTagInput): Promise<VideoSession> {
   const parsedInput = AddTagInputSchema.parse(input);
-  const repository = getSessionRepository();
-  const session = await repository.getSessionById(parsedInput.sessionId);
+  return getSessionRepository().mutateSessions((sessions) => {
+    const sessionIndex = sessions.findIndex(
+      (session) => session.id === parsedInput.sessionId,
+    );
 
-  if (!session) {
-    throw new Error(`Session ${parsedInput.sessionId} was not found`);
-  }
+    if (sessionIndex === -1) {
+      throw new Error(`Session ${parsedInput.sessionId} was not found`);
+    }
 
-  const nextTag = createTagRecord(parsedInput.params, {
-    tagId: parsedInput.tagId,
-    createdAt: parsedInput.createdAt,
-    seq: computeNextTagSequence(session),
+    const session = sessions[sessionIndex];
+    const nextTag = createTagRecord(parsedInput.params, {
+      tagId: parsedInput.tagId,
+      createdAt: parsedInput.createdAt,
+      seq: computeNextTagSequence(session),
+    });
+    const nextSession = {
+      ...session,
+      tags: [...session.tags, nextTag],
+      lastModified: Date.now(),
+    };
+
+    return {
+      sessions: sessions.map((currentSession, index) =>
+        index === sessionIndex ? nextSession : currentSession,
+      ),
+      result: nextSession,
+    };
   });
-
-  const nextSession = {
-    ...session,
-    tags: [...session.tags, nextTag],
-    lastModified: Date.now(),
-  };
-
-  return repository.updateSession(nextSession);
 }
 
 export async function updateTag(input: UpdateTagInput): Promise<VideoSession> {
   const parsedInput = UpdateTagInputSchema.parse(input);
-  const repository = getSessionRepository();
-  const session = await repository.getSessionById(parsedInput.sessionId);
+  return getSessionRepository().mutateSessions((sessions) => {
+    const sessionIndex = sessions.findIndex(
+      (session) => session.id === parsedInput.sessionId,
+    );
 
-  if (!session) {
-    throw new Error(`Session ${parsedInput.sessionId} was not found`);
-  }
-
-  let foundTag = false;
-  const nextTags = session.tags.map((tag) => {
-    if (tag.id !== parsedInput.tagId) {
-      return tag;
+    if (sessionIndex === -1) {
+      throw new Error(`Session ${parsedInput.sessionId} was not found`);
     }
 
-    foundTag = true;
-    return {
-      ...tag,
-      ...parsedInput.updates,
+    const session = sessions[sessionIndex];
+    let foundTag = false;
+    const nextTags = session.tags.map((tag) => {
+      if (tag.id !== parsedInput.tagId) {
+        return tag;
+      }
+
+      foundTag = true;
+      return {
+        ...tag,
+        ...parsedInput.updates,
+      };
+    });
+
+    if (!foundTag) {
+      throw new Error(
+        `Tag ${parsedInput.tagId} was not found in session ${parsedInput.sessionId}`,
+      );
+    }
+
+    const nextSession = {
+      ...session,
+      tags: nextTags,
+      lastModified: Date.now(),
     };
-  });
 
-  if (!foundTag) {
-    throw new Error(
-      `Tag ${parsedInput.tagId} was not found in session ${parsedInput.sessionId}`,
-    );
-  }
-
-  return repository.updateSession({
-    ...session,
-    tags: nextTags,
-    lastModified: Date.now(),
+    return {
+      sessions: sessions.map((currentSession, index) =>
+        index === sessionIndex ? nextSession : currentSession,
+      ),
+      result: nextSession,
+    };
   });
 }
 
 export async function deleteTag(input: DeleteTagInput): Promise<VideoSession> {
   const parsedInput = DeleteTagInputSchema.parse(input);
-  const repository = getSessionRepository();
-  const session = await repository.getSessionById(parsedInput.sessionId);
-
-  if (!session) {
-    throw new Error(`Session ${parsedInput.sessionId} was not found`);
-  }
-
-  const nextTags = session.tags.filter((tag) => tag.id !== parsedInput.tagId);
-
-  if (nextTags.length === session.tags.length) {
-    throw new Error(
-      `Tag ${parsedInput.tagId} was not found in session ${parsedInput.sessionId}`,
+  return getSessionRepository().mutateSessions((sessions) => {
+    const sessionIndex = sessions.findIndex(
+      (session) => session.id === parsedInput.sessionId,
     );
-  }
 
-  return repository.updateSession({
-    ...session,
-    tags: nextTags,
-    lastModified: Date.now(),
+    if (sessionIndex === -1) {
+      throw new Error(`Session ${parsedInput.sessionId} was not found`);
+    }
+
+    const session = sessions[sessionIndex];
+    const nextTags = session.tags.filter((tag) => tag.id !== parsedInput.tagId);
+
+    if (nextTags.length === session.tags.length) {
+      throw new Error(
+        `Tag ${parsedInput.tagId} was not found in session ${parsedInput.sessionId}`,
+      );
+    }
+
+    const nextSession = {
+      ...session,
+      tags: nextTags,
+      lastModified: Date.now(),
+    };
+
+    return {
+      sessions: sessions.map((currentSession, index) =>
+        index === sessionIndex ? nextSession : currentSession,
+      ),
+      result: nextSession,
+    };
   });
 }
 

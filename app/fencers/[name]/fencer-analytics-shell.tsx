@@ -24,16 +24,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSessions } from "@/hooks/use-sessions";
 import { deriveFencerPageViewModel } from "@/lib/fencer-stats";
 import { SIDE_COLORS } from "@/lib/constants";
+import type { VideoSession } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface FencerAnalyticsShellProps {
   fencerName: string;
+  initialSessions: VideoSession[];
 }
 
 export function FencerAnalyticsShell({
   fencerName,
+  initialSessions,
 }: FencerAnalyticsShellProps) {
-  const { sessions } = useSessions();
+  const { sessions } = useSessions(initialSessions);
 
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");

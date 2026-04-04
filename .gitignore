@@ -2,6 +2,7 @@
 .claude
 .codex
 *.csv
+.data/
 
 # dependencies
 /node_modules

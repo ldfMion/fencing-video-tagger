@@ -16,8 +16,13 @@ import {
   type SessionDraftParams,
   type SessionVideoSelection,
 } from "@/hooks/use-sessions";
+import type { VideoSession } from "@/lib/types";
 
-export function LibraryPageShell() {
+interface LibraryPageShellProps {
+  initialSessions: VideoSession[];
+}
+
+export function LibraryPageShell({ initialSessions }: LibraryPageShellProps) {
   const router = useRouter();
   const { playTemporaryVideo } = useVideoContext();
   const {
@@ -26,7 +31,7 @@ export function LibraryPageShell() {
     deleteSession,
     exportToCSV,
     allFencerNames,
-  } = useSessions();
+  } = useSessions(initialSessions);
 
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -46,15 +51,29 @@ export function LibraryPageShell() {
   );
 
   const handleCreateSession = useCallback(
-    (params: SessionDraftParams, videoSelection: SessionVideoSelection) => {
-      const session = createSessionEntry(params, videoSelection);
+    async (params: SessionDraftParams, videoSelection: SessionVideoSelection) => {
+      const sessionId = crypto.randomUUID();
 
       if (videoSelection.kind === "temporary") {
-        playTemporaryVideo(session.id, videoSelection.file);
+        playTemporaryVideo(sessionId, videoSelection.file);
       }
 
-      router.push(`/bouts/${session.id}`);
-      return session;
+      router.push(`/bouts/${sessionId}`);
+
+      try {
+        const session = await createSessionEntry(params, videoSelection, {
+          sessionId,
+        });
+
+        if (session.id !== sessionId) {
+          router.replace(`/bouts/${session.id}`);
+        }
+
+        return session;
+      } catch (error) {
+        router.replace("/");
+        throw error;
+      }
     },
     [createSessionEntry, playTemporaryVideo, router],
   );

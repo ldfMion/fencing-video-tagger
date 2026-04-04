@@ -8,9 +8,14 @@ import { getTodayIsoDate } from "@/lib/date-utils";
 interface ExportButtonProps {
   exportToCSV: () => string;
   disabled?: boolean;
+  size?: React.ComponentProps<typeof Button>["size"];
 }
 
-export function ExportButton({ exportToCSV, disabled }: ExportButtonProps) {
+export function ExportButton({
+  exportToCSV,
+  disabled,
+  size = "default",
+}: ExportButtonProps) {
   const handleExport = useCallback(() => {
     const csv = exportToCSV();
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -25,7 +30,12 @@ export function ExportButton({ exportToCSV, disabled }: ExportButtonProps) {
   }, [exportToCSV]);
 
   return (
-    <Button variant="outline" onClick={handleExport} disabled={disabled}>
+    <Button
+      variant="outline"
+      size={size}
+      onClick={handleExport}
+      disabled={disabled}
+    >
       <Download className="h-4 w-4 mr-2" />
       Export CSV
     </Button>

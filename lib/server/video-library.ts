@@ -1,6 +1,6 @@
 import "server-only";
 
-import { promises as fs } from "node:fs";
+import { constants as fsConstants, promises as fs } from "node:fs";
 import path from "node:path";
 import type { VideoLibraryItem } from "@/lib/video-library";
 
@@ -27,6 +27,26 @@ function getVideoLibraryRoot(): string {
   }
 
   return path.resolve(configuredRoot);
+}
+
+async function assertReadablePath(
+  targetPath: string,
+  errorMessage: string,
+): Promise<void> {
+  try {
+    await fs.access(targetPath, fsConstants.R_OK);
+  } catch (error) {
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      (error.code === "EACCES" || error.code === "EPERM")
+    ) {
+      throw new Error(errorMessage);
+    }
+
+    throw error;
+  }
 }
 
 export function getVideoLibraryRootName(): string {
@@ -84,6 +104,7 @@ async function walkDirectory(
 
 export async function listVideoLibraryItems(): Promise<VideoLibraryItem[]> {
   const root = getVideoLibraryRoot();
+  await assertReadablePath(root, "Video library root cannot be read");
   const stats = await fs.stat(root);
 
   if (!stats.isDirectory()) {
@@ -140,6 +161,24 @@ export async function resolveVideoLibraryFile(relativePath: string): Promise<{
 
   if (!stats.isFile()) {
     throw new Error("Video file not found");
+  }
+
+  await assertReadablePath(absolutePath, "Video file cannot be read");
+
+  try {
+    const fileHandle = await fs.open(absolutePath, "r");
+    await fileHandle.close();
+  } catch (error) {
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      (error.code === "EACCES" || error.code === "EPERM")
+    ) {
+      throw new Error("Video file cannot be read");
+    }
+
+    throw error;
   }
 
   return {

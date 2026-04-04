@@ -1,5 +1,4 @@
 import { createReadStream } from "node:fs";
-import { Readable } from "node:stream";
 import { resolveVideoLibraryFile } from "@/lib/server/video-library";
 
 export const runtime = "nodejs";
@@ -60,6 +59,50 @@ function parseRangeHeader(
   };
 }
 
+function createVideoStream(
+  absolutePath: string,
+  options?: { start?: number; end?: number },
+): ReadableStream<Uint8Array> {
+  const stream = createReadStream(absolutePath, options);
+
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      let isClosed = false;
+
+      const closeController = () => {
+        if (!isClosed) {
+          isClosed = true;
+          controller.close();
+        }
+      };
+
+      const errorController = (error: unknown) => {
+        if (!isClosed) {
+          isClosed = true;
+          controller.error(error);
+        }
+      };
+
+      stream.on("data", (chunk) => {
+        if (!isClosed) {
+          controller.enqueue(
+            typeof chunk === "string"
+              ? new TextEncoder().encode(chunk)
+              : new Uint8Array(chunk),
+          );
+        }
+      });
+
+      stream.once("end", closeController);
+      stream.once("close", closeController);
+      stream.once("error", errorController);
+    },
+    cancel() {
+      stream.destroy();
+    },
+  });
+}
+
 async function getVideoResponse(request: Request, method: "GET" | "HEAD") {
   const requestUrl = new URL(request.url);
   const relativePath = requestUrl.searchParams.get("path");
@@ -84,8 +127,7 @@ async function getVideoResponse(request: Request, method: "GET" | "HEAD") {
         });
       }
 
-      const stream = createReadStream(absolutePath);
-      return new Response(Readable.toWeb(stream) as ReadableStream, {
+      return new Response(createVideoStream(absolutePath), {
         status: 200,
         headers: baseHeaders,
       });
@@ -116,8 +158,7 @@ async function getVideoResponse(request: Request, method: "GET" | "HEAD") {
       });
     }
 
-    const stream = createReadStream(absolutePath, { start, end });
-    return new Response(Readable.toWeb(stream) as ReadableStream, {
+    return new Response(createVideoStream(absolutePath, { start, end }), {
       status: 206,
       headers,
     });

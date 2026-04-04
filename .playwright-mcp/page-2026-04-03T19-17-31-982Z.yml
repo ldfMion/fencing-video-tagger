@@ -1,0 +1,28 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e5]:
+        - img [ref=e6]
+        - heading "Fencing Video Tagger" [level=1] [ref=e15]
+      - generic [ref=e16]:
+        - button "Import JSON" [ref=e18]:
+          - img
+          - text: Import JSON
+        - button "Export CSV" [disabled]:
+          - img
+          - text: Export CSV
+        - button "New Bout" [ref=e19]:
+          - img
+          - text: New Bout
+    - generic [ref=e20]:
+      - generic [ref=e21]:
+        - img [ref=e22]
+        - textbox "Search fencer or filename..." [ref=e25]
+      - generic [ref=e26]:
+        - textbox "From date" [ref=e27]
+        - generic [ref=e28]: to
+        - textbox "To date" [ref=e29]
+    - generic [ref=e30]: No bouts found.
+  - button "Open Next.js Dev Tools" [ref=e36] [cursor=pointer]:
+    - img [ref=e37]
+  - alert [ref=e40]

@@ -264,7 +264,11 @@ export function VideoPlayer({
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className={maximized ? "h-full flex flex-col" : "space-y-2"}>
+      <div
+        className={
+          maximized ? "flex h-full min-h-0 flex-col overflow-y-auto" : "space-y-2"
+        }
+      >
         <div
           className={`${maximized ? "flex-1 min-h-0" : "aspect-video"} bg-black rounded-lg overflow-hidden flex items-center justify-center relative`}
         >
@@ -288,7 +292,7 @@ export function VideoPlayer({
 
         {/* Progress bar */}
         <div
-          className={`h-2 bg-muted rounded-full cursor-pointer ${maximized ? "mt-2" : ""}`}
+          className={`h-1.5 bg-muted rounded-full cursor-pointer ${maximized ? "mt-1.5" : ""}`}
           onClick={handleProgressClick}
         >
           <div
@@ -299,17 +303,17 @@ export function VideoPlayer({
 
         {/* Controls */}
         <div
-          className={`flex items-center gap-2 flex-wrap ${maximized ? "mt-2" : ""}`}
+          className={`shrink-0 flex items-center gap-1.5 flex-wrap ${maximized ? "mt-1.5 pb-1" : ""}`}
         >
           {/* Frame back */}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="outline"
-                size="icon"
+                size="icon-sm"
                 onClick={() => stepFrame("backward")}
               >
-                <ChevronLeft className="h-4 w-4" />
+                <ChevronLeft className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>
@@ -322,10 +326,10 @@ export function VideoPlayer({
             <TooltipTrigger asChild>
               <Button
                 variant="outline"
-                size="icon"
+                size="icon-sm"
                 onClick={() => skip("backward")}
               >
-                <SkipBack className="h-4 w-4" />
+                <SkipBack className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>
@@ -336,11 +340,11 @@ export function VideoPlayer({
           {/* Play/Pause */}
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="outline" size="icon" onClick={togglePlay}>
+              <Button variant="outline" size="icon-sm" onClick={togglePlay}>
                 {isPlaying ? (
-                  <Pause className="h-4 w-4" />
+                  <Pause className="h-3.5 w-3.5" />
                 ) : (
-                  <Play className="h-4 w-4" />
+                  <Play className="h-3.5 w-3.5" />
                 )}
               </Button>
             </TooltipTrigger>
@@ -354,10 +358,10 @@ export function VideoPlayer({
             <TooltipTrigger asChild>
               <Button
                 variant="outline"
-                size="icon"
+                size="icon-sm"
                 onClick={() => skip("forward")}
               >
-                <SkipForward className="h-4 w-4" />
+                <SkipForward className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>
@@ -370,10 +374,10 @@ export function VideoPlayer({
             <TooltipTrigger asChild>
               <Button
                 variant="outline"
-                size="icon"
+                size="icon-sm"
                 onClick={() => stepFrame("forward")}
               >
-                <ChevronRight className="h-4 w-4" />
+                <ChevronRight className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>
@@ -382,7 +386,7 @@ export function VideoPlayer({
           </Tooltip>
 
           {/* Time display */}
-          <span className="text-sm text-muted-foreground px-2">
+          <span className="px-1.5 text-xs text-muted-foreground">
             {formatTime(currentTime)} / {formatTime(duration)}
           </span>
 
@@ -392,11 +396,11 @@ export function VideoPlayer({
               <TooltipTrigger asChild>
                 <Button
                   variant="outline"
-                  size="icon"
+                  size="icon-sm"
                   onClick={zoomOut}
                   disabled={zoomLevel === ZOOM_LEVELS[0]}
                 >
-                  <ZoomOut className="h-4 w-4" />
+                  <ZoomOut className="h-3.5 w-3.5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
@@ -408,9 +412,9 @@ export function VideoPlayer({
               <TooltipTrigger asChild>
                 <Button
                   variant="outline"
-                  size="sm"
+                  size="xs"
                   onClick={resetZoom}
-                  className="px-2 h-8 min-w-[3.5rem]"
+                  className="min-w-[3.25rem] px-1.5"
                 >
                   {Math.round(zoomLevel * 100)}%
                 </Button>
@@ -424,11 +428,11 @@ export function VideoPlayer({
               <TooltipTrigger asChild>
                 <Button
                   variant="outline"
-                  size="icon"
+                  size="icon-sm"
                   onClick={zoomIn}
                   disabled={zoomLevel === ZOOM_LEVELS[ZOOM_LEVELS.length - 1]}
                 >
-                  <ZoomIn className="h-4 w-4" />
+                  <ZoomIn className="h-3.5 w-3.5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
@@ -440,12 +444,12 @@ export function VideoPlayer({
           {/* Pan controls - only show when zoomed in */}
           {zoomLevel > 1 && (
             <div className="flex items-center gap-1">
-              <span className="text-sm text-muted-foreground mr-1">Pan:</span>
+              <span className="mr-1 text-xs text-muted-foreground">Pan:</span>
 
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="outline" size="icon" onClick={panUp}>
-                    <ArrowUp className="h-4 w-4" />
+                  <Button variant="outline" size="icon-sm" onClick={panUp}>
+                    <ArrowUp className="h-3.5 w-3.5" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -455,8 +459,8 @@ export function VideoPlayer({
 
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="outline" size="icon" onClick={panLeft}>
-                    <ArrowLeft className="h-4 w-4" />
+                  <Button variant="outline" size="icon-sm" onClick={panLeft}>
+                    <ArrowLeft className="h-3.5 w-3.5" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -466,8 +470,8 @@ export function VideoPlayer({
 
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="outline" size="icon" onClick={panDown}>
-                    <ArrowDown className="h-4 w-4" />
+                  <Button variant="outline" size="icon-sm" onClick={panDown}>
+                    <ArrowDown className="h-3.5 w-3.5" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -477,8 +481,8 @@ export function VideoPlayer({
 
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="outline" size="icon" onClick={panRight}>
-                    <ArrowRight className="h-4 w-4" />
+                  <Button variant="outline" size="icon-sm" onClick={panRight}>
+                    <ArrowRight className="h-3.5 w-3.5" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -488,8 +492,8 @@ export function VideoPlayer({
 
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="outline" size="icon" onClick={centerPan}>
-                    <Crosshair className="h-4 w-4" />
+                  <Button variant="outline" size="icon-sm" onClick={centerPan}>
+                    <Crosshair className="h-3.5 w-3.5" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -500,16 +504,16 @@ export function VideoPlayer({
           )}
 
           {/* Speed selector */}
-          <div className="flex items-center gap-1 ml-auto">
-            <span className="text-sm text-muted-foreground mr-1">Speed:</span>
+          <div className="ml-auto flex items-center gap-1">
+            <span className="mr-1 text-xs text-muted-foreground">Speed:</span>
             {PLAYBACK_SPEEDS.map((speed) => (
               <Tooltip key={speed}>
                 <TooltipTrigger asChild>
                   <Button
                     variant={playbackSpeed === speed ? "default" : "outline"}
-                    size="sm"
+                    size="xs"
                     onClick={() => setPlaybackSpeed(speed)}
-                    className="px-2 h-8 min-w-[3rem]"
+                    className="min-w-[2.75rem] px-1.5"
                   >
                     {speed}x
                   </Button>

@@ -1,0 +1,12 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - img [ref=e3]
+    - heading "Bout not found" [level=1] [ref=e5]
+    - paragraph [ref=e6]: This bout doesn't exist or may have been deleted.
+    - link "Back to Bouts" [ref=e7] [cursor=pointer]:
+      - /url: /
+      - button "Back to Bouts" [ref=e8]:
+        - img
+        - text: Back to Bouts
+  - button "Open Next.js Dev Tools" [ref=e14] [cursor=pointer]:
+    - img [ref=e15]

@@ -203,7 +203,7 @@ export function BoutWorkspaceShell({ boutId }: BoutWorkspaceShellProps) {
   return (
     <>
       <Tabs defaultValue="tagging" className="flex h-screen flex-col bg-background">
-        <header className="flex h-12 shrink-0 items-center justify-between border-b px-3">
+        <header className="flex h-11 shrink-0 items-center justify-between border-b px-2.5">
           <div className="flex items-center gap-1">
             <Link href="/">
               <Button variant="ghost" size="sm">
@@ -214,24 +214,25 @@ export function BoutWorkspaceShell({ boutId }: BoutWorkspaceShellProps) {
             <span className="text-muted-foreground">/</span>
             <button
               onClick={() => setIsEditDialogOpen(true)}
-              className="max-w-[200px] truncate text-sm text-foreground hover:underline"
+              className="max-w-[180px] truncate text-xs text-foreground hover:underline"
             >
               {getBoutDisplayLabel(session)}
             </button>
           </div>
 
-          <div className="flex items-center gap-2">
-            <TabsList className="h-8">
-              <TabsTrigger value="tagging" className="h-6 px-3 text-xs">
+          <div className="flex items-center gap-1.5">
+            <TabsList className="h-7">
+              <TabsTrigger value="tagging" className="h-5 px-2 text-[11px]">
                 Tagging
               </TabsTrigger>
-              <TabsTrigger value="analysis" className="h-6 px-3 text-xs">
+              <TabsTrigger value="analysis" className="h-5 px-2 text-[11px]">
                 Analysis
               </TabsTrigger>
             </TabsList>
             <ExportButton
               exportToCSV={exportToCSV}
               disabled={sessions.length === 0}
+              size="sm"
             />
             <input
               ref={fileInputRef}
@@ -244,11 +245,16 @@ export function BoutWorkspaceShell({ boutId }: BoutWorkspaceShellProps) {
               size="sm"
               variant="outline"
               onClick={() => setIsLibraryPickerOpen(true)}
+              className="text-[11px]"
             >
               <Video className="mr-1.5 h-4 w-4" />
               {hasAttachedLibraryVideo ? "Replace From Library" : "Attach From Library"}
             </Button>
-            <Button size="sm" onClick={() => fileInputRef.current?.click()}>
+            <Button
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              className="text-[11px]"
+            >
               <Upload className="mr-1.5 h-4 w-4" />
               Load Temporary File
             </Button>
@@ -257,6 +263,7 @@ export function BoutWorkspaceShell({ boutId }: BoutWorkspaceShellProps) {
                 size="sm"
                 variant="ghost"
                 onClick={handleRemoveAttachedVideo}
+                className="text-[11px]"
               >
                 Remove Attached Video
               </Button>
@@ -265,6 +272,7 @@ export function BoutWorkspaceShell({ boutId }: BoutWorkspaceShellProps) {
               size="sm"
               variant="outline"
               onClick={() => setIsEditDialogOpen(true)}
+              className="text-[11px]"
             >
               <Edit2 className="mr-1.5 h-4 w-4" />
               Edit
@@ -286,17 +294,17 @@ export function BoutWorkspaceShell({ boutId }: BoutWorkspaceShellProps) {
           />
         </header>
 
-        <TabsContent value="tagging" className="mt-0 flex-1 overflow-hidden p-2">
-          <div className="grid h-full grid-cols-1 gap-2 lg:grid-cols-[1fr_280px]">
-            <div className="flex min-h-0 flex-col gap-2">
+        <TabsContent value="tagging" className="mt-0 flex-1 overflow-hidden p-1.5">
+          <div className="grid h-full grid-cols-1 gap-1.5 lg:grid-cols-[1fr_252px]">
+            <div className="flex min-h-0 flex-col gap-1.5">
               {activeVideoUrl ? (
-                <div className="min-h-0 flex-1 overflow-hidden rounded-lg border bg-card p-2">
-                  <div className="mb-2 flex flex-wrap items-center gap-2 px-1">
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border bg-card p-1.5">
+                  <div className="mb-1 flex shrink-0 flex-wrap items-center gap-1.5 px-0.5">
                     <Badge variant={hasTemporaryOverride ? "secondary" : "outline"}>
                       {activeVideoBadge}
                     </Badge>
                     {activeVideoFileName ? (
-                      <span className="max-w-[320px] truncate text-sm text-muted-foreground">
+                      <span className="max-w-[280px] truncate text-xs text-muted-foreground">
                         {activeVideoFileName}
                       </span>
                     ) : null}
@@ -306,18 +314,20 @@ export function BoutWorkspaceShell({ boutId }: BoutWorkspaceShellProps) {
                       </span>
                     ) : null}
                   </div>
-                  <VideoPlayer videoUrl={activeVideoUrl} video={video} maximized />
+                  <div className="min-h-0 flex-1">
+                    <VideoPlayer videoUrl={activeVideoUrl} video={video} maximized />
+                  </div>
                 </div>
               ) : showLibraryLoadingState ? (
-                <div className="flex h-[140px] flex-none flex-col items-center justify-center gap-2 rounded-lg border bg-card p-2 text-muted-foreground">
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                  <p className="text-sm">Checking attached video...</p>
+                <div className="flex h-[124px] flex-none flex-col items-center justify-center gap-2 rounded-lg border bg-card p-2 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <p className="text-xs">Checking attached video...</p>
                 </div>
               ) : showUnavailableState ? (
-                <div className="flex h-[160px] flex-none flex-col items-center justify-center gap-3 rounded-lg border bg-card p-3 text-center">
-                  <AlertCircle className="h-6 w-6 text-destructive" />
+                <div className="flex h-[144px] flex-none flex-col items-center justify-center gap-2.5 rounded-lg border bg-card p-2.5 text-center">
+                  <AlertCircle className="h-5 w-5 text-destructive" />
                   <div className="space-y-1">
-                    <p className="text-sm font-medium text-foreground">
+                    <p className="text-xs font-medium text-foreground">
                       Attached video is unavailable
                     </p>
                     {session.fileName ? (
@@ -351,8 +361,8 @@ export function BoutWorkspaceShell({ boutId }: BoutWorkspaceShellProps) {
                   </div>
                 </div>
               ) : (
-                <div className="flex h-[160px] flex-none flex-col items-center justify-center gap-3 rounded-lg border bg-card p-3 text-center">
-                  <p className="text-sm">
+                <div className="flex h-[144px] flex-none flex-col items-center justify-center gap-2.5 rounded-lg border bg-card p-2.5 text-center">
+                  <p className="text-xs">
                     {isTemporaryOnly
                       ? "Temporary video metadata exists for this bout, but the file is not loaded."
                       : "No video attached to this bout"}
@@ -381,7 +391,7 @@ export function BoutWorkspaceShell({ boutId }: BoutWorkspaceShellProps) {
                 </div>
               )}
 
-              <div className="rounded-lg border bg-card p-3">
+              <div className="shrink-0 rounded-lg border bg-card p-2">
                 <TagForm
                   ref={tagFormRef}
                   onAddTag={handleAddTag}

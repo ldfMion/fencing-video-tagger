@@ -150,7 +150,7 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
 
   return (
     <TooltipProvider delayDuration={300}>
-      <form onSubmit={handleSubmit} className="space-y-2">
+      <form onSubmit={handleSubmit} className="space-y-1.5">
         {isVideoMode ? (
           <div className="flex items-center justify-between">
             <p className="text-xs text-muted-foreground">
@@ -170,14 +170,14 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
                 placeholder="m:ss (optional)"
                 value={manualTime}
                 onChange={(e) => setManualTime(e.target.value)}
-                className="h-7 text-xs px-2 border border-input rounded-md bg-background flex-1 max-w-[80px]"
+                className="h-6 text-xs px-2 border border-input rounded-md bg-background flex-1 max-w-[76px]"
               />
             </div>
           </div>
         )}
 
         {/* Main form row: Side, Action, Mistake */}
-        <div className="flex flex-wrap items-end gap-3">
+        <div className="flex flex-wrap items-end gap-2.5">
           {/* Side selector */}
           <div className="space-y-1">
             <Label className="text-xs">Side</Label>
@@ -190,7 +190,7 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
                     size="sm"
                     onClick={() => setSide(side === "L" ? undefined : "L")}
                     className={cn(
-                      "w-10 h-8",
+                      "h-7 w-8",
                       side === "L" &&
                         "bg-red-500 hover:bg-red-600 text-white border-red-500",
                     )}
@@ -210,7 +210,7 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
                     size="sm"
                     onClick={() => setSide(side === "R" ? undefined : "R")}
                     className={cn(
-                      "w-10 h-8",
+                      "h-7 w-8",
                       side === "R" &&
                         "bg-green-500 hover:bg-green-600 text-white border-green-500",
                     )}
@@ -226,7 +226,7 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
           </div>
 
           {/* Action selector (searchable) */}
-          <div className="space-y-1 flex-1 min-w-[140px]">
+          <div className="space-y-1 flex-1 min-w-[128px]">
             <Label className="text-xs">Action</Label>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -238,13 +238,14 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
                         variant="outline"
                         role="combobox"
                         aria-expanded={actionOpen}
-                        className="w-full h-8 justify-between text-sm"
+                        size="sm"
+                        className="w-full justify-between"
                       >
                         {action ?? "Select..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-[200px] p-0" align="start">
+                    <PopoverContent className="w-[190px] p-0" align="start">
                       <Command>
                         <CommandInput
                           placeholder="Search action..."
@@ -307,7 +308,7 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
                         mistake === "tactical" ? undefined : "tactical",
                       )
                     }
-                    className="h-8 text-xs px-2"
+                    className="h-7 px-2 text-[11px]"
                   >
                     Tactical
                   </Button>
@@ -327,7 +328,7 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
                         mistake === "execution" ? undefined : "execution",
                       )
                     }
-                    className="h-8 text-xs px-2"
+                    className="h-7 px-2 text-[11px]"
                   >
                     Execution
                   </Button>
@@ -351,7 +352,7 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
                   onChange={(e) => setComment(e.target.value)}
                   placeholder="Comment (optional)..."
                   disabled={disabled}
-                  className="text-sm resize-none min-h-[60px]"
+                  className="min-h-[52px] resize-none text-xs"
                   rows={2}
                 />
               </div>
@@ -365,9 +366,10 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
               <Button
                 type="submit"
                 disabled={disabled || !canSubmit}
-                className="h-[60px] px-4"
+                size="sm"
+                className="h-[52px] px-3"
               >
-                <Plus className="h-4 w-4" />
+                <Plus className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>

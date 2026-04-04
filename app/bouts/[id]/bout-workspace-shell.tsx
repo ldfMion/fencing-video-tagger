@@ -29,13 +29,18 @@ import {
 } from "@/hooks/use-sessions";
 import { useVideo } from "@/hooks/use-video";
 import { getBoutDisplayLabel } from "@/lib/session-selectors";
+import type { VideoSession } from "@/lib/types";
 import type { VideoLibraryItem } from "@/lib/video-library";
 
 interface BoutWorkspaceShellProps {
   boutId: string;
+  initialSessions: VideoSession[];
 }
 
-export function BoutWorkspaceShell({ boutId }: BoutWorkspaceShellProps) {
+export function BoutWorkspaceShell({
+  boutId,
+  initialSessions,
+}: BoutWorkspaceShellProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const tagFormRef = useRef<TagFormHandle>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -50,7 +55,7 @@ export function BoutWorkspaceShell({ boutId }: BoutWorkspaceShellProps) {
     exportToCSV,
     updateSessionEntry,
     allFencerNames,
-  } = useSessions();
+  } = useSessions(initialSessions);
 
   const session = getSessionById(boutId);
   const tags = session?.tags ?? [];
@@ -86,12 +91,12 @@ export function BoutWorkspaceShell({ boutId }: BoutWorkspaceShellProps) {
   );
 
   const handleAttachLibraryVideo = useCallback(
-    (selectedVideo: VideoLibraryItem) => {
+    async (selectedVideo: VideoLibraryItem) => {
       if (!session) {
         return;
       }
 
-      updateSessionEntry(session.id, {}, {
+      await updateSessionEntry(session.id, {}, {
         kind: "library",
         video: selectedVideo,
       });
@@ -104,33 +109,33 @@ export function BoutWorkspaceShell({ boutId }: BoutWorkspaceShellProps) {
     [handlePersistedVideoSelection, session, updateSessionEntry],
   );
 
-  const handleRemoveAttachedVideo = useCallback(() => {
+  const handleRemoveAttachedVideo = useCallback(async () => {
     if (!session) {
       return;
     }
 
-    updateSessionEntry(session.id, {}, { kind: "none" });
+    await updateSessionEntry(session.id, {}, { kind: "none" });
     handlePersistedVideoSelection({ kind: "none" });
   }, [handlePersistedVideoSelection, session, updateSessionEntry]);
 
   const handleAddTag = useCallback(
-    (params: AddTagParams) => {
+    async (params: AddTagParams) => {
       if (!session) {
         return;
       }
 
-      addTag(session.id, params);
+      await addTag(session.id, params);
     },
     [addTag, session],
   );
 
   const handleDeleteTag = useCallback(
-    (tagId: string) => {
+    async (tagId: string) => {
       if (!session) {
         return;
       }
 
-      deleteTag(session.id, tagId);
+      await deleteTag(session.id, tagId);
     },
     [deleteTag, session],
   );
@@ -283,11 +288,11 @@ export function BoutWorkspaceShell({ boutId }: BoutWorkspaceShellProps) {
             isOpen={isEditDialogOpen}
             onOpenChange={setIsEditDialogOpen}
             editSession={session}
-            onUpdateSession={(
+            onUpdateSession={async (
               params: SessionDraftParams,
               videoSelection: PersistedSessionVideoSelection,
             ) => {
-              updateSessionEntry(session.id, params, videoSelection);
+              await updateSessionEntry(session.id, params, videoSelection);
               handlePersistedVideoSelection(videoSelection);
             }}
             fencerNames={allFencerNames}

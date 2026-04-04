@@ -32,11 +32,11 @@ interface NewBoutDialogProps {
   onCreateSession?: (
     params: SessionDraftParams,
     videoSelection: SessionVideoSelection,
-  ) => VideoSession;
+  ) => Promise<VideoSession>;
   onUpdateSession?: (
     params: SessionDraftParams,
     videoSelection: PersistedSessionVideoSelection,
-  ) => void;
+  ) => Promise<void | VideoSession>;
   editSession?: VideoSession;
   fencerNames?: string[];
 }
@@ -47,11 +47,11 @@ interface DialogFormContentsProps {
   onCreateSession?: (
     params: SessionDraftParams,
     videoSelection: SessionVideoSelection,
-  ) => VideoSession;
+  ) => Promise<VideoSession>;
   onUpdateSession?: (
     params: SessionDraftParams,
     videoSelection: PersistedSessionVideoSelection,
-  ) => void;
+  ) => Promise<void | VideoSession>;
   onLibraryPanelChange?: (open: boolean) => void;
   onOpenChange: (open: boolean) => void;
 }
@@ -105,6 +105,7 @@ function DialogFormContents({
   );
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isLibraryPickerOpen, setIsLibraryPickerOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedLibraryVideo, setSelectedLibraryVideo] =
     useState<VideoLibraryItem | null>(
       editSession?.videoRelativePath
@@ -147,7 +148,7 @@ function DialogFormContents({
     (videoMode === "library" && !selectedLibraryVideo) ||
     (videoMode === "temporary" && !selectedFile);
 
-  function handleSubmit() {
+  async function handleSubmit() {
     const params: SessionDraftParams = {
       leftFencer: leftFencer.trim() || undefined,
       rightFencer: rightFencer.trim() || undefined,
@@ -155,34 +156,40 @@ function DialogFormContents({
       externalSource: externalSource.trim() || undefined,
     };
 
-    if (isEditMode) {
-      const videoSelection: PersistedSessionVideoSelection =
-        videoMode === "library" && selectedLibraryVideo
-          ? {
-              kind: "library",
-              video: selectedLibraryVideo,
-            }
-          : { kind: "none" };
+    setIsSubmitting(true);
 
-      onUpdateSession?.(params, videoSelection);
-    } else {
-      const videoSelection: SessionVideoSelection =
-        videoMode === "library" && selectedLibraryVideo
-          ? {
-              kind: "library",
-              video: selectedLibraryVideo,
-            }
-          : videoMode === "temporary" && selectedFile
+    try {
+      if (isEditMode) {
+        const videoSelection: PersistedSessionVideoSelection =
+          videoMode === "library" && selectedLibraryVideo
             ? {
-                kind: "temporary",
-                file: selectedFile,
+                kind: "library",
+                video: selectedLibraryVideo,
               }
             : { kind: "none" };
 
-      onCreateSession?.(params, videoSelection);
-    }
+        await onUpdateSession?.(params, videoSelection);
+      } else {
+        const videoSelection: SessionVideoSelection =
+          videoMode === "library" && selectedLibraryVideo
+            ? {
+                kind: "library",
+                video: selectedLibraryVideo,
+              }
+            : videoMode === "temporary" && selectedFile
+              ? {
+                  kind: "temporary",
+                  file: selectedFile,
+                }
+              : { kind: "none" };
 
-    onOpenChange(false);
+        await onCreateSession?.(params, videoSelection);
+      }
+
+      onOpenChange(false);
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -318,6 +325,7 @@ function DialogFormContents({
                     variant="outline"
                     size="sm"
                     type="button"
+                    disabled={isSubmitting}
                     onClick={() => fileInputRef.current?.click()}
                     className="h-8 text-sm"
                   >
@@ -346,6 +354,7 @@ function DialogFormContents({
                 type="button"
                 variant="ghost"
                 size="sm"
+                disabled={isSubmitting}
                 onClick={() => setIsLibraryPickerOpen((open) => !open)}
               >
                 {isLibraryPickerOpen ? "Hide picker" : "Browse library"}
@@ -373,6 +382,7 @@ function DialogFormContents({
                 type="button"
                 variant="outline"
                 size="sm"
+                disabled={isSubmitting}
                 onClick={() => {
                   setSelectedLibraryVideo(null);
                   setVideoMode("none");
@@ -391,6 +401,7 @@ function DialogFormContents({
         <Button
           variant="outline"
           onClick={() => onOpenChange(false)}
+          disabled={isSubmitting}
           className="h-8 text-sm"
         >
           Cancel
@@ -398,7 +409,7 @@ function DialogFormContents({
         <Button
           onClick={handleSubmit}
           className="h-8 text-sm"
-          disabled={isSubmitDisabled}
+          disabled={isSubmitDisabled || isSubmitting}
         >
           {isEditMode ? "Save Changes" : "Create Bout"}
         </Button>

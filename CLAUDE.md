@@ -19,14 +19,15 @@ This is a **Fencing Video Tagger** application built with Next.js 16 (App Router
 
 1. User selects a video file → creates browser Object URL
 2. Video playback state managed by `useVideo` hook
-3. Tags are stored per video filename in localStorage via `useSessions` hook
-4. Tags reference video timestamps and allow seeking back to those moments
+3. Sessions load server-side from the JSON-backed repository and hydrate TanStack Query
+4. Session and tag mutations flow through Next.js server actions with optimistic client updates
+5. Tags reference video timestamps and allow seeking back to those moments
 
 ### Core Hooks
 
 - **`hooks/use-video.ts`**: Video playback state machine (play/pause, seek, frame stepping, skip, playback speed, zoom, pan). Returns refs and callbacks for controlling an HTML5 video element.
 
-- **`hooks/use-sessions.ts`**: Tag persistence layer using `useSyncExternalStore` pattern. Manages an in-memory store that syncs bidirectionally with localStorage. Sessions are keyed by video filename.
+- **`hooks/use-sessions.ts`**: Client facade over TanStack Query and server actions. Maintains the canonical `["sessions"]` cache and performs optimistic session/tag mutations.
 
 ### Routes
 
@@ -37,11 +38,10 @@ This is a **Fencing Video Tagger** application built with Next.js 16 (App Router
 
 ```
 app/layout.tsx (root layout)
-├── ThemeProvider       - next-themes provider (defaults to dark, supports system preference)
-└── VideoProvider       - Video context provider
-    app/page.tsx (main page, client component)
-    ├── VideoLibrary    - Previous video sessions from localStorage
-    app/bouts/[id]/page.tsx (bout page, client component)
+├── AppProviders        - QueryClientProvider + ThemeProvider + VideoProvider
+    app/page.tsx (server component)
+    ├── VideoLibrary    - Previous server-backed video sessions
+    app/bouts/[id]/page.tsx (server component)
     ├── VideoPlayer        - Video element with playback controls, zoom/pan, keyboard shortcuts
     ├── TagForm            - Add tags at current timestamp
     ├── TagList            - Display/delete tags, click to seek
@@ -53,6 +53,9 @@ app/layout.tsx (root layout)
 ### Shared Logic (`lib/`)
 
 - **`lib/types.ts`** — Zod schemas and TypeScript types. Storage versioning with migration from v0.
+- **`lib/server/session-repository.ts`** — Server-only repository contract for session persistence.
+- **`lib/server/json-session-repository.ts`** — JSON-file repository implementation using validated envelope reads and serialized atomic writes.
+- **`lib/server/session-service.ts`** — Server-side session/tag domain logic and request validation used by server actions and SSR loaders.
 - **`lib/utils.ts`** — `cn()` (Tailwind class merging) and `formatTime()` (seconds → `m:ss` string).
 - **`lib/score.ts`** — `computeScore(tags)` returns final left/right score; `computeRunningScore(tags)` returns event-by-event `ScoringEvent[]` timeline. `computeScore` delegates to `computeRunningScore`.
 - **`lib/constants.ts`** — `SIDE_COLORS` with `left`/`right` keys containing `text` and `badge` Tailwind class strings for fencer side coloring (red for left, green for right).
@@ -75,7 +78,8 @@ Uses shadcn/ui components in `components/ui/` with Radix primitives. Styling via
 - **Side colors**: Left fencer = red, right fencer = green. Always use `SIDE_COLORS` from `lib/constants.ts` instead of hardcoding Tailwind color classes.
 - **Scoring logic**: Use `computeScore`/`computeRunningScore` from `lib/score.ts`. Do not reimplement scoring loops in components.
 - **Prefer shadcn/ui components**: Use `Button`, `Badge`, etc. from `components/ui/` for interactive elements. Plain `<button>` is acceptable only for unstyled click targets that need no visual treatment.
-- **All components are client components**: This app is fully client-side (localStorage-based). Components use `"use client"` directive.
+- **Session persistence is server-backed**: session CRUD and import now go through server actions and the repository layer, not browser `localStorage`.
+- **Pages mix server and client components**: page entry points load initial session data server-side and pass it to client shells.
 - **`use-video.ts` internal helpers**: `playWithRetry` (AbortError retry), `clampToVideoDuration` (time clamping), and `panBy` (directional panning) are internal deduplication helpers — keep them when modifying video logic.
 
 # Agent Instructions

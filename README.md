@@ -1,36 +1,42 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Fencing Video Tagger
 
-## Getting Started
+Next.js 16 app for tagging and analyzing fencing bouts with timestamped notes,
+score reconstruction, and local video-library playback.
 
-First, run the development server:
+## Development
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
 pnpm dev
-# or
-bun dev
+pnpm lint
+pnpm build
+pnpm start
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Environment
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+`VIDEO_LIBRARY_ROOT`
+- Required for the existing server-backed video-library routes.
+- Must point to a readable local directory.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+`SESSION_STORE_FILE`
+- Optional path for the server-backed session JSON store.
+- Defaults to `.data/fencing-tags-sessions.json`.
+- Relative paths resolve from the repository root.
 
-## Learn More
+## Session Storage
 
-To learn more about Next.js, take a look at the following resources:
+Sessions now persist on the server in a JSON file using the shared
+`StorageEnvelope` shape from `lib/types.ts`. The app loads sessions through SSR,
+hydrates the client with TanStack Query, and performs session/tag CRUD via
+server actions.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Older browser `localStorage` data is not imported automatically. When the
+server store is empty and valid legacy browser data exists, the library page
+shows a one-time migration prompt.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Notes
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Temporary local video files still stay browser-local and must be reloaded
+  after refresh.
+- Library-backed videos still stream through the existing `/api/video-library`
+  and `/api/videos/[sessionId]` route handlers.

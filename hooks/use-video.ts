@@ -47,6 +47,7 @@ export interface UseVideoReturn {
   panLeft: () => void;
   panRight: () => void;
   centerPan: () => void;
+  resetPlaybackState: () => void;
   clearError: () => void;
 }
 
@@ -55,6 +56,8 @@ export function useVideo(options: UseVideoOptions = {}): UseVideoReturn {
   const frameDuration = 1 / frameRate;
 
   const videoElementRef = useRef<HTMLVideoElement | null>(null);
+  const resumeTimeRef = useRef(0);
+  const hasPendingResumeRef = useRef(false);
   const seekTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isFrameSteppingRef = useRef(false);
   const [videoElementTrigger, setVideoElementTrigger] = useState(0);
@@ -68,32 +71,101 @@ export function useVideo(options: UseVideoOptions = {}): UseVideoReturn {
   const [panY, setPanY] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  const setVideoElement = useCallback((el: HTMLVideoElement | null) => {
-    videoElementRef.current = el;
-    setVideoElementTrigger((n) => n + 1);
-  }, []);
+  const clampToVideoDuration = useCallback(
+    (videoElement: HTMLVideoElement, time: number) => {
+      const videoDuration = isFinite(videoElement.duration)
+        ? videoElement.duration
+        : Infinity;
+      return Math.max(0, Math.min(time, videoDuration));
+    },
+    [],
+  );
+
+  const updateResumeTime = useCallback(
+    (time: number) => {
+      if (hasPendingResumeRef.current && time <= frameDuration) {
+        return;
+      }
+
+      resumeTimeRef.current = time;
+    },
+    [frameDuration],
+  );
+
+  const restorePlaybackPosition = useCallback(
+    (videoElement: HTMLVideoElement) => {
+      if (resumeTimeRef.current <= 0) {
+        hasPendingResumeRef.current = false;
+        return;
+      }
+
+      const targetTime = clampToVideoDuration(videoElement, resumeTimeRef.current);
+      if (Math.abs(videoElement.currentTime - targetTime) <= frameDuration) {
+        hasPendingResumeRef.current = false;
+        return;
+      }
+
+      videoElement.currentTime = targetTime;
+      hasPendingResumeRef.current = false;
+    },
+    [clampToVideoDuration, frameDuration],
+  );
+
+  const applyInitialVideoState = useCallback(
+    (videoElement: HTMLVideoElement) => {
+      restorePlaybackPosition(videoElement);
+
+      if (isFinite(videoElement.duration)) {
+        setDuration(videoElement.duration);
+      }
+
+      setCurrentTime(videoElement.currentTime);
+      setIsPlaying(!videoElement.paused);
+      videoElement.playbackRate = playbackSpeed;
+      updateResumeTime(videoElement.currentTime);
+    },
+    [playbackSpeed, restorePlaybackPosition, updateResumeTime],
+  );
+
+  const setVideoElement = useCallback(
+    (el: HTMLVideoElement | null) => {
+      const previousElement = videoElementRef.current;
+
+      if (!el && previousElement) {
+        if (isFinite(previousElement.duration)) {
+          setDuration(previousElement.duration);
+        }
+        setCurrentTime(previousElement.currentTime);
+        setIsPlaying(!previousElement.paused);
+        updateResumeTime(previousElement.currentTime);
+        hasPendingResumeRef.current = previousElement.currentTime > frameDuration;
+      }
+
+      videoElementRef.current = el;
+      setVideoElementTrigger((n) => n + 1);
+    },
+    [frameDuration, updateResumeTime],
+  );
 
   useEffect(() => {
     const videoElement = videoElementRef.current;
     if (!videoElement) return;
 
-    const handleTimeUpdate = () => setCurrentTime(videoElement.currentTime);
+    const handleTimeUpdate = () => {
+      setCurrentTime(videoElement.currentTime);
+      updateResumeTime(videoElement.currentTime);
+    };
     const handleDurationChange = () => {
       if (isFinite(videoElement.duration)) {
         setDuration(videoElement.duration);
       }
     };
-    const handleLoadedMetadata = () => {
-      if (isFinite(videoElement.duration)) {
-        setDuration(videoElement.duration);
-      }
-      setCurrentTime(videoElement.currentTime);
-      setIsPlaying(!videoElement.paused);
-      // Apply current playback speed to new video element
-      videoElement.playbackRate = playbackSpeed;
-    };
+    const handleLoadedMetadata = () => applyInitialVideoState(videoElement);
     const handlePlay = () => setIsPlaying(true);
-    const handlePause = () => setIsPlaying(false);
+    const handlePause = () => {
+      setIsPlaying(false);
+      updateResumeTime(videoElement.currentTime);
+    };
     const handleEnded = () => setIsPlaying(false);
     const handleSeeking = () => {
       if (isFrameSteppingRef.current) return;
@@ -150,12 +222,7 @@ export function useVideo(options: UseVideoOptions = {}): UseVideoReturn {
 
     // Set initial values only if video metadata is already loaded (readyState >= 1)
     if (videoElement.readyState >= 1) {
-      if (isFinite(videoElement.duration)) {
-        setDuration(videoElement.duration);
-      }
-      setCurrentTime(videoElement.currentTime);
-      setIsPlaying(!videoElement.paused);
-      videoElement.playbackRate = playbackSpeed;
+      applyInitialVideoState(videoElement);
     }
 
     videoElement.addEventListener("timeupdate", handleTimeUpdate);
@@ -183,7 +250,7 @@ export function useVideo(options: UseVideoOptions = {}): UseVideoReturn {
       videoElement.removeEventListener("error", handleError);
       videoElement.removeEventListener("loadstart", handleLoadStart);
     };
-  }, [videoElementTrigger, playbackSpeed, isSeeking]);
+  }, [applyInitialVideoState, isSeeking, updateResumeTime, videoElementTrigger]);
 
   const playWithRetry = useCallback(
     (videoElement: HTMLVideoElement) => {
@@ -226,16 +293,6 @@ export function useVideo(options: UseVideoOptions = {}): UseVideoReturn {
     }
   }, [playWithRetry]);
 
-  const clampToVideoDuration = useCallback(
-    (videoElement: HTMLVideoElement, time: number) => {
-      const videoDuration = isFinite(videoElement.duration)
-        ? videoElement.duration
-        : Infinity;
-      return Math.max(0, Math.min(time, videoDuration));
-    },
-    [],
-  );
-
   const seek = useCallback(
     (time: number) => {
       const videoElement = videoElementRef.current;
@@ -260,9 +317,11 @@ export function useVideo(options: UseVideoOptions = {}): UseVideoReturn {
         seekTimeoutRef.current = setTimeout(() => {
           setIsSeeking(false);
         }, 3000);
+
+        updateResumeTime(targetTime);
       }
     },
-    [clampToVideoDuration],
+    [clampToVideoDuration, updateResumeTime],
   );
 
   const setPlaybackSpeed = useCallback((speed: PlaybackSpeed) => {
@@ -280,13 +339,15 @@ export function useVideo(options: UseVideoOptions = {}): UseVideoReturn {
         videoElement.pause();
         isFrameSteppingRef.current = true;
         const delta = direction === "forward" ? frameDuration : -frameDuration;
-        videoElement.currentTime = clampToVideoDuration(
+        const nextTime = clampToVideoDuration(
           videoElement,
           videoElement.currentTime + delta,
         );
+        videoElement.currentTime = nextTime;
+        updateResumeTime(nextTime);
       }
     },
-    [frameDuration, clampToVideoDuration],
+    [frameDuration, clampToVideoDuration, updateResumeTime],
   );
 
   const skip = useCallback(
@@ -295,13 +356,15 @@ export function useVideo(options: UseVideoOptions = {}): UseVideoReturn {
       if (videoElement) {
         isFrameSteppingRef.current = true;
         const delta = direction === "forward" ? SKIP_DURATION : -SKIP_DURATION;
-        videoElement.currentTime = clampToVideoDuration(
+        const nextTime = clampToVideoDuration(
           videoElement,
           videoElement.currentTime + delta,
         );
+        videoElement.currentTime = nextTime;
+        updateResumeTime(nextTime);
       }
     },
-    [clampToVideoDuration],
+    [clampToVideoDuration, updateResumeTime],
   );
 
   // Calculate max pan distance for a given zoom level
@@ -386,6 +449,16 @@ export function useVideo(options: UseVideoOptions = {}): UseVideoReturn {
     setPanY(0);
   }, []);
 
+  const resetPlaybackState = useCallback(() => {
+    resumeTimeRef.current = 0;
+    hasPendingResumeRef.current = false;
+    setCurrentTime(0);
+    setDuration(0);
+    setIsPlaying(false);
+    setIsSeeking(false);
+    setError(null);
+  }, []);
+
   const clearError = useCallback(() => {
     setError(null);
   }, []);
@@ -417,6 +490,7 @@ export function useVideo(options: UseVideoOptions = {}): UseVideoReturn {
     panLeft,
     panRight,
     centerPan,
+    resetPlaybackState,
     clearError,
   };
 }

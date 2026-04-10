@@ -47,6 +47,8 @@ interface BoutWorkspaceShellProps {
   initialTagId: string | null;
 }
 
+type BoutWorkspaceTab = "tagging" | "analysis";
+
 export function BoutWorkspaceShell({
   boutId,
   initialSessions,
@@ -54,9 +56,11 @@ export function BoutWorkspaceShell({
 }: BoutWorkspaceShellProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const tagFormRef = useRef<TagFormHandle>(null);
+  const activeTabRef = useRef<BoutWorkspaceTab>("tagging");
   const hasAppliedInitialTagRef = useRef(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isLibraryPickerOpen, setIsLibraryPickerOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<BoutWorkspaceTab>("tagging");
   const [copyFeedback, setCopyFeedback] = useState<"idle" | "copied" | "error">("idle");
 
   const video = useVideo();
@@ -85,7 +89,10 @@ export function BoutWorkspaceShell({
     showUnavailableState,
   } = useBoutVideo({
     session,
-    onSourceChange: video.resetZoom,
+    onSourceChange: () => {
+      video.resetZoom();
+      video.resetPlaybackState();
+    },
   });
 
   const handleFileSelect = useCallback(
@@ -153,7 +160,15 @@ export function BoutWorkspaceShell({
   );
 
   useEffect(() => {
+    activeTabRef.current = activeTab;
+  }, [activeTab]);
+
+  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (activeTabRef.current !== "tagging") {
+        return;
+      }
+
       if (
         event.target instanceof HTMLInputElement ||
         event.target instanceof HTMLTextAreaElement
@@ -238,6 +253,21 @@ export function BoutWorkspaceShell({
     [session],
   );
 
+  const handleTabChange = useCallback(
+    (nextTab: string) => {
+      if (nextTab !== "tagging" && nextTab !== "analysis") {
+        return;
+      }
+
+      if (activeTab === "tagging" && nextTab !== "tagging") {
+        video.pause();
+      }
+
+      setActiveTab(nextTab);
+    },
+    [activeTab, video],
+  );
+
   if (!session) {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-4 bg-background">
@@ -258,7 +288,11 @@ export function BoutWorkspaceShell({
 
   return (
     <>
-      <Tabs defaultValue="tagging" className="flex h-screen flex-col bg-background">
+      <Tabs
+        value={activeTab}
+        onValueChange={handleTabChange}
+        className="flex h-screen flex-col bg-background"
+      >
         <header className="flex h-11 shrink-0 items-center justify-between border-b px-2.5">
           <div className="flex items-center gap-1">
             <Link href="/">

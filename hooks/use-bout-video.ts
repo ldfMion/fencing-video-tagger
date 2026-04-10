@@ -141,6 +141,31 @@ export function useBoutVideo({ onSourceChange, session }: UseBoutVideoOptions) {
     hasAttachedLibraryVideo &&
     libraryVideoState === "checking" &&
     !hasTemporaryOverride;
+  const currentSourceKey = hasTemporaryOverride
+    ? `blob:${videoUrl}`
+    : sessionVideoUrl && libraryVideoState === "available"
+      ? `server:${sessionVideoUrl}`
+      : null;
+
+  const getNextSourceKey = useCallback(
+    (selection: PersistedSessionVideoSelection) => {
+      if (!session) {
+        return currentSourceKey;
+      }
+
+      if (selection.kind === "none") {
+        return hasTemporaryOverride ? currentSourceKey : null;
+      }
+
+      const nextServerUrl = buildSessionVideoUrl({
+        id: session.id,
+        videoRelativePath: selection.video.relativePath,
+      });
+
+      return `server:${nextServerUrl}`;
+    },
+    [currentSourceKey, hasTemporaryOverride, session],
+  );
 
   const handlePersistedVideoSelection = useCallback(
     (selection: PersistedSessionVideoSelection) => {
@@ -148,7 +173,10 @@ export function useBoutVideo({ onSourceChange, session }: UseBoutVideoOptions) {
         return;
       }
 
-      onSourceChange?.();
+      const nextSourceKey = getNextSourceKey(selection);
+      if (nextSourceKey !== currentSourceKey) {
+        onSourceChange?.();
+      }
 
       if (selection.kind === "none") {
         if (contextMatchesSession && urlSource === "server") {
@@ -164,6 +192,8 @@ export function useBoutVideo({ onSourceChange, session }: UseBoutVideoOptions) {
     [
       clearVideo,
       contextMatchesSession,
+      currentSourceKey,
+      getNextSourceKey,
       onSourceChange,
       session,
       urlSource,

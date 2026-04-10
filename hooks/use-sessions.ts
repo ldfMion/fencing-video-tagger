@@ -15,7 +15,11 @@ import {
   updateTagAction,
 } from "@/app/actions/session-actions";
 import { useSessionsQuery, sessionsQueryKey } from "@/hooks/use-sessions-query";
-import { exportSessionsToCsv } from "@/lib/session-export";
+import {
+  exportSessionToCsv,
+  exportSessionsToJson,
+  exportSessionsToNormalizedCsvZip,
+} from "@/lib/session-export";
 import {
   type AddTagParams,
   applySessionUpdates,
@@ -522,6 +526,29 @@ export function useSessions(initialSessions?: VideoSession[]) {
     [importSessionsMutation],
   );
 
+  const exportAllToJson = useCallback(
+    () => exportSessionsToJson(sessions),
+    [sessions],
+  );
+
+  const exportAllToNormalizedCsvZip = useCallback(
+    () => exportSessionsToNormalizedCsvZip(sessions),
+    [sessions],
+  );
+
+  const exportSessionCsv = useCallback(
+    (sessionId: string) => {
+      const session = getSessionById(sessionId);
+
+      if (!session) {
+        throw new Error(`Session ${sessionId} was not found`);
+      }
+
+      return exportSessionToCsv(session);
+    },
+    [getSessionById],
+  );
+
   return useMemo(
     () => ({
       sessions,
@@ -536,7 +563,9 @@ export function useSessions(initialSessions?: VideoSession[]) {
       updateTag,
       deleteTag,
       deleteSession,
-      exportToCSV: () => exportSessionsToCsv(sessions),
+      exportAllToJson,
+      exportAllToNormalizedCsvZip,
+      exportSessionCsv,
       importSessions,
     }),
     [
@@ -545,6 +574,9 @@ export function useSessions(initialSessions?: VideoSession[]) {
       deleteSession,
       deleteTag,
       error,
+      exportAllToJson,
+      exportAllToNormalizedCsvZip,
+      exportSessionCsv,
       getSessionById,
       importSessions,
       sessions,

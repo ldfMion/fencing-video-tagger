@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Search, Swords, X } from "lucide-react";
-import { ExportButton } from "@/components/export-button";
+import { ExportMenuButton } from "@/components/export-button";
 import { ImportButton } from "@/components/import-button";
 import { NewBoutDialog } from "@/components/new-bout-dialog";
 import { VideoLibrary } from "@/components/video-library";
@@ -29,7 +29,8 @@ export function LibraryPageShell({ initialSessions }: LibraryPageShellProps) {
     sessions,
     createSessionEntry,
     deleteSession,
-    exportToCSV,
+    exportAllToJson,
+    exportAllToNormalizedCsvZip,
     allFencerNames,
   } = useSessions(initialSessions);
 
@@ -88,8 +89,9 @@ export function LibraryPageShell({ initialSessions }: LibraryPageShellProps) {
           </div>
           <div className="flex items-center gap-2">
             <ImportButton />
-            <ExportButton
-              exportToCSV={exportToCSV}
+            <ExportMenuButton
+              exportAllToJson={exportAllToJson}
+              exportAllToNormalizedCsvZip={exportAllToNormalizedCsvZip}
               disabled={sessions.length === 0}
             />
             <Button onClick={() => setIsNewBoutDialogOpen(true)}>

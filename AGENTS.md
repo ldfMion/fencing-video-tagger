@@ -22,6 +22,9 @@ Do not duplicate scoring or styling rules in components. Reuse `lib/score.ts`, `
 ## Testing Guidelines
 There is no dedicated test suite configured yet. For now, treat `pnpm lint` and `pnpm build` as required checks before opening a PR. When adding tests later, place them next to the feature or in a clear `__tests__` location and name them after the unit under test.
 
+## Build Environment Notes
+`pnpm build` may fail inside restricted sandboxes that cannot reach external Google Fonts URLs. In this repo, that shows up as `next/font` fetch failures for fonts such as `Geist`, `Geist Mono`, or `IBM Plex Sans`, and it should be treated as an environment/network limitation rather than an application build regression.
+
 ## Commit & Pull Request Guidelines
 Recent commits use short, imperative summaries such as `added some charts` and `imported bouts from spreadsheet`. Keep commit messages brief, descriptive, and focused on one change.
 

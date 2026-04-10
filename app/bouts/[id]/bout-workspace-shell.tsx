@@ -11,7 +11,7 @@ import {
   Video,
 } from "lucide-react";
 import { BoutAnalysis } from "@/components/bout-analysis";
-import { ExportButton } from "@/components/export-button";
+import { BoutExportButton } from "@/components/export-button";
 import { NewBoutDialog } from "@/components/new-bout-dialog";
 import { TagForm, type TagFormHandle } from "@/components/tag-form";
 import { TagList } from "@/components/tag-list";
@@ -34,6 +34,7 @@ import {
   type PersistedSessionVideoSelection,
   type SessionDraftParams,
 } from "@/hooks/use-sessions";
+import { getTodayIsoDate } from "@/lib/date-utils";
 import { useVideo } from "@/hooks/use-video";
 import { getBoutDisplayLabel } from "@/lib/session-selectors";
 import { findTagById, getSharedTagHref } from "@/lib/tag-share";
@@ -60,11 +61,10 @@ export function BoutWorkspaceShell({
 
   const video = useVideo();
   const {
-    sessions,
     getSessionById,
     addTag,
     deleteTag,
-    exportToCSV,
+    exportSessionCsv,
     updateSessionEntry,
     allFencerNames,
   } = useSessions(initialSessions);
@@ -285,9 +285,10 @@ export function BoutWorkspaceShell({
                 Analysis
               </TabsTrigger>
             </TabsList>
-            <ExportButton
-              exportToCSV={exportToCSV}
-              disabled={sessions.length === 0}
+            <BoutExportButton
+              exportBoutToCsv={() => exportSessionCsv(session.id)}
+              fileName={`fencing-bout-${session.id}-${getTodayIsoDate()}.csv`}
+              disabled={!session}
               size="sm"
             />
             <input

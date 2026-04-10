@@ -7,6 +7,16 @@ export interface SessionListFilters {
   dateTo?: string;
 }
 
+function normalizeDateOnly(value: string | undefined): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  const dateOnlyMatch = /^(\d{4}-\d{2}-\d{2})/.exec(trimmed);
+  return dateOnlyMatch?.[1];
+}
+
 export function getSessionByFileName(
   sessions: VideoSession[],
   fileName: string,
@@ -64,12 +74,18 @@ export function filterSessionsBySearchAndDate(
       }
     }
 
-    if (dateFrom && (!session.boutDate || session.boutDate < dateFrom)) {
-      return false;
+    if (dateFrom) {
+      const boutDate = normalizeDateOnly(session.boutDate);
+      if (!boutDate || boutDate < dateFrom) {
+        return false;
+      }
     }
 
-    if (dateTo && (!session.boutDate || session.boutDate > dateTo)) {
-      return false;
+    if (dateTo) {
+      const boutDate = normalizeDateOnly(session.boutDate);
+      if (!boutDate || boutDate > dateTo) {
+        return false;
+      }
     }
 
     return true;
@@ -86,15 +102,18 @@ export function sortSessionsByDisplayDate(
   sessions: VideoSession[],
 ): VideoSession[] {
   return [...sessions].sort((left, right) => {
-    if (left.boutDate && right.boutDate) {
-      return right.boutDate.localeCompare(left.boutDate);
+    const leftDate = normalizeDateOnly(left.boutDate);
+    const rightDate = normalizeDateOnly(right.boutDate);
+
+    if (leftDate && rightDate) {
+      return rightDate.localeCompare(leftDate);
     }
 
-    if (left.boutDate) {
+    if (leftDate) {
       return -1;
     }
 
-    if (right.boutDate) {
+    if (rightDate) {
       return 1;
     }
 

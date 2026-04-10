@@ -1,5 +1,6 @@
 import {
   getVideoLibraryRootName,
+  isVideoLibraryError,
   listVideoLibraryItems,
 } from "@/lib/server/video-library";
 
@@ -14,9 +15,22 @@ export async function GET() {
       items,
     });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to read video library";
+    if (isVideoLibraryError(error)) {
+      return Response.json(
+        {
+          error: error.message,
+          code: error.code,
+        },
+        { status: error.status },
+      );
+    }
 
-    return Response.json({ error: message }, { status: 500 });
+    return Response.json(
+      {
+        error: "Failed to read video library",
+        code: "VIDEO_LIBRARY_UNKNOWN",
+      },
+      { status: 500 },
+    );
   }
 }

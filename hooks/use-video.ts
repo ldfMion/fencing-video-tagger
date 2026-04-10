@@ -59,7 +59,9 @@ export function useVideo(options: UseVideoOptions = {}): UseVideoReturn {
   const resumeTimeRef = useRef(0);
   const hasPendingResumeRef = useRef(false);
   const seekTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const playRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isFrameSteppingRef = useRef(false);
+  const isSeekingRef = useRef(false);
   const [videoElementTrigger, setVideoElementTrigger] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -70,6 +72,24 @@ export function useVideo(options: UseVideoOptions = {}): UseVideoReturn {
   const [panX, setPanX] = useState(0);
   const [panY, setPanY] = useState(0);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    isSeekingRef.current = isSeeking;
+  }, [isSeeking]);
+
+  useEffect(() => {
+    return () => {
+      if (seekTimeoutRef.current) {
+        clearTimeout(seekTimeoutRef.current);
+        seekTimeoutRef.current = null;
+      }
+
+      if (playRetryTimeoutRef.current) {
+        clearTimeout(playRetryTimeoutRef.current);
+        playRetryTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   const clampToVideoDuration = useCallback(
     (videoElement: HTMLVideoElement, time: number) => {
@@ -193,7 +213,7 @@ export function useVideo(options: UseVideoOptions = {}): UseVideoReturn {
 
       // Ignore errors that occur during seeking - these are often transient
       // The browser may report decode errors while seeking that resolve themselves
-      if (isSeeking) {
+      if (isSeekingRef.current) {
         return;
       }
 
@@ -250,19 +270,24 @@ export function useVideo(options: UseVideoOptions = {}): UseVideoReturn {
       videoElement.removeEventListener("error", handleError);
       videoElement.removeEventListener("loadstart", handleLoadStart);
     };
-  }, [applyInitialVideoState, isSeeking, updateResumeTime, videoElementTrigger]);
+  }, [applyInitialVideoState, updateResumeTime, videoElementTrigger]);
 
   const playWithRetry = useCallback(
     (videoElement: HTMLVideoElement) => {
       videoElement.play().catch((err) => {
         if (err.name === "AbortError") {
           // Retry play after a short delay - this happens when play is interrupted by seek
-          setTimeout(() => {
+          if (playRetryTimeoutRef.current) {
+            clearTimeout(playRetryTimeoutRef.current);
+          }
+
+          playRetryTimeoutRef.current = setTimeout(() => {
             videoElement.play().catch((retryErr) => {
               if (retryErr.name !== "AbortError") {
                 setError(`Failed to play video: ${retryErr.message}`);
               }
             });
+            playRetryTimeoutRef.current = null;
           }, 100);
         } else {
           setError(`Failed to play video: ${err.message}`);

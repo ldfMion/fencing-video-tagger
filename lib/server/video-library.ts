@@ -14,6 +14,41 @@ const VIDEO_MIME_TYPES: Record<string, string> = {
   ".mpg": "video/mpeg",
   ".webm": "video/webm",
 };
+const VIDEO_LIBRARY_CACHE_TTL_MS = 15_000;
+let cachedLibraryItems: {
+  root: string;
+  fetchedAt: number;
+  items: VideoLibraryItem[];
+} | null = null;
+
+export type VideoLibraryErrorCode =
+  | "VIDEO_LIBRARY_CONFIG_MISSING"
+  | "VIDEO_LIBRARY_ROOT_UNREADABLE"
+  | "VIDEO_LIBRARY_ROOT_NOT_DIRECTORY"
+  | "VIDEO_PATH_INVALID"
+  | "VIDEO_PATH_OUTSIDE_ROOT"
+  | "VIDEO_FILE_NOT_FOUND"
+  | "VIDEO_FILE_UNREADABLE";
+
+export class VideoLibraryError extends Error {
+  readonly code: VideoLibraryErrorCode;
+  readonly status: number;
+
+  constructor(
+    code: VideoLibraryErrorCode,
+    message: string,
+    status = 400,
+  ) {
+    super(message);
+    this.name = "VideoLibraryError";
+    this.code = code;
+    this.status = status;
+  }
+}
+
+export function isVideoLibraryError(error: unknown): error is VideoLibraryError {
+  return error instanceof VideoLibraryError;
+}
 
 function toPosixPath(filePath: string): string {
   return filePath.split(path.sep).join("/");
@@ -23,7 +58,11 @@ function getVideoLibraryRoot(): string {
   const configuredRoot = process.env.VIDEO_LIBRARY_ROOT?.trim();
 
   if (!configuredRoot) {
-    throw new Error("VIDEO_LIBRARY_ROOT is not configured");
+    throw new VideoLibraryError(
+      "VIDEO_LIBRARY_CONFIG_MISSING",
+      "VIDEO_LIBRARY_ROOT is not configured",
+      500,
+    );
   }
 
   return path.resolve(configuredRoot);
@@ -32,6 +71,8 @@ function getVideoLibraryRoot(): string {
 async function assertReadablePath(
   targetPath: string,
   errorMessage: string,
+  code: VideoLibraryErrorCode,
+  status = 500,
 ): Promise<void> {
   try {
     await fs.access(targetPath, fsConstants.R_OK);
@@ -42,7 +83,7 @@ async function assertReadablePath(
       "code" in error &&
       (error.code === "EACCES" || error.code === "EPERM")
     ) {
-      throw new Error(errorMessage);
+      throw new VideoLibraryError(code, errorMessage, status);
     }
 
     throw error;
@@ -104,17 +145,39 @@ async function walkDirectory(
 
 export async function listVideoLibraryItems(): Promise<VideoLibraryItem[]> {
   const root = getVideoLibraryRoot();
-  await assertReadablePath(root, "Video library root cannot be read");
+  if (
+    cachedLibraryItems &&
+    cachedLibraryItems.root === root &&
+    Date.now() - cachedLibraryItems.fetchedAt < VIDEO_LIBRARY_CACHE_TTL_MS
+  ) {
+    return cachedLibraryItems.items;
+  }
+
+  await assertReadablePath(
+    root,
+    "Video library root cannot be read",
+    "VIDEO_LIBRARY_ROOT_UNREADABLE",
+    500,
+  );
   const stats = await fs.stat(root);
 
   if (!stats.isDirectory()) {
-    throw new Error("VIDEO_LIBRARY_ROOT must point to a directory");
+    throw new VideoLibraryError(
+      "VIDEO_LIBRARY_ROOT_NOT_DIRECTORY",
+      "VIDEO_LIBRARY_ROOT must point to a directory",
+      500,
+    );
   }
 
   const items: VideoLibraryItem[] = [];
   await walkDirectory(root, root, items);
-
-  return items.sort((left, right) => right.modifiedAt - left.modifiedAt);
+  const sortedItems = items.sort((left, right) => right.modifiedAt - left.modifiedAt);
+  cachedLibraryItems = {
+    root,
+    fetchedAt: Date.now(),
+    items: sortedItems,
+  };
+  return sortedItems;
 }
 
 export async function resolveVideoLibraryFile(relativePath: string): Promise<{
@@ -128,7 +191,7 @@ export async function resolveVideoLibraryFile(relativePath: string): Promise<{
   const normalizedRelativePath = relativePath.trim();
 
   if (!isSafeRelativePath(normalizedRelativePath)) {
-    throw new Error("Invalid video path");
+    throw new VideoLibraryError("VIDEO_PATH_INVALID", "Invalid video path");
   }
 
   const absolutePath = path.resolve(root, normalizedRelativePath);
@@ -139,7 +202,10 @@ export async function resolveVideoLibraryFile(relativePath: string): Promise<{
     path.isAbsolute(relativeFromRoot) ||
     !isAllowedVideoFile(absolutePath)
   ) {
-    throw new Error("Video path is outside the library root");
+    throw new VideoLibraryError(
+      "VIDEO_PATH_OUTSIDE_ROOT",
+      "Video path is outside the library root",
+    );
   }
 
   let stats: Awaited<ReturnType<typeof fs.stat>>;
@@ -153,17 +219,21 @@ export async function resolveVideoLibraryFile(relativePath: string): Promise<{
       "code" in error &&
       error.code === "ENOENT"
     ) {
-      throw new Error("Video file not found");
+      throw new VideoLibraryError("VIDEO_FILE_NOT_FOUND", "Video file not found", 404);
     }
 
     throw error;
   }
 
   if (!stats.isFile()) {
-    throw new Error("Video file not found");
+    throw new VideoLibraryError("VIDEO_FILE_NOT_FOUND", "Video file not found", 404);
   }
 
-  await assertReadablePath(absolutePath, "Video file cannot be read");
+  await assertReadablePath(
+    absolutePath,
+    "Video file cannot be read",
+    "VIDEO_FILE_UNREADABLE",
+  );
 
   try {
     const fileHandle = await fs.open(absolutePath, "r");
@@ -175,7 +245,10 @@ export async function resolveVideoLibraryFile(relativePath: string): Promise<{
       "code" in error &&
       (error.code === "EACCES" || error.code === "EPERM")
     ) {
-      throw new Error("Video file cannot be read");
+      throw new VideoLibraryError(
+        "VIDEO_FILE_UNREADABLE",
+        "Video file cannot be read",
+      );
     }
 
     throw error;

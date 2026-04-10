@@ -1,5 +1,6 @@
 import {
   getVideoLibraryRootName,
+  isVideoLibraryError,
   listVideoLibraryItems,
 } from "@/lib/server/video-library";
 
@@ -14,18 +15,20 @@ export async function GET() {
       items,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "";
-    const allowedErrors = new Set([
-      "VIDEO_LIBRARY_ROOT is not configured",
-      "VIDEO_LIBRARY_ROOT must point to a directory",
-      "Video library root cannot be read",
-    ]);
+    if (isVideoLibraryError(error)) {
+      return Response.json(
+        {
+          error: error.message,
+          code: error.code,
+        },
+        { status: error.status },
+      );
+    }
 
     return Response.json(
       {
-        error: allowedErrors.has(message)
-          ? message
-          : "Failed to read video library",
+        error: "Failed to read video library",
+        code: "VIDEO_LIBRARY_UNKNOWN",
       },
       { status: 500 },
     );

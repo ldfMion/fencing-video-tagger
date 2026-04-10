@@ -1,7 +1,10 @@
 import { createReadStream } from "node:fs";
 import { Readable } from "node:stream";
 import { getSessionById } from "@/lib/server/session-service";
-import { resolveVideoLibraryFile } from "@/lib/server/video-library";
+import {
+  isVideoLibraryError,
+  resolveVideoLibraryFile,
+} from "@/lib/server/video-library";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -147,21 +150,23 @@ async function getVideoResponse(
       headers,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "";
-    const allowedErrors = new Set([
-      "Video file not found",
-      "Invalid video path",
-      "Video path is outside the library root",
-      "Video file cannot be read",
-      "VIDEO_LIBRARY_ROOT is not configured",
-      "Video library root cannot be read",
-    ]);
-    const safeMessage = allowedErrors.has(message)
-      ? message
-      : "Failed to stream video";
-    const status = safeMessage === "Video file not found" ? 404 : 400;
+    if (isVideoLibraryError(error)) {
+      return Response.json(
+        {
+          error: error.message,
+          code: error.code,
+        },
+        { status: error.status },
+      );
+    }
 
-    return Response.json({ error: safeMessage }, { status });
+    return Response.json(
+      {
+        error: "Failed to stream video",
+        code: "VIDEO_STREAM_UNKNOWN",
+      },
+      { status: 500 },
+    );
   }
 }
 

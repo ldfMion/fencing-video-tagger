@@ -14,9 +14,20 @@ export async function GET() {
       items,
     });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to read video library";
+    const message = error instanceof Error ? error.message : "";
+    const allowedErrors = new Set([
+      "VIDEO_LIBRARY_ROOT is not configured",
+      "VIDEO_LIBRARY_ROOT must point to a directory",
+      "Video library root cannot be read",
+    ]);
 
-    return Response.json({ error: message }, { status: 500 });
+    return Response.json(
+      {
+        error: allowedErrors.has(message)
+          ? message
+          : "Failed to read video library",
+      },
+      { status: 500 },
+    );
   }
 }

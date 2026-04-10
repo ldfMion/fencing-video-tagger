@@ -213,7 +213,7 @@ export function TagList({
                       }
                     }}
                     className="text-left"
-                    disabled={tag.timestamp == null && !onSeek}
+                    disabled={tag.timestamp == null || !onSeek}
                   >
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-mono text-sm text-primary">

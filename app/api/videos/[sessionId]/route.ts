@@ -1,4 +1,6 @@
 import { createReadStream } from "node:fs";
+import { Readable } from "node:stream";
+import { getSessionById } from "@/lib/server/session-service";
 import { resolveVideoLibraryFile } from "@/lib/server/video-library";
 
 export const runtime = "nodejs";
@@ -64,58 +66,40 @@ function createVideoStream(
   options?: { start?: number; end?: number },
 ): ReadableStream<Uint8Array> {
   const stream = createReadStream(absolutePath, options);
-
-  return new ReadableStream<Uint8Array>({
-    start(controller) {
-      let isClosed = false;
-
-      const closeController = () => {
-        if (!isClosed) {
-          isClosed = true;
-          controller.close();
-        }
-      };
-
-      const errorController = (error: unknown) => {
-        if (!isClosed) {
-          isClosed = true;
-          controller.error(error);
-        }
-      };
-
-      stream.on("data", (chunk) => {
-        if (!isClosed) {
-          controller.enqueue(
-            typeof chunk === "string"
-              ? new TextEncoder().encode(chunk)
-              : new Uint8Array(chunk),
-          );
-        }
-      });
-
-      stream.once("end", closeController);
-      stream.once("close", closeController);
-      stream.once("error", errorController);
-    },
-    cancel() {
-      stream.destroy();
-    },
-  });
+  return Readable.toWeb(stream) as ReadableStream<Uint8Array>;
 }
 
-async function getVideoResponse(request: Request, method: "GET" | "HEAD") {
+async function getVideoResponse(
+  request: Request,
+  sessionId: string,
+  method: "GET" | "HEAD",
+) {
   const requestUrl = new URL(request.url);
-  const relativePath = requestUrl.searchParams.get("path");
+  const session = await getSessionById(sessionId);
 
-  if (!relativePath) {
+  if (!session) {
+    return Response.json({ error: "Session not found" }, { status: 404 });
+  }
+
+  if (!session.videoRelativePath) {
     return Response.json(
-      { error: "Missing required video path" },
+      { error: "Session does not have an attached library video" },
+      { status: 404 },
+    );
+  }
+
+  const relativePath = requestUrl.searchParams.get("path");
+  if (relativePath && relativePath !== session.videoRelativePath) {
+    return Response.json(
+      { error: "Requested video path does not match the session attachment" },
       { status: 400 },
     );
   }
 
   try {
-    const { absolutePath, mimeType, size } = await resolveVideoLibraryFile(relativePath);
+    const { absolutePath, mimeType, size } = await resolveVideoLibraryFile(
+      session.videoRelativePath,
+    );
     const baseHeaders = buildBaseHeaders(mimeType, size);
     const rangeHeader = request.headers.get("range");
 
@@ -163,11 +147,21 @@ async function getVideoResponse(request: Request, method: "GET" | "HEAD") {
       headers,
     });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to stream video";
-    const status = message === "Video file not found" ? 404 : 400;
+    const message = error instanceof Error ? error.message : "";
+    const allowedErrors = new Set([
+      "Video file not found",
+      "Invalid video path",
+      "Video path is outside the library root",
+      "Video file cannot be read",
+      "VIDEO_LIBRARY_ROOT is not configured",
+      "Video library root cannot be read",
+    ]);
+    const safeMessage = allowedErrors.has(message)
+      ? message
+      : "Failed to stream video";
+    const status = safeMessage === "Video file not found" ? 404 : 400;
 
-    return Response.json({ error: message }, { status });
+    return Response.json({ error: safeMessage }, { status });
   }
 }
 
@@ -175,14 +169,14 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ sessionId: string }> },
 ) {
-  await context.params;
-  return getVideoResponse(request, "GET");
+  const { sessionId } = await context.params;
+  return getVideoResponse(request, sessionId, "GET");
 }
 
 export async function HEAD(
   request: Request,
   context: { params: Promise<{ sessionId: string }> },
 ) {
-  await context.params;
-  return getVideoResponse(request, "HEAD");
+  const { sessionId } = await context.params;
+  return getVideoResponse(request, sessionId, "HEAD");
 }

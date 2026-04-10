@@ -14,6 +14,12 @@ const VIDEO_MIME_TYPES: Record<string, string> = {
   ".mpg": "video/mpeg",
   ".webm": "video/webm",
 };
+const VIDEO_LIBRARY_CACHE_TTL_MS = 15_000;
+let cachedLibraryItems: {
+  root: string;
+  fetchedAt: number;
+  items: VideoLibraryItem[];
+} | null = null;
 
 function toPosixPath(filePath: string): string {
   return filePath.split(path.sep).join("/");
@@ -104,6 +110,14 @@ async function walkDirectory(
 
 export async function listVideoLibraryItems(): Promise<VideoLibraryItem[]> {
   const root = getVideoLibraryRoot();
+  if (
+    cachedLibraryItems &&
+    cachedLibraryItems.root === root &&
+    Date.now() - cachedLibraryItems.fetchedAt < VIDEO_LIBRARY_CACHE_TTL_MS
+  ) {
+    return cachedLibraryItems.items;
+  }
+
   await assertReadablePath(root, "Video library root cannot be read");
   const stats = await fs.stat(root);
 
@@ -113,8 +127,13 @@ export async function listVideoLibraryItems(): Promise<VideoLibraryItem[]> {
 
   const items: VideoLibraryItem[] = [];
   await walkDirectory(root, root, items);
-
-  return items.sort((left, right) => right.modifiedAt - left.modifiedAt);
+  const sortedItems = items.sort((left, right) => right.modifiedAt - left.modifiedAt);
+  cachedLibraryItems = {
+    root,
+    fetchedAt: Date.now(),
+    items: sortedItems,
+  };
+  return sortedItems;
 }
 
 export async function resolveVideoLibraryFile(relativePath: string): Promise<{

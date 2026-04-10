@@ -17,7 +17,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Check, ChevronDown, Trash2, X } from "lucide-react";
+import { Check, Copy, ChevronDown, Trash2, X } from "lucide-react";
 import { SIDE_COLORS } from "@/lib/constants";
 import type { ActionCode, Side, Tag } from "@/lib/types";
 import { cn, formatTime, sortTags } from "@/lib/utils";
@@ -28,6 +28,7 @@ interface TagListProps {
   tags: Tag[];
   onSeek?: (time: number) => void;
   onDelete: (tagId: string) => void;
+  onShareTag?: (tagId: string) => void;
   fillHeight?: boolean;
 }
 
@@ -35,6 +36,7 @@ export function TagList({
   tags,
   onSeek,
   onDelete,
+  onShareTag,
   fillHeight = false,
 }: TagListProps) {
   const sortedTags = useMemo(() => sortTags(tags), [tags]);
@@ -202,7 +204,7 @@ export function TagList({
             </div>
           ) : (
             filteredTags.map((tag, index) => (
-              <div key={tag.id} className="group p-2 rounded-lg hover:bg-muted">
+              <div key={tag.id} className="group rounded-lg p-2 hover:bg-muted">
                 <div className="flex items-start justify-between gap-2">
                   <button
                     onClick={() => {
@@ -246,15 +248,34 @@ export function TagList({
                       )}
                     </div>
                   </button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    title="Delete tag"
-                    className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                    onClick={() => onDelete(tag.id)}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    {onShareTag ? (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Copy share link"
+                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground hover:bg-muted"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onShareTag(tag.id);
+                        }}
+                      >
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    ) : null}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      title="Delete tag"
+                      className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onDelete(tag.id);
+                      }}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </div>
                 {tag.comment && (
                   <p

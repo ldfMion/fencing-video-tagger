@@ -2,7 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { AlertCircle, Edit2, Library, Loader2, Upload, Video } from "lucide-react";
+import {
+  AlertCircle,
+  Edit2,
+  Library,
+  Loader2,
+  Upload,
+  Video,
+} from "lucide-react";
 import { BoutAnalysis } from "@/components/bout-analysis";
 import { ExportButton } from "@/components/export-button";
 import { NewBoutDialog } from "@/components/new-bout-dialog";
@@ -29,22 +36,27 @@ import {
 } from "@/hooks/use-sessions";
 import { useVideo } from "@/hooks/use-video";
 import { getBoutDisplayLabel } from "@/lib/session-selectors";
+import { findTagById, getSharedTagHref } from "@/lib/tag-share";
 import type { VideoSession } from "@/lib/types";
 import type { VideoLibraryItem } from "@/lib/video-library";
 
 interface BoutWorkspaceShellProps {
   boutId: string;
   initialSessions: VideoSession[];
+  initialTagId: string | null;
 }
 
 export function BoutWorkspaceShell({
   boutId,
   initialSessions,
+  initialTagId,
 }: BoutWorkspaceShellProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const tagFormRef = useRef<TagFormHandle>(null);
+  const hasAppliedInitialTagRef = useRef(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isLibraryPickerOpen, setIsLibraryPickerOpen] = useState(false);
+  const [copyFeedback, setCopyFeedback] = useState<"idle" | "copied" | "error">("idle");
 
   const video = useVideo();
   const {
@@ -186,6 +198,45 @@ export function BoutWorkspaceShell({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
+
+  useEffect(() => {
+    if (!initialTagId || hasAppliedInitialTagRef.current) {
+      return;
+    }
+
+    const initialTag = findTagById(session, initialTagId);
+
+    if (!initialTag) {
+      hasAppliedInitialTagRef.current = true;
+      return;
+    }
+
+    if (initialTag.timestamp == null || !activeVideoUrl || video.isSeeking) {
+      return;
+    }
+
+    video.seek(initialTag.timestamp);
+    hasAppliedInitialTagRef.current = true;
+  }, [activeVideoUrl, initialTagId, session, video, video.isSeeking]);
+
+  const handleCopyTagLink = useCallback(
+    async (tagId: string) => {
+      if (!session) {
+        return;
+      }
+
+      const href = getSharedTagHref(session.id, tagId);
+
+      try {
+        const url = new URL(href, window.location.origin);
+        await navigator.clipboard.writeText(url.toString());
+        setCopyFeedback("copied");
+      } catch {
+        setCopyFeedback("error");
+      }
+    },
+    [session],
+  );
 
   if (!session) {
     return (
@@ -410,8 +461,16 @@ export function BoutWorkspaceShell({
                 tags={tags}
                 onDelete={handleDeleteTag}
                 onSeek={activeVideoUrl ? video.seek : undefined}
+                onShareTag={handleCopyTagLink}
                 fillHeight
               />
+              {copyFeedback !== "idle" ? (
+                <p className="mt-1.5 px-1 text-xs text-muted-foreground">
+                  {copyFeedback === "copied"
+                    ? "Link copied to clipboard."
+                    : "Could not copy the link."}
+                </p>
+              ) : null}
             </div>
           </div>
         </TabsContent>

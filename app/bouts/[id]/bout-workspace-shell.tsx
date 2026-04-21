@@ -61,12 +61,14 @@ export function BoutWorkspaceShell({
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isLibraryPickerOpen, setIsLibraryPickerOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<BoutWorkspaceTab>("tagging");
+  const [editingTagId, setEditingTagId] = useState<string | null>(null);
   const [copyFeedback, setCopyFeedback] = useState<"idle" | "copied" | "error">("idle");
 
   const video = useVideo();
   const {
     getSessionById,
     addTag,
+    updateTag,
     deleteTag,
     exportSessionCsv,
     updateSessionEntry,
@@ -75,6 +77,8 @@ export function BoutWorkspaceShell({
 
   const session = getSessionById(boutId);
   const tags = session?.tags ?? [];
+  const editingTag = findTagById(session, editingTagId);
+  const activeEditingTagId = editingTag ? editingTagId : null;
   const {
     activeVideoBadge,
     activeVideoFileName,
@@ -155,8 +159,32 @@ export function BoutWorkspaceShell({
       }
 
       await deleteTag(session.id, tagId);
+      setEditingTagId((currentTagId) => (currentTagId === tagId ? null : currentTagId));
     },
     [deleteTag, session],
+  );
+
+  const handleEditTag = useCallback((tagId: string) => {
+    setEditingTagId(tagId);
+  }, []);
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingTagId(null);
+  }, []);
+
+  const handleUpdateTag = useCallback(
+    async (
+      tagId: string,
+      updates: Parameters<typeof updateTag>[2],
+    ) => {
+      if (!session) {
+        return;
+      }
+
+      await updateTag(session.id, tagId, updates);
+      setEditingTagId((currentTagId) => (currentTagId === tagId ? null : currentTagId));
+    },
+    [session, updateTag],
   );
 
   useEffect(() => {
@@ -486,6 +514,9 @@ export function BoutWorkspaceShell({
                 <TagForm
                   ref={tagFormRef}
                   onAddTag={handleAddTag}
+                  onUpdateTag={handleUpdateTag}
+                  onCancelEdit={handleCancelEdit}
+                  editingTag={editingTag}
                   currentTime={activeVideoUrl ? video.currentTime : undefined}
                   taggingOptions={session.taggingOptions}
                 />
@@ -495,9 +526,11 @@ export function BoutWorkspaceShell({
             <div className="min-h-0">
               <TagList
                 tags={tags}
+                onEdit={handleEditTag}
                 onDelete={handleDeleteTag}
                 onSeek={activeVideoUrl ? video.seek : undefined}
                 onShareTag={handleCopyTagLink}
+                editingTagId={activeEditingTagId}
                 fillHeight
               />
               {copyFeedback !== "idle" ? (

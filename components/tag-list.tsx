@@ -17,7 +17,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Check, Copy, ChevronDown, Trash2, X } from "lucide-react";
+import { Check, Copy, ChevronDown, Pencil, Trash2, X } from "lucide-react";
 import { SIDE_COLORS } from "@/lib/constants";
 import {
   formatMatchPeriodLabel,
@@ -31,16 +31,20 @@ const SEEK_BUFFER = 3;
 interface TagListProps {
   tags: Tag[];
   onSeek?: (time: number) => void;
+  onEdit: (tagId: string) => void;
   onDelete: (tagId: string) => void;
   onShareTag?: (tagId: string) => void;
+  editingTagId?: string | null;
   fillHeight?: boolean;
 }
 
 export function TagList({
   tags,
   onSeek,
+  onEdit,
   onDelete,
   onShareTag,
+  editingTagId,
   fillHeight = false,
 }: TagListProps) {
   const sortedTags = useMemo(() => sortTags(tags), [tags]);
@@ -208,7 +212,13 @@ export function TagList({
             </div>
           ) : (
             filteredTags.map((tag, index) => (
-              <div key={tag.id} className="group rounded-lg p-2 hover:bg-muted">
+              <div
+                key={tag.id}
+                className={cn(
+                  "group rounded-lg p-2 hover:bg-muted",
+                  editingTagId === tag.id && "bg-muted ring-1 ring-primary/30",
+                )}
+              >
                 <div className="flex items-start justify-between gap-2">
                   <button
                     onClick={() => {
@@ -263,6 +273,23 @@ export function TagList({
                     </div>
                   </button>
                   <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      title="Edit tag"
+                      className={cn(
+                        "h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-muted",
+                        editingTagId === tag.id
+                          ? "opacity-100"
+                          : "opacity-0 group-hover:opacity-100 transition-opacity",
+                      )}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onEdit(tag.id);
+                      }}
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </Button>
                     {onShareTag ? (
                       <Button
                         variant="ghost"

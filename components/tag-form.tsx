@@ -49,6 +49,7 @@ import {
   type MatchPeriod,
   type MistakeType,
   type StripZone,
+  type Tag,
   type TaggingOptions,
 } from "@/lib/types";
 import type { AddTagParams } from "@/hooks/use-sessions";
@@ -65,23 +66,56 @@ export interface TagFormHandle {
 interface TagFormProps {
   currentTime: number | undefined;
   onAddTag: (params: AddTagParams) => void;
+  onUpdateTag: (
+    tagId: string,
+    updates: Partial<Omit<Tag, "id" | "createdAt">>,
+  ) => void | Promise<void>;
+  onCancelEdit: () => void;
+  editingTag?: Tag | null;
   taggingOptions?: TaggingOptions;
   disabled?: boolean;
 }
 
-export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
-  { currentTime, onAddTag, taggingOptions, disabled },
+interface TagFormFieldsProps {
+  currentTime: number | undefined;
+  onAddTag: (params: AddTagParams) => void;
+  onUpdateTag: (
+    tagId: string,
+    updates: Partial<Omit<Tag, "id" | "createdAt">>,
+  ) => void | Promise<void>;
+  onCancelEdit: () => void;
+  editingTag?: Tag | null;
+  taggingOptions?: TaggingOptions;
+  disabled?: boolean;
+  formIdPrefix: string;
+}
+
+const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function TagFormFields(
+  {
+    currentTime,
+    onAddTag,
+    onUpdateTag,
+    onCancelEdit,
+    editingTag,
+    taggingOptions,
+    disabled,
+    formIdPrefix,
+  },
   ref,
 ) {
-  const [comment, setComment] = useState("");
-  const [side, setSide] = useState<Side | undefined>(undefined);
-  const [action, setAction] = useState<ActionCode | undefined>(undefined);
-  const [mistake, setMistake] = useState<MistakeType | undefined>(undefined);
+  const isEditing = Boolean(editingTag);
+  const [comment, setComment] = useState(editingTag?.comment ?? "");
+  const [side, setSide] = useState<Side | undefined>(editingTag?.side);
+  const [action, setAction] = useState<ActionCode | undefined>(editingTag?.action);
+  const [mistake, setMistake] = useState<MistakeType | undefined>(editingTag?.mistake);
   const [actionOpen, setActionOpen] = useState(false);
   const [manualTime, setManualTime] = useState("");
-  const [matchPeriod, setMatchPeriod] = useState<MatchPeriod>(getDefaultMatchPeriod());
-  const [matchClock, setMatchClock] = useState("");
-  const [stripZone, setStripZone] = useState<StripZone | undefined>(undefined);
+  const [matchPeriod, setMatchPeriod] = useState<MatchPeriod>(
+    editingTag?.matchPeriod ?? getDefaultMatchPeriod(),
+  );
+  const [matchClock, setMatchClock] = useState(editingTag?.matchClock ?? "");
+  const [stripZone, setStripZone] = useState<StripZone | undefined>(editingTag?.stripZone);
+  const [actionSearch, setActionSearch] = useState("");
 
   const isVideoMode = currentTime != null;
   const requiresMatchClock = isMatchClockEnabled({ taggingOptions });
@@ -90,11 +124,23 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
     () => normalizeMatchClockInput(matchClock),
     [matchClock],
   );
+  const filteredActions = useMemo(() => {
+    if (!actionSearch) {
+      return ACTION_CODES;
+    }
 
-  const actionButtonRef = useRef<HTMLButtonElement>(null);
+    const lower = actionSearch.toLowerCase();
+    return ACTION_CODES.filter((code) => code.toLowerCase().includes(lower));
+  }, [actionSearch]);
+  const canSubmit = Boolean(
+    (side || comment.trim()) &&
+      (!requiresMatchClock || normalizedMatchClock) &&
+      (!requiresStripZone || stripZone),
+  );
+
   const commentRef = useRef<HTMLTextAreaElement>(null);
 
-  const resetForm = useCallback(() => {
+  const resetCreateFields = useCallback(() => {
     setComment("");
     setSide(undefined);
     setAction(undefined);
@@ -104,7 +150,7 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
 
   const parseManualTime = (timeStr: string): number | undefined => {
     if (!timeStr.trim()) return undefined;
-    // Parse "m:ss" or "mm:ss" format
+
     const parts = timeStr.split(":");
     if (parts.length === 2) {
       const mins = parseInt(parts[0], 10);
@@ -113,22 +159,35 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
         return mins * 60 + secs;
       }
     }
-    // Also accept plain seconds
+
     const seconds = parseInt(timeStr, 10);
     if (!isNaN(seconds)) {
       return seconds;
     }
+
     return undefined;
   };
 
   const handleSubmit = useCallback(
-    (e?: React.FormEvent) => {
-      e?.preventDefault();
+    (event?: React.FormEvent) => {
+      event?.preventDefault();
 
-      // Need at least side or comment
       if (!side && !comment.trim()) return false;
       if (requiresMatchClock && !normalizedMatchClock) return false;
       if (requiresStripZone && !stripZone) return false;
+
+      if (editingTag) {
+        onUpdateTag(editingTag.id, {
+          comment: comment.trim(),
+          side,
+          action,
+          mistake,
+          matchPeriod: requiresMatchClock ? matchPeriod : undefined,
+          matchClock: requiresMatchClock ? normalizedMatchClock : undefined,
+          stripZone: requiresStripZone ? stripZone : undefined,
+        });
+        return true;
+      }
 
       let timestamp: number | undefined;
       if (isVideoMode) {
@@ -147,32 +206,34 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
         matchClock: requiresMatchClock ? normalizedMatchClock : undefined,
         stripZone: requiresStripZone ? stripZone : undefined,
       });
-      resetForm();
+      resetCreateFields();
       return true;
     },
     [
       action,
       comment,
       currentTime,
+      editingTag,
       isVideoMode,
       manualTime,
       matchPeriod,
       mistake,
       normalizedMatchClock,
       onAddTag,
+      onUpdateTag,
       requiresMatchClock,
       requiresStripZone,
-      resetForm,
+      resetCreateFields,
       side,
       stripZone,
     ],
   );
 
-  // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({
-    setSide: (s: Side) => setSide((prev) => (prev === s ? undefined : s)),
+    setSide: (nextSide: Side) =>
+      setSide((previousSide) => (previousSide === nextSide ? undefined : nextSide)),
     toggleMistake: (type: MistakeType) =>
-      setMistake((prev) => (prev === type ? undefined : type)),
+      setMistake((previousMistake) => (previousMistake === type ? undefined : type)),
     submit: () => handleSubmit(),
     focusAction: () => {
       setActionOpen(true);
@@ -182,24 +243,25 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
     },
   }));
 
-  const canSubmit = Boolean(
-    (side || comment.trim()) &&
-      (!requiresMatchClock || normalizedMatchClock) &&
-      (!requiresStripZone || stripZone),
-  );
-
-  // Filter action codes for search
-  const [actionSearch, setActionSearch] = useState("");
-  const filteredActions = useMemo(() => {
-    if (!actionSearch) return ACTION_CODES;
-    const lower = actionSearch.toLowerCase();
-    return ACTION_CODES.filter((code) => code.toLowerCase().includes(lower));
-  }, [actionSearch]);
-
   return (
     <TooltipProvider delayDuration={300}>
       <form onSubmit={handleSubmit} className="space-y-1.5">
-        {isVideoMode ? (
+        {isEditing ? (
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-muted-foreground">
+              Editing tag
+              {editingTag?.timestamp != null ? (
+                <>
+                  {" "}
+                  at <span className="font-mono">{formatTime(editingTag.timestamp)}</span>
+                </>
+              ) : null}
+            </p>
+            <span className="text-[11px] text-muted-foreground">
+              Time is unchanged
+            </span>
+          </div>
+        ) : isVideoMode ? (
           <div className="flex items-center justify-between">
             <p className="text-xs text-muted-foreground">
               Tag at <span className="font-mono">{formatTime(currentTime)}</span>
@@ -207,26 +269,24 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
           </div>
         ) : (
           <div className="flex items-center gap-2">
-            <Label htmlFor="manual-time" className="text-xs shrink-0">
+            <Label htmlFor={`manual-time-${formIdPrefix}`} className="shrink-0 text-xs">
               Time:
             </Label>
-            <div className="flex items-center gap-1 flex-1">
+            <div className="flex flex-1 items-center gap-1">
               <Clock className="h-3 w-3 text-muted-foreground" />
               <input
-                id="manual-time"
+                id={`manual-time-${formIdPrefix}`}
                 type="text"
                 placeholder="m:ss (optional)"
                 value={manualTime}
-                onChange={(e) => setManualTime(e.target.value)}
-                className="h-6 text-xs px-2 border border-input rounded-md bg-background flex-1 max-w-[76px]"
+                onChange={(event) => setManualTime(event.target.value)}
+                className="h-6 max-w-[76px] flex-1 rounded-md border border-input bg-background px-2 text-xs"
               />
             </div>
           </div>
         )}
 
-        {/* Main form row: Side, Action, Mistake */}
         <div className="flex flex-wrap items-end gap-2.5">
-          {/* Side selector */}
           <div className="space-y-1">
             <Label className="text-xs">Side</Label>
             <div className="flex gap-1">
@@ -240,7 +300,7 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
                     className={cn(
                       "h-7 w-8",
                       side === "L" &&
-                        "bg-red-500 hover:bg-red-600 text-white border-red-500",
+                        "border-red-500 bg-red-500 text-white hover:bg-red-600",
                     )}
                   >
                     L
@@ -260,7 +320,7 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
                     className={cn(
                       "h-7 w-8",
                       side === "R" &&
-                        "bg-green-500 hover:bg-green-600 text-white border-green-500",
+                        "border-green-500 bg-green-500 text-white hover:bg-green-600",
                     )}
                   >
                     R
@@ -273,8 +333,7 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
             </div>
           </div>
 
-          {/* Action selector (searchable) */}
-          <div className="space-y-1 flex-1 min-w-[128px]">
+          <div className="min-w-[128px] flex-1 space-y-1">
             <Label className="text-xs">Action</Label>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -282,7 +341,6 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
                   <Popover open={actionOpen} onOpenChange={setActionOpen}>
                     <PopoverTrigger asChild>
                       <Button
-                        ref={actionButtonRef}
                         variant="outline"
                         role="combobox"
                         aria-expanded={actionOpen}
@@ -308,11 +366,7 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
                                 key={code}
                                 value={code}
                                 onSelect={() => {
-                                  setAction(
-                                    action === code
-                                      ? undefined
-                                      : (code as ActionCode),
-                                  );
+                                  setAction(action === code ? undefined : (code as ActionCode));
                                   setActionOpen(false);
                                   setActionSearch("");
                                 }}
@@ -320,9 +374,7 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
                                 <Check
                                   className={cn(
                                     "mr-2 h-4 w-4",
-                                    action === code
-                                      ? "opacity-100"
-                                      : "opacity-0",
+                                    action === code ? "opacity-100" : "opacity-0",
                                   )}
                                 />
                                 {code}
@@ -341,7 +393,6 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
             </Tooltip>
           </div>
 
-          {/* Mistake selector */}
           <div className="space-y-1">
             <Label className="text-xs">Mistake</Label>
             <div className="flex gap-1">
@@ -352,9 +403,7 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
                     variant={mistake === "tactical" ? "default" : "outline"}
                     size="sm"
                     onClick={() =>
-                      setMistake(
-                        mistake === "tactical" ? undefined : "tactical",
-                      )
+                      setMistake(mistake === "tactical" ? undefined : "tactical")
                     }
                     className="h-7 px-2 text-[11px]"
                   >
@@ -372,9 +421,7 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
                     variant={mistake === "execution" ? "default" : "outline"}
                     size="sm"
                     onClick={() =>
-                      setMistake(
-                        mistake === "execution" ? undefined : "execution",
-                      )
+                      setMistake(mistake === "execution" ? undefined : "execution")
                     }
                     className="h-7 px-2 text-[11px]"
                   >
@@ -389,7 +436,6 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
           </div>
         </div>
 
-        {/* Comment and submit row */}
         <div className="flex gap-2">
           <Tooltip>
             <TooltipTrigger asChild>
@@ -397,7 +443,7 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
                 <Textarea
                   ref={commentRef}
                   value={comment}
-                  onChange={(e) => setComment(e.target.value)}
+                  onChange={(event) => setComment(event.target.value)}
                   placeholder="Comment (optional)..."
                   disabled={disabled}
                   className="min-h-[52px] resize-none text-xs"
@@ -411,17 +457,31 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button
-                type="submit"
-                disabled={disabled || !canSubmit}
-                size="sm"
-                className="h-[52px] px-3"
-              >
-                <Plus className="h-3.5 w-3.5" />
-              </Button>
+              <div className="flex shrink-0 flex-col gap-2">
+                {isEditing ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={disabled}
+                    className="h-[22px] px-3 text-[11px]"
+                    onClick={onCancelEdit}
+                  >
+                    Cancel
+                  </Button>
+                ) : null}
+                <Button
+                  type="submit"
+                  disabled={disabled || !canSubmit}
+                  size="sm"
+                  className={cn("px-3", isEditing ? "h-[22px] text-[11px]" : "h-[52px]")}
+                >
+                  {isEditing ? "Save" : <Plus className="h-3.5 w-3.5" />}
+                </Button>
+              </div>
             </TooltipTrigger>
             <TooltipContent>
-              <p>Add tag (Enter)</p>
+              <p>{isEditing ? "Save tag (Enter)" : "Add tag (Enter)"}</p>
             </TooltipContent>
           </Tooltip>
         </div>
@@ -438,7 +498,7 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
             {requiresMatchClock ? (
               <div className="space-y-1.5 rounded-lg border bg-muted/20 p-2">
                 <div className="flex items-center justify-between gap-2">
-                  <Label htmlFor="match-clock" className="text-xs">
+                  <Label htmlFor={`match-clock-${formIdPrefix}`} className="text-xs">
                     Match clock
                   </Label>
                   <span className="text-[11px] text-muted-foreground">
@@ -461,7 +521,7 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
                     ))}
                   </div>
                   <Input
-                    id="match-clock"
+                    id={`match-clock-${formIdPrefix}`}
                     value={matchClock}
                     onChange={(event) => setMatchClock(event.target.value)}
                     onBlur={() => {
@@ -492,11 +552,13 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
                         key={zone}
                         type="button"
                         onClick={() =>
-                          setStripZone((current) => (current === zone ? undefined : zone))
+                          setStripZone((currentZone) =>
+                            currentZone === zone ? undefined : zone,
+                          )
                         }
                         style={{ flex: STRIP_ZONE_FLEX_WEIGHTS[index] }}
                         className={cn(
-                          "flex h-8 items-center justify-center border-r border-input px-1 text-center text-[9px] leading-tight font-medium whitespace-normal transition-colors last:border-r-0",
+                          "flex h-8 items-center justify-center whitespace-normal border-r border-input px-1 text-center text-[9px] font-medium leading-tight transition-colors last:border-r-0",
                           stripZone === zone
                             ? "bg-primary text-primary-foreground"
                             : "hover:bg-muted",
@@ -513,5 +575,51 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
         ) : null}
       </form>
     </TooltipProvider>
+  );
+});
+
+export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
+  props,
+  ref,
+) {
+  const createFormRef = useRef<TagFormHandle>(null);
+  const editFormRef = useRef<TagFormHandle>(null);
+  const activeFormRef = props.editingTag ? editFormRef : createFormRef;
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      setSide: (side: Side) => activeFormRef.current?.setSide(side),
+      toggleMistake: (type: MistakeType) => activeFormRef.current?.toggleMistake(type),
+      submit: () => activeFormRef.current?.submit() ?? false,
+      focusAction: () => {
+        activeFormRef.current?.focusAction();
+      },
+      focusComment: () => {
+        activeFormRef.current?.focusComment();
+      },
+    }),
+    [activeFormRef],
+  );
+
+  return (
+    <>
+      <div className={props.editingTag ? "hidden" : undefined}>
+        <TagFormFields
+          ref={createFormRef}
+          {...props}
+          editingTag={null}
+          formIdPrefix="create"
+        />
+      </div>
+      {props.editingTag ? (
+        <TagFormFields
+          key={props.editingTag.id}
+          ref={editFormRef}
+          {...props}
+          formIdPrefix={`edit-${props.editingTag.id}`}
+        />
+      ) : null}
+    </>
   );
 });

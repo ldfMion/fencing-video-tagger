@@ -1,8 +1,12 @@
 import { readFileSync, writeFileSync } from "fs";
 import { z } from "zod";
+import { normalizeTaggingOptions } from "../lib/tagging";
 import {
   ACTION_CODES,
   ActionCodeSchema,
+  MatchClockSchema,
+  MatchPeriodSchema,
+  StripZoneSchema,
   SideSchema,
   MistakeTypeSchema,
   VideoSessionSchema,
@@ -110,9 +114,16 @@ const EXPECTED_TAG_COLUMNS = [
   "mistake",
 ];
 
+const OPTIONAL_TAG_COLUMNS = [
+  "match_period",
+  "match_clock",
+  "strip_zone",
+];
+
 function validateColumns(
   actual: string[],
   expected: string[],
+  optional: string[],
   fileName: string
 ) {
   const missing = expected.filter((col) => !actual.includes(col));
@@ -125,7 +136,7 @@ function validateColumns(
   }
 
   const extra = actual.filter(
-    (col) => col !== "" && !expected.includes(col)
+    (col) => col !== "" && !expected.includes(col) && !optional.includes(col)
   );
   if (extra.length > 0) {
     console.log(`  Note: ignoring extra columns in ${fileName}: ${extra.join(", ")}`);
@@ -149,9 +160,9 @@ if (boutRows.length === 0) {
 const boutHeaders = Object.keys(boutRows[0]);
 const tagHeaders = tagRows.length > 0 ? Object.keys(tagRows[0]) : [];
 
-validateColumns(boutHeaders, EXPECTED_BOUT_COLUMNS, boutsPath);
+validateColumns(boutHeaders, EXPECTED_BOUT_COLUMNS, [], boutsPath);
 if (tagRows.length > 0) {
-  validateColumns(tagHeaders, EXPECTED_TAG_COLUMNS, tagsPath);
+  validateColumns(tagHeaders, EXPECTED_TAG_COLUMNS, OPTIONAL_TAG_COLUMNS, tagsPath);
 }
 
 // Validate all rows - collect errors, then reject all-or-nothing
@@ -180,10 +191,13 @@ if (skippedTagRows > 0) {
 
 // Validate tags
 const actionCodesSet = new Set<string>(ACTION_CODES);
+const boutClockUsage = new Map<string, boolean>();
+const boutStripUsage = new Map<string, boolean>();
 
 for (let i = 0; i < validTagRows.length; i++) {
   const row = validTagRows[i];
   const lineNum = i + 2;
+  const boutId = row.bout_id.trim();
 
   if (!boutIds.has(row.bout_id.trim())) {
     errors.push(
@@ -215,6 +229,82 @@ for (let i = 0; i < validTagRows.length; i++) {
       );
     }
   }
+
+  const matchPeriod = row.match_period?.trim();
+  const matchClock = row.match_clock?.trim();
+  const stripZone = row.strip_zone?.trim();
+  const hasClockMetadata = Boolean(matchPeriod || matchClock);
+
+  if (hasClockMetadata) {
+    if (!matchPeriod || !matchClock) {
+      errors.push(
+        `Tags row ${lineNum}: match_period and match_clock must both be provided together`
+      );
+    }
+
+    boutClockUsage.set(boutId, true);
+  } else if (!boutClockUsage.has(boutId)) {
+    boutClockUsage.set(boutId, false);
+  } else if (boutClockUsage.get(boutId)) {
+    errors.push(
+      `Tags row ${lineNum}: missing match_period/match_clock for bout "${boutId}"`
+    );
+  }
+
+  if (matchPeriod) {
+    const result = MatchPeriodSchema.safeParse(matchPeriod);
+    if (!result.success) {
+      errors.push(`Tags row ${lineNum}: invalid match_period "${matchPeriod}"`);
+    }
+  }
+
+  if (matchClock) {
+    const result = MatchClockSchema.safeParse(matchClock);
+    if (!result.success) {
+      errors.push(
+        `Tags row ${lineNum}: invalid match_clock "${matchClock}" (must be m:ss)`
+      );
+    }
+  }
+
+  if (stripZone) {
+    boutStripUsage.set(boutId, true);
+
+    const result = StripZoneSchema.safeParse(stripZone);
+    if (!result.success) {
+      errors.push(
+        `Tags row ${lineNum}: invalid strip_zone "${stripZone}" (must be 1-5)`
+      );
+    }
+  } else if (!boutStripUsage.has(boutId)) {
+    boutStripUsage.set(boutId, false);
+  } else if (boutStripUsage.get(boutId)) {
+    errors.push(
+      `Tags row ${lineNum}: missing strip_zone for bout "${boutId}"`
+    );
+  }
+}
+
+for (const boutId of boutIds) {
+  const rows = validTagRows.filter((row) => row.bout_id.trim() === boutId);
+  const hasClockMetadata = rows.some(
+    (row) => row.match_period?.trim() || row.match_clock?.trim()
+  );
+  const missingClockMetadata = rows.some(
+    (row) => !(row.match_period?.trim() && row.match_clock?.trim())
+  );
+  const hasStripMetadata = rows.some((row) => row.strip_zone?.trim());
+  const missingStripMetadata = rows.some((row) => !row.strip_zone?.trim());
+
+  if (hasClockMetadata && missingClockMetadata) {
+    errors.push(
+      `Bout "${boutId}" mixes tags with and without match_period/match_clock`
+    );
+  }
+
+  if (hasStripMetadata && missingStripMetadata) {
+    errors.push(`Bout "${boutId}" mixes tags with and without strip_zone`);
+  }
 }
 
 if (errors.length > 0) {
@@ -245,6 +335,9 @@ const sessions = validBoutRows.map((bout) => {
     const action = tagRow.action_new?.trim() || undefined;
     const side = tagRow.side?.trim() || undefined;
     const mistake = tagRow.mistake?.trim() || undefined;
+    const matchPeriod = tagRow.match_period?.trim() || undefined;
+    const matchClock = tagRow.match_clock?.trim() || undefined;
+    const stripZone = tagRow.strip_zone?.trim() || undefined;
 
     return {
       id: crypto.randomUUID(),
@@ -256,12 +349,19 @@ const sessions = validBoutRows.map((bout) => {
       ...(mistake && {
         mistake: mistake as "tactical" | "execution",
       }),
+      ...(matchPeriod && { matchPeriod: matchPeriod as z.infer<typeof MatchPeriodSchema> }),
+      ...(matchClock && { matchClock }),
+      ...(stripZone && { stripZone: stripZone as z.infer<typeof StripZoneSchema> }),
     };
   });
 
   const date = bout.date?.trim() || undefined;
   const boutType = bout.bout_type?.trim() || undefined;
   const link = bout.link?.trim() || undefined;
+  const taggingOptions = normalizeTaggingOptions({
+    matchClockEnabled: boutClockUsage.get(boutId) === true,
+    stripZoneEnabled: boutStripUsage.get(boutId) === true,
+  });
 
   return {
     id: boutId,
@@ -274,6 +374,7 @@ const sessions = validBoutRows.map((bout) => {
     ...(date && { boutDate: date }),
     ...(boutType && { boutType }),
     ...(link && { externalSource: link }),
+    ...(taggingOptions && { taggingOptions }),
   };
 });
 

@@ -1,14 +1,21 @@
 import { z } from "zod";
 import { deriveBoutDateFromFileMetadata } from "@/lib/date-utils";
+import {
+  assertTagMetadataMatchesSession,
+  normalizeTaggingOptions,
+} from "@/lib/tagging";
 import type { VideoLibraryItem } from "@/lib/video-library";
 import {
   type ActionCode,
   CURRENT_SCHEMA_VERSION,
+  type MatchPeriod,
   type MistakeType,
+  type StripZone,
   StorageEnvelopeSchema,
   type StorageEnvelope,
   type Tag,
   TagSchema,
+  type TaggingOptions,
   type Side,
   type VideoSession,
   VideoSessionSchema,
@@ -28,6 +35,9 @@ const LegacyTagSchema = z
     side: z.enum(["L", "R"]).optional(),
     action: z.string().optional(),
     mistake: z.enum(["tactical", "execution"]).optional(),
+    matchPeriod: z.enum(["1", "2", "3", "priority"]).optional(),
+    matchClock: z.string().optional(),
+    stripZone: z.enum(["1", "2", "3", "4", "5"]).optional(),
   })
   .transform(
     (tag): z.input<typeof TagSchema> => ({
@@ -38,6 +48,9 @@ const LegacyTagSchema = z
       side: tag.side,
       action: tag.action as Tag["action"],
       mistake: tag.mistake,
+      matchPeriod: tag.matchPeriod,
+      matchClock: tag.matchClock,
+      stripZone: tag.stripZone,
     }),
   );
 
@@ -50,6 +63,12 @@ const LegacySessionSchema = z
     leftFencer: z.string().optional(),
     rightFencer: z.string().optional(),
     boutDate: z.string().optional(),
+    taggingOptions: z
+      .object({
+        matchClockEnabled: z.boolean().optional(),
+        stripZoneEnabled: z.boolean().optional(),
+      })
+      .optional(),
   })
   .transform(
     (session): z.input<typeof VideoSessionSchema> => ({
@@ -63,6 +82,9 @@ export interface AddTagParams {
   side?: Side;
   action?: ActionCode;
   mistake?: MistakeType;
+  matchPeriod?: MatchPeriod;
+  matchClock?: string;
+  stripZone?: StripZone;
 }
 
 export interface UpdateSessionParams {
@@ -74,6 +96,7 @@ export interface UpdateSessionParams {
   rightFencer?: string | null;
   boutDate?: string | null;
   externalSource?: string | null;
+  taggingOptions?: TaggingOptions | null;
 }
 
 export interface SessionDraftParams {
@@ -81,6 +104,7 @@ export interface SessionDraftParams {
   rightFencer?: string;
   boutDate?: string;
   externalSource?: string;
+  taggingOptions?: TaggingOptions;
 }
 
 export type SessionMetadataParams = Partial<
@@ -94,6 +118,7 @@ export type SessionMetadataParams = Partial<
     | "rightFencer"
     | "boutDate"
     | "externalSource"
+    | "taggingOptions"
   >
 >;
 
@@ -160,7 +185,10 @@ export function createSessionRecord(
     id: options?.sessionId ?? generateSessionId(),
     tags: [],
     lastModified: options?.now ?? Date.now(),
-    ...withDefinedValues(params ?? {}),
+    ...withDefinedValues({
+      ...(params ?? {}),
+      taggingOptions: normalizeTaggingOptions(params?.taggingOptions),
+    }),
   };
 }
 
@@ -202,9 +230,10 @@ export function createSessionRecordWithLibraryVideo(
 
 export function createTagRecord(
   params: AddTagParams,
+  session?: Pick<VideoSession, "taggingOptions">,
   options?: CreateTagRecordOptions,
 ): Tag {
-  return {
+  const nextTag: Tag = {
     id: options?.tagId ?? generateTagId(),
     timestamp: params.timestamp,
     seq: options?.seq,
@@ -213,7 +242,16 @@ export function createTagRecord(
     side: params.side,
     action: params.action,
     mistake: params.mistake,
+    matchPeriod: params.matchPeriod,
+    matchClock: params.matchClock,
+    stripZone: params.stripZone,
   };
+
+  if (session) {
+    assertTagMetadataMatchesSession(session, nextTag);
+  }
+
+  return nextTag;
 }
 
 export function computeNextTagSequence(session: VideoSession): number {
@@ -244,7 +282,10 @@ export function applySessionUpdates(
       continue;
     }
 
-    nextSession[key] = value;
+    nextSession[key] =
+      key === "taggingOptions"
+        ? normalizeTaggingOptions(value as TaggingOptions | undefined)
+        : value;
   }
 
   return nextSession;
@@ -315,7 +356,7 @@ export function parseStoredSessionsFromRaw(raw: unknown): ParsedStoredSessions {
   if (envelope.success) {
     return {
       sessions: envelope.data.sessions,
-      migrated: false,
+      migrated: envelope.data.version !== CURRENT_SCHEMA_VERSION,
     };
   }
 

@@ -19,6 +19,10 @@ import {
 } from "@/components/ui/command";
 import { Check, Copy, ChevronDown, Trash2, X } from "lucide-react";
 import { SIDE_COLORS } from "@/lib/constants";
+import {
+  formatMatchPeriodLabel,
+  formatStripZoneLabel,
+} from "@/lib/tagging";
 import type { ActionCode, Side, Tag } from "@/lib/types";
 import { cn, formatTime, sortTags } from "@/lib/utils";
 
@@ -238,6 +242,16 @@ export function TagList({
                           {tag.action}
                         </Badge>
                       )}
+                      {formatMatchPeriodLabel(tag.matchPeriod) && tag.matchClock ? (
+                        <Badge variant="outline" className="text-xs px-1.5 py-0">
+                          {formatMatchPeriodLabel(tag.matchPeriod)} {tag.matchClock}
+                        </Badge>
+                      ) : null}
+                      {formatStripZoneLabel(tag.stripZone) ? (
+                        <Badge variant="outline" className="text-xs px-1.5 py-0">
+                          {formatStripZoneLabel(tag.stripZone)}
+                        </Badge>
+                      ) : null}
                       {tag.mistake && (
                         <Badge
                           variant="destructive"

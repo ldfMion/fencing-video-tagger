@@ -1,4 +1,8 @@
 import { getBoutDisplayLabel } from "@/lib/session-selectors";
+import {
+  formatMatchPeriodLabel,
+  formatStripZoneLabel,
+} from "@/lib/tagging";
 import type { Tag, VideoSession } from "@/lib/types";
 import { formatTime } from "@/lib/utils";
 
@@ -34,7 +38,15 @@ export function getTagShareDescription(tag: Tag): string {
     parts.push(`Tag at ${getTagTimestampLabel(tag)}`);
   }
 
-  const detailLabels = [tag.side, tag.action, tag.mistake].filter(
+  const detailLabels = [
+    tag.side,
+    tag.action,
+    tag.mistake,
+    tag.matchClock && formatMatchPeriodLabel(tag.matchPeriod)
+      ? `${formatMatchPeriodLabel(tag.matchPeriod)} ${tag.matchClock}`
+      : null,
+    formatStripZoneLabel(tag.stripZone),
+  ].filter(
     (value): value is NonNullable<typeof value> => value != null,
   );
 

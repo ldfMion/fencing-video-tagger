@@ -487,6 +487,7 @@ export function BoutWorkspaceShell({
                   ref={tagFormRef}
                   onAddTag={handleAddTag}
                   currentTime={activeVideoUrl ? video.currentTime : undefined}
+                  taggingOptions={session.taggingOptions}
                 />
               </div>
             </div>

@@ -3,19 +3,27 @@ import "server-only";
 import { z } from "zod";
 import {
   applySessionUpdates,
-  computeNextTagSequence,
   createSessionRecord,
+  computeNextTagSequence,
   createSessionRecordWithLibraryVideo,
   createSessionRecordWithTemporaryVideo,
   createTagRecord,
   type ServerSessionVideoSelection,
 } from "@/lib/session-service";
+import {
+  assertTagMetadataMatchesSession,
+  assertTaggingOptionsAreMutable,
+} from "@/lib/tagging";
 import { getSessionRepository } from "@/lib/server/session-repository";
 import {
   ActionCodeSchema,
+  MatchClockSchema,
+  MatchPeriodSchema,
   MistakeTypeSchema,
   SideSchema,
+  StripZoneSchema,
   TagSchema,
+  TaggingOptionsSchema,
   type VideoSession,
   VideoSessionSchema,
   VideoSourceTypeSchema,
@@ -49,6 +57,7 @@ const SessionDraftParamsSchema = z.object({
   rightFencer: z.string().optional(),
   boutDate: z.string().optional(),
   externalSource: z.string().optional(),
+  taggingOptions: TaggingOptionsSchema.optional(),
 });
 
 const UpdateSessionParamsSchema = z.object({
@@ -60,6 +69,7 @@ const UpdateSessionParamsSchema = z.object({
   rightFencer: z.string().nullable().optional(),
   boutDate: z.string().nullable().optional(),
   externalSource: z.string().nullable().optional(),
+  taggingOptions: TaggingOptionsSchema.nullable().optional(),
 });
 
 const AddTagParamsSchema = z.object({
@@ -68,6 +78,9 @@ const AddTagParamsSchema = z.object({
   side: SideSchema.optional(),
   action: ActionCodeSchema.optional(),
   mistake: MistakeTypeSchema.optional(),
+  matchPeriod: MatchPeriodSchema.optional(),
+  matchClock: MatchClockSchema.optional(),
+  stripZone: StripZoneSchema.optional(),
 });
 
 const CreateSessionInputSchema = z.object({
@@ -149,10 +162,10 @@ export async function updateSession(
       throw new Error(`Session ${parsedInput.sessionId} was not found`);
     }
 
-    const nextSession = applySessionUpdates(
-      sessions[sessionIndex],
-      parsedInput.updates,
-    );
+    const previousSession = sessions[sessionIndex];
+    const nextSession = applySessionUpdates(previousSession, parsedInput.updates);
+
+    assertTaggingOptionsAreMutable(previousSession, nextSession.taggingOptions);
 
     return {
       sessions: sessions.map((session, index) =>
@@ -190,7 +203,7 @@ export async function addTag(input: AddTagInput): Promise<VideoSession> {
     }
 
     const session = sessions[sessionIndex];
-    const nextTag = createTagRecord(parsedInput.params, {
+    const nextTag = createTagRecord(parsedInput.params, session, {
       tagId: parsedInput.tagId,
       createdAt: parsedInput.createdAt,
       seq: computeNextTagSequence(session),
@@ -229,10 +242,13 @@ export async function updateTag(input: UpdateTagInput): Promise<VideoSession> {
       }
 
       foundTag = true;
-      return {
+      const nextTag = {
         ...tag,
         ...parsedInput.updates,
       };
+
+      assertTagMetadataMatchesSession(session, nextTag);
+      return nextTag;
     });
 
     if (!foundTag) {

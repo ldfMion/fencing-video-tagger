@@ -9,6 +9,7 @@ import {
   useImperativeHandle,
 } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
@@ -32,10 +33,23 @@ import {
 } from "@/components/ui/command";
 import { Plus, Check, ChevronsUpDown, Clock } from "lucide-react";
 import {
+  getDefaultMatchPeriod,
+  isMatchClockEnabled,
+  isStripZoneEnabled,
+  normalizeMatchClockInput,
+  STRIP_ZONE_FLEX_WEIGHTS,
+  STRIP_ZONE_LABELS,
+} from "@/lib/tagging";
+import {
   ACTION_CODES,
+  MATCH_PERIODS,
+  STRIP_ZONES,
   type Side,
   type ActionCode,
+  type MatchPeriod,
   type MistakeType,
+  type StripZone,
+  type TaggingOptions,
 } from "@/lib/types";
 import type { AddTagParams } from "@/hooks/use-sessions";
 import { cn, formatTime } from "@/lib/utils";
@@ -51,11 +65,12 @@ export interface TagFormHandle {
 interface TagFormProps {
   currentTime: number | undefined;
   onAddTag: (params: AddTagParams) => void;
+  taggingOptions?: TaggingOptions;
   disabled?: boolean;
 }
 
 export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
-  { currentTime, onAddTag, disabled },
+  { currentTime, onAddTag, taggingOptions, disabled },
   ref,
 ) {
   const [comment, setComment] = useState("");
@@ -64,8 +79,17 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
   const [mistake, setMistake] = useState<MistakeType | undefined>(undefined);
   const [actionOpen, setActionOpen] = useState(false);
   const [manualTime, setManualTime] = useState("");
+  const [matchPeriod, setMatchPeriod] = useState<MatchPeriod>(getDefaultMatchPeriod());
+  const [matchClock, setMatchClock] = useState("");
+  const [stripZone, setStripZone] = useState<StripZone | undefined>(undefined);
 
   const isVideoMode = currentTime != null;
+  const requiresMatchClock = isMatchClockEnabled({ taggingOptions });
+  const requiresStripZone = isStripZoneEnabled({ taggingOptions });
+  const normalizedMatchClock = useMemo(
+    () => normalizeMatchClockInput(matchClock),
+    [matchClock],
+  );
 
   const actionButtonRef = useRef<HTMLButtonElement>(null);
   const commentRef = useRef<HTMLTextAreaElement>(null);
@@ -103,6 +127,8 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
 
       // Need at least side or comment
       if (!side && !comment.trim()) return false;
+      if (requiresMatchClock && !normalizedMatchClock) return false;
+      if (requiresStripZone && !stripZone) return false;
 
       let timestamp: number | undefined;
       if (isVideoMode) {
@@ -117,11 +143,29 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
         side,
         action,
         mistake,
+        matchPeriod: requiresMatchClock ? matchPeriod : undefined,
+        matchClock: requiresMatchClock ? normalizedMatchClock : undefined,
+        stripZone: requiresStripZone ? stripZone : undefined,
       });
       resetForm();
       return true;
     },
-    [comment, currentTime, manualTime, side, action, mistake, onAddTag, resetForm, isVideoMode],
+    [
+      action,
+      comment,
+      currentTime,
+      isVideoMode,
+      manualTime,
+      matchPeriod,
+      mistake,
+      normalizedMatchClock,
+      onAddTag,
+      requiresMatchClock,
+      requiresStripZone,
+      resetForm,
+      side,
+      stripZone,
+    ],
   );
 
   // Expose methods to parent via ref
@@ -138,7 +182,11 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
     },
   }));
 
-  const canSubmit = side || comment.trim();
+  const canSubmit = Boolean(
+    (side || comment.trim()) &&
+      (!requiresMatchClock || normalizedMatchClock) &&
+      (!requiresStripZone || stripZone),
+  );
 
   // Filter action codes for search
   const [actionSearch, setActionSearch] = useState("");
@@ -377,6 +425,92 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
             </TooltipContent>
           </Tooltip>
         </div>
+
+        {requiresMatchClock || requiresStripZone ? (
+          <div
+            className={cn(
+              "grid gap-2",
+              requiresMatchClock && requiresStripZone
+                ? "sm:grid-cols-[minmax(0,172px)_minmax(0,1fr)]"
+                : "sm:grid-cols-1",
+            )}
+          >
+            {requiresMatchClock ? (
+              <div className="space-y-1.5 rounded-lg border bg-muted/20 p-2">
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="match-clock" className="text-xs">
+                    Match clock
+                  </Label>
+                  <span className="text-[11px] text-muted-foreground">
+                    Sticky
+                  </span>
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex gap-1">
+                    {MATCH_PERIODS.map((period) => (
+                      <Button
+                        key={period}
+                        type="button"
+                        variant={matchPeriod === period ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setMatchPeriod(period)}
+                        className="h-6 min-w-0 flex-1 px-1 text-[10px]"
+                      >
+                        {period === "priority" ? "Pri" : `P${period}`}
+                      </Button>
+                    ))}
+                  </div>
+                  <Input
+                    id="match-clock"
+                    value={matchClock}
+                    onChange={(event) => setMatchClock(event.target.value)}
+                    onBlur={() => {
+                      if (normalizedMatchClock) {
+                        setMatchClock(normalizedMatchClock);
+                      }
+                    }}
+                    placeholder="2:17 or 217"
+                    aria-invalid={matchClock.length > 0 && !normalizedMatchClock}
+                    className="h-6 text-xs font-mono"
+                  />
+                </div>
+              </div>
+            ) : null}
+
+            {requiresStripZone ? (
+              <div className="space-y-1.5 rounded-lg border bg-muted/20 p-2">
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="text-xs">Strip zone</Label>
+                  <span className="text-[11px] text-muted-foreground">
+                    Left to right
+                  </span>
+                </div>
+                <div className="overflow-hidden rounded-md border border-input bg-background">
+                  <div className="flex">
+                    {STRIP_ZONES.map((zone, index) => (
+                      <button
+                        key={zone}
+                        type="button"
+                        onClick={() =>
+                          setStripZone((current) => (current === zone ? undefined : zone))
+                        }
+                        style={{ flex: STRIP_ZONE_FLEX_WEIGHTS[index] }}
+                        className={cn(
+                          "flex h-8 items-center justify-center border-r border-input px-1 text-center text-[9px] leading-tight font-medium whitespace-normal transition-colors last:border-r-0",
+                          stripZone === zone
+                            ? "bg-primary text-primary-foreground"
+                            : "hover:bg-muted",
+                        )}
+                      >
+                        {STRIP_ZONE_LABELS[zone]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </form>
     </TooltipProvider>
   );

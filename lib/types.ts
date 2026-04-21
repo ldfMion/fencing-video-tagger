@@ -51,11 +51,25 @@ export const ActionCodeSchema = z.enum(ACTION_CODES);
 export const SideSchema = z.enum(["L", "R"]);
 export const MistakeTypeSchema = z.enum(["tactical", "execution"]);
 export const VideoSourceTypeSchema = z.enum(["library", "temporary"]);
+export const MATCH_PERIODS = ["1", "2", "3", "priority"] as const;
+export const STRIP_ZONES = ["1", "2", "3", "4", "5"] as const;
+export const MATCH_CLOCK_PATTERN = /^(\d{1,2}):([0-5]\d)$/;
+export const MatchPeriodSchema = z.enum(MATCH_PERIODS);
+export const MatchClockSchema = z.string().regex(MATCH_CLOCK_PATTERN);
+export const StripZoneSchema = z.enum(STRIP_ZONES);
+export const TaggingOptionsSchema = z.object({
+  matchClockEnabled: z.boolean().optional(),
+  stripZoneEnabled: z.boolean().optional(),
+});
 
 export type ActionCode = z.infer<typeof ActionCodeSchema>;
 export type Side = z.infer<typeof SideSchema>;
 export type MistakeType = z.infer<typeof MistakeTypeSchema>;
 export type VideoSourceType = z.infer<typeof VideoSourceTypeSchema>;
+export type MatchPeriod = z.infer<typeof MatchPeriodSchema>;
+export type MatchClock = z.infer<typeof MatchClockSchema>;
+export type StripZone = z.infer<typeof StripZoneSchema>;
+export type TaggingOptions = z.infer<typeof TaggingOptionsSchema>;
 
 export const TagSchema = z.object({
   id: z.string(),
@@ -67,6 +81,9 @@ export const TagSchema = z.object({
   side: SideSchema.optional(), // required for statistics, optional for notes
   action: ActionCodeSchema.optional(), // only for statistics
   mistake: MistakeTypeSchema.optional(), // only for statistics
+  matchPeriod: MatchPeriodSchema.optional(),
+  matchClock: MatchClockSchema.optional(),
+  stripZone: StripZoneSchema.optional(),
 });
 
 export type Tag = z.infer<typeof TagSchema>;
@@ -85,13 +102,14 @@ export const VideoSessionSchema = z.object({
   boutDate: z.string().optional(), // ISO date string
   boutType: z.string().optional(), // e.g. "pool", "DE", "team"
   externalSource: z.string().optional(), // URL or reference note
+  taggingOptions: TaggingOptionsSchema.optional(),
 });
 
 export type VideoSession = z.infer<typeof VideoSessionSchema>;
 
 // --- Storage versioning ---
 
-export const CURRENT_SCHEMA_VERSION = 1;
+export const CURRENT_SCHEMA_VERSION = 2;
 
 export const StorageEnvelopeSchema = z.object({
   version: z.number(),

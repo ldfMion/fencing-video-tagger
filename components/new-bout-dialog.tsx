@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { normalizeTaggingOptions } from "@/lib/tagging";
 import { cn } from "@/lib/utils";
 import type {
   PersistedSessionVideoSelection,
@@ -103,6 +104,12 @@ function DialogFormContents({
   const [externalSource, setExternalSource] = useState(
     editSession?.externalSource ?? "",
   );
+  const [matchClockEnabled, setMatchClockEnabled] = useState(
+    editSession?.taggingOptions?.matchClockEnabled === true,
+  );
+  const [stripZoneEnabled, setStripZoneEnabled] = useState(
+    editSession?.taggingOptions?.stripZoneEnabled === true,
+  );
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isLibraryPickerOpen, setIsLibraryPickerOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -127,6 +134,7 @@ function DialogFormContents({
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isLibraryPanelVisible = videoMode === "library" && isLibraryPickerOpen;
+  const isTaggingOptionsLocked = Boolean(isEditMode && editSession?.tags.length);
 
   useEffect(() => {
     onLibraryPanelChange?.(isLibraryPanelVisible);
@@ -154,6 +162,10 @@ function DialogFormContents({
       rightFencer: rightFencer.trim() || undefined,
       boutDate: boutDate || undefined,
       externalSource: externalSource.trim() || undefined,
+      taggingOptions: normalizeTaggingOptions({
+        matchClockEnabled,
+        stripZoneEnabled,
+      }),
     };
 
     setIsSubmitting(true);
@@ -255,6 +267,56 @@ function DialogFormContents({
                 onChange={(event) => setExternalSource(event.target.value)}
                 className="h-8 text-sm"
               />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <Label className="text-sm">Tagging extras</Label>
+                <span className="text-[11px] text-muted-foreground">
+                  Optional per bout, required on every tag when enabled.
+                </span>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  disabled={isTaggingOptionsLocked}
+                  onClick={() => setMatchClockEnabled((value) => !value)}
+                  className={cn(
+                    "rounded-lg border px-3 py-2 text-left transition-colors",
+                    matchClockEnabled
+                      ? "border-foreground bg-muted"
+                      : "border-border hover:bg-muted/50",
+                    isTaggingOptionsLocked && "cursor-not-allowed opacity-60",
+                  )}
+                >
+                  <div className="font-medium">Match clock</div>
+                  <div className="text-xs text-muted-foreground">
+                    Require period + match clock on each tag.
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  disabled={isTaggingOptionsLocked}
+                  onClick={() => setStripZoneEnabled((value) => !value)}
+                  className={cn(
+                    "rounded-lg border px-3 py-2 text-left transition-colors",
+                    stripZoneEnabled
+                      ? "border-foreground bg-muted"
+                      : "border-border hover:bg-muted/50",
+                    isTaggingOptionsLocked && "cursor-not-allowed opacity-60",
+                  )}
+                >
+                  <div className="font-medium">Strip zone</div>
+                  <div className="text-xs text-muted-foreground">
+                    Require one of five left-to-right strip zones on each tag.
+                  </div>
+                </button>
+              </div>
+              {isTaggingOptionsLocked ? (
+                <p className="text-xs text-muted-foreground">
+                  Tagging extras are locked after the first tag so existing bout tags stay consistent.
+                </p>
+              ) : null}
             </div>
 
             <div className="space-y-2">

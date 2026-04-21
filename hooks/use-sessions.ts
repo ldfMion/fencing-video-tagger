@@ -21,6 +21,10 @@ import {
   exportSessionsToNormalizedCsvZip,
 } from "@/lib/session-export";
 import {
+  assertTagMetadataMatchesSession,
+  assertTaggingOptionsAreMutable,
+} from "@/lib/tagging";
+import {
   type AddTagParams,
   applySessionUpdates,
   attachLibraryVideoToSession,
@@ -41,7 +45,7 @@ import {
   getAllFencerNames,
   getSessionById as selectSessionById,
 } from "@/lib/session-selectors";
-import type { Tag, VideoSession } from "@/lib/types";
+import type { Tag, TaggingOptions, VideoSession } from "@/lib/types";
 
 export type {
   AddTagParams,
@@ -362,6 +366,8 @@ export function useSessions(initialSessions?: VideoSession[]) {
         );
       }
 
+      assertTaggingOptionsAreMutable(currentSession, optimisticSession.taggingOptions);
+
       const updates = deriveSessionUpdates(currentSession, optimisticSession);
 
       if (Object.keys(updates).length === 0) {
@@ -412,7 +418,7 @@ export function useSessions(initialSessions?: VideoSession[]) {
         throw new Error(`Session ${sessionId} was not found`);
       }
 
-      const optimisticTag = createTagRecord(params, {
+      const optimisticTag = createTagRecord(params, currentSession, {
         tagId: crypto.randomUUID(),
         createdAt: Date.now(),
         seq: computeNextTagSequence(currentSession),
@@ -457,6 +463,14 @@ export function useSessions(initialSessions?: VideoSession[]) {
         ),
         lastModified: Date.now(),
       };
+
+      const updatedTag = optimisticSession.tags.find((tag) => tag.id === tagId);
+
+      if (!updatedTag) {
+        throw new Error(`Tag ${tagId} was not found in session ${sessionId}`);
+      }
+
+      assertTagMetadataMatchesSession(currentSession, updatedTag);
 
       return updateTagMutation.mutateAsync({
         sessionId,
@@ -735,6 +749,10 @@ function applySessionDraftUpdates(
     updates.externalSource = params.externalSource ?? null;
   }
 
+  if ("taggingOptions" in params) {
+    updates.taggingOptions = (params.taggingOptions as TaggingOptions | undefined) ?? null;
+  }
+
   return Object.keys(updates).length > 0
     ? applySessionUpdates(session, updates)
     : session;
@@ -808,6 +826,13 @@ function deriveSessionUpdates(
 
   if (previousSession.externalSource !== nextSession.externalSource) {
     updates.externalSource = nextSession.externalSource ?? null;
+  }
+
+  if (
+    JSON.stringify(previousSession.taggingOptions ?? null) !==
+    JSON.stringify(nextSession.taggingOptions ?? null)
+  ) {
+    updates.taggingOptions = nextSession.taggingOptions ?? null;
   }
 
   return updates;

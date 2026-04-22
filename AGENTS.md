@@ -20,10 +20,10 @@ Write TypeScript with 2-space indentation avoided here in favor of the repositor
 Do not duplicate scoring or styling rules in components. Reuse `lib/score.ts`, `lib/constants.ts`, and the UI primitives in `components/ui/`. Prefer small client components and colocate route-specific logic with the route.
 
 ## Testing Guidelines
-There is no dedicated test suite configured yet. For now, treat `pnpm lint` and `pnpm build` as required checks before opening a PR. When adding tests later, place them next to the feature or in a clear `__tests__` location and name them after the unit under test.
+There is no dedicated test suite configured yet. For now, treat `pnpm lint` and `pnpm exec tsc --noEmit` as the required checks before opening a PR. Do not rely on `pnpm build` in sandboxed environments for routine validation in this repo, because it will fail on blocked Google Fonts fetches. When adding tests later, place them next to the feature or in a clear `__tests__` location and name them after the unit under test.
 
 ## Build Environment Notes
-`pnpm build` may fail inside restricted sandboxes that cannot reach external Google Fonts URLs. In this repo, that shows up as `next/font` fetch failures for fonts such as `Geist`, `Geist Mono`, or `IBM Plex Sans`, and it should be treated as an environment/network limitation rather than an application build regression.
+`pnpm build` is expected to fail inside restricted sandboxes that cannot reach external Google Fonts URLs. In this repo, that shows up as `next/font` fetch failures for fonts such as `Geist`, `Geist Mono`, or `IBM Plex Sans`, and it should be treated as an environment/network limitation rather than an application build regression. Do not keep retrying `pnpm build` during normal validation unless the environment has external font access.
 
 ## Commit & Pull Request Guidelines
 Recent commits use short, imperative summaries such as `added some charts` and `imported bouts from spreadsheet`. Keep commit messages brief, descriptive, and focused on one change.

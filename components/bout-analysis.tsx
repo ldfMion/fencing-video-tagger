@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { BoutScoreChart } from "@/components/bout-score-chart";
 import { SIDE_COLORS } from "@/lib/constants";
 import { computeScore, computeRunningScore } from "@/lib/score";
 import { BoutStats } from "@/components/bout-stats";
@@ -60,6 +61,12 @@ export function BoutAnalysis({
           </div>
         </div>
       </div>
+
+      <BoutScoreChart
+        tags={tags}
+        leftFencer={leftFencer}
+        rightFencer={rightFencer}
+      />
 
       {/* Stats + Events: side-by-side on lg, stacked on smaller */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

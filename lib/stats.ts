@@ -1,4 +1,6 @@
-import type { Tag, Side } from "@/lib/types";
+import { STRIP_ZONE_LABELS } from "@/lib/tagging";
+import type { Tag, Side, StripZone } from "@/lib/types";
+import { STRIP_ZONES } from "@/lib/types";
 import {
   getTacticalIntent,
   getScoringDefAlternative,
@@ -22,6 +24,25 @@ export interface MirrorPair<C extends string = string> {
   categoryLabel: string;
   mirror: C;
   mirrorLabel: string;
+}
+
+export interface StripZoneStat {
+  zone: StripZone;
+  label: string;
+  leftScoreCount: number;
+  rightScoreCount: number;
+  total: number;
+  net: number;
+}
+
+export interface StripZoneStatsSummary {
+  zones: StripZoneStat[];
+  leftTotal: number;
+  rightTotal: number;
+  totalScoringActions: number;
+  maxLeftCount: number;
+  maxRightCount: number;
+  maxNetAbs: number;
 }
 
 /**
@@ -165,4 +186,66 @@ export function computeDefMatchupStats(
   perspective: Side,
 ): StatRow<DefMatchup>[] {
   return computeStats(tags, classifyDefMatchup, DEF_MATCHUP_MIRROR_PAIRS, perspective);
+}
+
+export function computeStripZoneStats(tags: Tag[]): StripZoneStatsSummary {
+  const zoneCounts = new Map<StripZone, { left: number; right: number }>();
+
+  for (const zone of STRIP_ZONES) {
+    zoneCounts.set(zone, { left: 0, right: 0 });
+  }
+
+  for (const tag of tags) {
+    if (!tag.side || !tag.action || !tag.stripZone) continue;
+    if (tag.action === "yc" || tag.action === "bl") continue;
+
+    const zone = zoneCounts.get(tag.stripZone);
+
+    if (!zone) continue;
+
+    const scoringSide: Side =
+      tag.action === "rc"
+        ? tag.side === "L"
+          ? "R"
+          : "L"
+        : tag.side;
+
+    if (scoringSide === "L") {
+      zone.left++;
+    } else {
+      zone.right++;
+    }
+  }
+
+  const zones = STRIP_ZONES.map((zone) => {
+    const counts = zoneCounts.get(zone) ?? { left: 0, right: 0 };
+    const total = counts.left + counts.right;
+    const net = counts.left - counts.right;
+
+    return {
+      zone,
+      label: STRIP_ZONE_LABELS[zone],
+      leftScoreCount: counts.left,
+      rightScoreCount: counts.right,
+      total,
+      net,
+    };
+  });
+
+  const leftTotal = zones.reduce((sum, zone) => sum + zone.leftScoreCount, 0);
+  const rightTotal = zones.reduce((sum, zone) => sum + zone.rightScoreCount, 0);
+  const totalScoringActions = leftTotal + rightTotal;
+  const maxLeftCount = zones.reduce((max, zone) => Math.max(max, zone.leftScoreCount), 0);
+  const maxRightCount = zones.reduce((max, zone) => Math.max(max, zone.rightScoreCount), 0);
+  const maxNetAbs = zones.reduce((max, zone) => Math.max(max, Math.abs(zone.net)), 0);
+
+  return {
+    zones,
+    leftTotal,
+    rightTotal,
+    totalScoringActions,
+    maxLeftCount,
+    maxRightCount,
+    maxNetAbs,
+  };
 }

@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { BoutScoreChart } from "@/components/bout-score-chart";
+import { BoutStripHeatmap } from "@/components/bout-strip-heatmap";
 import { SIDE_COLORS } from "@/lib/constants";
 import { computeScore, computeRunningScore } from "@/lib/score";
 import { BoutStats } from "@/components/bout-stats";
@@ -63,6 +64,12 @@ export function BoutAnalysis({
       </div>
 
       <BoutScoreChart
+        tags={tags}
+        leftFencer={leftFencer}
+        rightFencer={rightFencer}
+      />
+
+      <BoutStripHeatmap
         tags={tags}
         leftFencer={leftFencer}
         rightFencer={rightFencer}

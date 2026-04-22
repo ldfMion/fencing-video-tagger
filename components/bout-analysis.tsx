@@ -6,6 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { SIDE_COLORS } from "@/lib/constants";
 import { computeScore, computeRunningScore } from "@/lib/score";
 import { BoutStats } from "@/components/bout-stats";
+import { formatMatchPeriodLabel } from "@/lib/tagging";
 import type { Tag } from "@/lib/types";
 
 interface BoutAnalysisProps {
@@ -79,11 +80,19 @@ export function BoutAnalysis({
           ) : (
             <ScrollArea className="h-[calc(100vh-320px)]">
               <div className="space-y-1">
-                {scoringEvents.map((event) => {
+                {scoringEvents.map((event, index) => {
                   const isCard =
                     event.tag.action === "yc" || event.tag.action === "rc";
                   const isRedCard = event.tag.action === "rc";
                   const isYellowCard = event.tag.action === "yc";
+                  const matchPeriodLabel = formatMatchPeriodLabel(
+                    event.tag.matchPeriod,
+                  );
+                  const previousPeriod = scoringEvents[index - 1]?.tag.matchPeriod;
+                  const showPeriodStart =
+                    Boolean(matchPeriodLabel) &&
+                    event.tag.matchPeriod !== previousPeriod;
+                  const matchTimeLabel = event.tag.matchClock ?? null;
 
                   const highlightLeft = isYellowCard
                     ? false
@@ -101,45 +110,62 @@ export function BoutAnalysis({
                     : `text-xs px-1.5 py-0 ${event.tag.side === "L" ? leftBadge : rightBadge}`;
 
                   return (
-                    <div
-                      key={event.tag.id}
-                      className="grid grid-cols-[1fr_auto_1fr] items-center py-1.5 px-2 rounded hover:bg-muted"
-                    >
-                      {/* Left fencer column */}
-                      <div className="flex justify-end">
-                        {event.tag.side === "L" && (
-                          <Badge variant="outline" className={badgeClass}>
-                            {event.tag.action}
-                          </Badge>
-                        )}
-                      </div>
+                    <div key={event.tag.id} className="space-y-2">
+                      {showPeriodStart ? (
+                        <div className="px-2 py-2">
+                          <div className="flex items-center gap-3">
+                            <div className="h-px flex-1 bg-border" />
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-foreground">
+                              {matchPeriodLabel}
+                            </p>
+                            <div className="h-px flex-1 bg-border" />
+                          </div>
+                        </div>
+                      ) : null}
+                      <div className="grid grid-cols-[1fr_auto_1fr] items-center rounded px-2 py-1.5 hover:bg-muted">
+                        {/* Left fencer column */}
+                        <div className="flex justify-end">
+                          {event.tag.side === "L" && (
+                            <Badge variant="outline" className={badgeClass}>
+                              {event.tag.action}
+                            </Badge>
+                          )}
+                        </div>
 
-                      {/* Center: score */}
-                      <span className="text-sm tabular-nums text-center mx-4">
-                        <span
-                          className={
-                            highlightLeft ? `font-bold ${leftColor}` : ""
-                          }
-                        >
-                          {event.leftScore}
-                        </span>
-                        <span className="text-muted-foreground"> - </span>
-                        <span
-                          className={
-                            highlightRight ? `font-bold ${rightColor}` : ""
-                          }
-                        >
-                          {event.rightScore}
-                        </span>
-                      </span>
+                        {/* Center: score */}
+                        <div className="mx-4 text-center">
+                          {matchTimeLabel ? (
+                            <p className="text-sm font-semibold font-mono text-foreground">
+                              {matchTimeLabel}
+                            </p>
+                          ) : null}
+                          <span className="mt-0.5 inline-block text-sm tabular-nums">
+                            <span
+                              className={
+                                highlightLeft ? `font-bold ${leftColor}` : ""
+                              }
+                            >
+                              {event.leftScore}
+                            </span>
+                            <span className="text-muted-foreground"> - </span>
+                            <span
+                              className={
+                                highlightRight ? `font-bold ${rightColor}` : ""
+                              }
+                            >
+                              {event.rightScore}
+                            </span>
+                          </span>
+                        </div>
 
-                      {/* Right fencer column */}
-                      <div className="flex justify-start">
-                        {event.tag.side === "R" && (
-                          <Badge variant="outline" className={badgeClass}>
-                            {event.tag.action}
-                          </Badge>
-                        )}
+                        {/* Right fencer column */}
+                        <div className="flex justify-start">
+                          {event.tag.side === "R" && (
+                            <Badge variant="outline" className={badgeClass}>
+                              {event.tag.action}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );

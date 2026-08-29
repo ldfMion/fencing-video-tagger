@@ -1,9 +1,6 @@
 import { createReadStream } from "node:fs";
 import { resolveVideoLibraryFile } from "@/lib/server/video-library";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
 function buildBaseHeaders(mimeType: string, size: number): Headers {
   return new Headers({
     "Accept-Ranges": "bytes",

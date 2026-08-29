@@ -18,6 +18,7 @@ import { TagList } from "@/components/tag-list";
 import { VideoLibraryPicker } from "@/components/video-library-picker";
 import { VideoPlayer } from "@/components/video-player";
 import { Badge } from "@/components/ui/badge";
+import { AppearanceMenu } from "@/components/appearance-menu";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -339,6 +340,7 @@ export function BoutWorkspaceShell({
           </div>
 
           <div className="flex items-center gap-1.5">
+            <AppearanceMenu compact />
             <TabsList className="h-7">
               <TabsTrigger value="tagging" className="h-5 px-2 text-[11px]">
                 Tagging

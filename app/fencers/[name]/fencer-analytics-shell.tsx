@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Check, ChevronDown, Swords, X } from "lucide-react";
+import { AppearanceMenu } from "@/components/appearance-menu";
 import { FencerCharts } from "@/components/fencer-charts";
 import { StatsTable } from "@/components/stats-table";
 import { Badge } from "@/components/ui/badge";
@@ -66,6 +67,9 @@ export function FencerAnalyticsShell({
           </Button>
           <Swords className="h-6 w-6 text-muted-foreground" />
           <h1 className="text-2xl font-bold">{fencerName}</h1>
+          <div className="ml-auto">
+            <AppearanceMenu />
+          </div>
         </div>
 
         <div className="mb-6 grid grid-cols-3 gap-3">

@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Search, Swords, X } from "lucide-react";
+import { AppearanceMenu } from "@/components/appearance-menu";
 import { ExportMenuButton } from "@/components/export-button";
 import { ImportButton } from "@/components/import-button";
 import { NewBoutDialog } from "@/components/new-bout-dialog";
@@ -88,6 +89,7 @@ export function LibraryPageShell({ initialSessions }: LibraryPageShellProps) {
             <h1 className="text-2xl font-bold">Fencing Video Tagger</h1>
           </div>
           <div className="flex items-center gap-2">
+            <AppearanceMenu compact />
             <ImportButton />
             <ExportMenuButton
               exportAllToJson={exportAllToJson}

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { connection } from "next/server";
 import { BoutWorkspaceShell } from "@/app/bouts/[id]/bout-workspace-shell";
+import { RouteLoading } from "@/components/route-loading";
 import { getBoutDisplayLabel } from "@/lib/session-selectors";
 import { getSessionById, listSessions } from "@/lib/server/session-service";
 import {
@@ -66,7 +68,7 @@ export async function generateMetadata(
   };
 }
 
-export default async function BoutPage(props: BoutPageProps) {
+async function BoutPageContent(props: BoutPageProps) {
   await connection();
   const { id } = await props.params;
   const searchParams = await props.searchParams;
@@ -79,5 +81,13 @@ export default async function BoutPage(props: BoutPageProps) {
       initialSessions={initialSessions}
       initialTagId={initialTagId}
     />
+  );
+}
+
+export default function BoutPage(props: BoutPageProps) {
+  return (
+    <Suspense fallback={<RouteLoading compact />}>
+      <BoutPageContent {...props} />
+    </Suspense>
   );
 }

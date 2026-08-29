@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 import { ThemeProvider } from "@/components/theme-provider";
+import { DesignThemeProvider } from "@/components/design-theme-provider";
 import { VideoProvider } from "@/contexts/video-context";
 
 function createQueryClient() {
@@ -24,11 +25,14 @@ export function AppProviders({ children }: { children: ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider
         attribute="class"
-        defaultTheme="dark"
+        defaultTheme="system"
         enableSystem
+        storageKey="fencing-video-tagger-theme"
         disableTransitionOnChange
       >
-        <VideoProvider>{children}</VideoProvider>
+        <DesignThemeProvider>
+          <VideoProvider>{children}</VideoProvider>
+        </DesignThemeProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

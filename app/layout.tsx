@@ -6,6 +6,17 @@ import { cn } from "@/lib/utils";
 
 const ibmPlexSans = IBM_Plex_Sans({subsets:['latin'],variable:'--font-sans'});
 
+const designThemeScript = `
+  try {
+    const theme = localStorage.getItem("fencing-video-tagger-design-theme");
+    document.documentElement.dataset.designTheme = ["classic", "prism", "brutalist"].includes(theme)
+      ? theme
+      : "classic";
+  } catch (_) {
+    document.documentElement.dataset.designTheme = "classic";
+  }
+`;
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -27,10 +38,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning className={cn("font-sans", ibmPlexSans.variable)}>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={cn(
+        "font-sans",
+        ibmPlexSans.variable,
+        geistSans.variable,
+        geistMono.variable,
+      )}
+    >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: designThemeScript }} />
+      </head>
+      <body className="antialiased">
         <AppProviders>{children}</AppProviders>
       </body>
     </html>

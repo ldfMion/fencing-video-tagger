@@ -40,10 +40,10 @@ export function AppearanceMenu({ compact = false }: { compact?: boolean }) {
           {compact ? null : <span>Appearance</span>}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-72">
+      <PopoverContent align="end" className="appearance-popover w-72">
         <PopoverHeader>
           <PopoverTitle>Appearance</PopoverTitle>
-          <PopoverDescription>
+          <PopoverDescription className="text-foreground">
             Choose a visual style and color mode independently.
           </PopoverDescription>
         </PopoverHeader>
@@ -59,7 +59,7 @@ export function AppearanceMenu({ compact = false }: { compact?: boolean }) {
                 type="button"
                 onClick={() => setDesignTheme(option.id)}
                 className={cn(
-                  "flex items-center gap-3 rounded-md border px-3 py-2 text-left transition-colors hover:bg-muted",
+                  "appearance-option flex items-center gap-3 rounded-md border px-3 py-2 text-left transition-colors hover:bg-muted",
                   designTheme === option.id && "border-primary bg-primary/8",
                 )}
               >

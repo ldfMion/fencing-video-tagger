@@ -270,7 +270,7 @@ export function VideoPlayer({
         }
       >
         <div
-          className={`${maximized ? "flex-1 min-h-0" : "aspect-video"} bg-black rounded-lg overflow-hidden flex items-center justify-center relative`}
+          className={`${maximized ? "flex-1 min-h-0" : "aspect-video"} video-frame bg-black overflow-hidden flex items-center justify-center relative`}
         >
           <video
             ref={setVideoElement}
@@ -292,7 +292,7 @@ export function VideoPlayer({
 
         {/* Progress bar */}
         <div
-          className={`h-1.5 bg-muted rounded-full cursor-pointer ${maximized ? "mt-1.5" : ""}`}
+          className={`video-scrubber h-1.5 bg-muted rounded-full cursor-pointer ${maximized ? "mt-3" : ""}`}
           onClick={handleProgressClick}
         >
           <div
@@ -303,7 +303,7 @@ export function VideoPlayer({
 
         {/* Controls */}
         <div
-          className={`shrink-0 flex items-center gap-1.5 flex-wrap ${maximized ? "mt-1.5 pb-1" : ""}`}
+          className={`video-controls shrink-0 flex items-center gap-1.5 flex-wrap ${maximized ? "mt-2 pb-1" : ""}`}
         >
           {/* Frame back */}
           <Tooltip>

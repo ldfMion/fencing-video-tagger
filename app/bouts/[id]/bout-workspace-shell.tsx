@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   AlertCircle,
-  Edit2,
   Library,
   Loader2,
   Upload,
@@ -320,35 +319,33 @@ export function BoutWorkspaceShell({
       <Tabs
         value={activeTab}
         onValueChange={handleTabChange}
-        className="flex h-screen flex-col bg-background"
+        className="app-canvas bout-workspace flex h-screen flex-col bg-background"
       >
-        <header className="flex h-11 shrink-0 items-center justify-between border-b px-2.5">
-          <div className="flex items-center gap-1">
-            <Link href="/">
-              <Button variant="ghost" size="sm">
-                <Library className="mr-1.5 h-4 w-4" />
-                Bouts
-              </Button>
-            </Link>
-            <span className="text-muted-foreground">/</span>
+        <header className="bout-toolbar grid min-h-14 shrink-0 grid-cols-[1fr_auto_1fr] items-center border-b px-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <Button variant="ghost" size="icon-sm" asChild title="Back to bouts">
+              <Link href="/"><Library className="h-4 w-4" /></Link>
+            </Button>
+            <span className="h-5 w-px bg-border" />
             <button
               onClick={() => setIsEditDialogOpen(true)}
-              className="max-w-[180px] truncate text-xs text-foreground hover:underline"
+              className="min-w-0 max-w-[260px] truncate text-left text-sm font-medium text-foreground hover:text-muted-foreground"
             >
               {getBoutDisplayLabel(session)}
             </button>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <AppearanceMenu compact />
-            <TabsList className="h-7">
-              <TabsTrigger value="tagging" className="h-5 px-2 text-[11px]">
+          <TabsList className="h-8 bg-muted/60">
+              <TabsTrigger value="tagging" className="h-6 px-3 text-[11px]">
                 Tagging
               </TabsTrigger>
-              <TabsTrigger value="analysis" className="h-5 px-2 text-[11px]">
+              <TabsTrigger value="analysis" className="h-6 px-3 text-[11px]">
                 Analysis
               </TabsTrigger>
-            </TabsList>
+          </TabsList>
+
+          <div className="flex items-center justify-end gap-1.5">
+            <AppearanceMenu compact />
             <BoutExportButton
               exportBoutToCsv={() => exportSessionCsv(session.id)}
               fileName={`fencing-bout-${session.id}-${getTodayIsoDate()}.csv`}
@@ -369,7 +366,7 @@ export function BoutWorkspaceShell({
               className="text-[11px]"
             >
               <Video className="mr-1.5 h-4 w-4" />
-              {hasAttachedLibraryVideo ? "Replace From Library" : "Attach From Library"}
+              {hasAttachedLibraryVideo ? "Change video" : "Attach video"}
             </Button>
             <Button
               size="sm"
@@ -377,26 +374,7 @@ export function BoutWorkspaceShell({
               className="text-[11px]"
             >
               <Upload className="mr-1.5 h-4 w-4" />
-              Load Temporary File
-            </Button>
-            {hasAttachedLibraryVideo ? (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={handleRemoveAttachedVideo}
-                className="text-[11px]"
-              >
-                Remove Attached Video
-              </Button>
-            ) : null}
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setIsEditDialogOpen(true)}
-              className="text-[11px]"
-            >
-              <Edit2 className="mr-1.5 h-4 w-4" />
-              Edit
+              Open file
             </Button>
           </div>
 
@@ -415,11 +393,11 @@ export function BoutWorkspaceShell({
           />
         </header>
 
-        <TabsContent value="tagging" className="mt-0 flex-1 overflow-hidden p-1.5">
-          <div className="grid h-full grid-cols-1 gap-1.5 lg:grid-cols-[1fr_252px]">
-            <div className="flex min-h-0 flex-col gap-1.5">
+        <TabsContent value="tagging" className="mt-0 flex-1 overflow-hidden p-3">
+          <div className="mx-auto grid h-full max-w-[1680px] grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+            <div className="flex min-h-0 flex-col gap-3">
               {activeVideoUrl ? (
-                <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border bg-card p-1.5">
+                <div className="video-stage flex min-h-0 flex-1 flex-col overflow-hidden">
                   <div className="mb-1 flex shrink-0 flex-wrap items-center gap-1.5 px-0.5">
                     <Badge variant={hasTemporaryOverride ? "secondary" : "outline"}>
                       {activeVideoBadge}
@@ -512,7 +490,7 @@ export function BoutWorkspaceShell({
                 </div>
               )}
 
-              <div className="shrink-0 rounded-lg border bg-card p-2">
+              <div className="tagging-dock shrink-0 py-1">
                 <TagForm
                   ref={tagFormRef}
                   onAddTag={handleAddTag}
@@ -525,7 +503,7 @@ export function BoutWorkspaceShell({
               </div>
             </div>
 
-            <div className="min-h-0">
+            <aside className="tag-rail min-h-0 border-l pl-4">
               <TagList
                 tags={tags}
                 onEdit={handleEditTag}
@@ -542,7 +520,7 @@ export function BoutWorkspaceShell({
                     : "Could not copy the link."}
                 </p>
               ) : null}
-            </div>
+            </aside>
           </div>
         </TabsContent>
 

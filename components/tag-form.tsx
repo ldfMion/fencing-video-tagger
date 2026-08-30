@@ -245,7 +245,7 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
 
   return (
     <TooltipProvider delayDuration={300}>
-      <form onSubmit={handleSubmit} className="space-y-1.5">
+      <form onSubmit={handleSubmit} className="tag-composer space-y-2">
         {isEditing ? (
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs text-muted-foreground">
@@ -286,7 +286,7 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
           </div>
         )}
 
-        <div className="flex flex-wrap items-end gap-2.5">
+        <div className="tag-properties flex flex-wrap items-end gap-2.5">
           <div className="space-y-1">
             <Label className="text-xs">Side</Label>
             <div className="flex gap-1">
@@ -298,9 +298,9 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
                     size="sm"
                     onClick={() => setSide(side === "L" ? undefined : "L")}
                     className={cn(
-                      "h-7 w-8",
+                      "side-choice side-choice-left h-9 w-12",
                       side === "L" &&
-                        "border-red-500 bg-red-500 text-white hover:bg-red-600",
+                        "side-choice-selected border-red-500 bg-red-500 text-white hover:bg-red-600",
                     )}
                   >
                     L
@@ -318,9 +318,9 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
                     size="sm"
                     onClick={() => setSide(side === "R" ? undefined : "R")}
                     className={cn(
-                      "h-7 w-8",
+                      "side-choice side-choice-right h-9 w-12",
                       side === "R" &&
-                        "border-green-500 bg-green-500 text-white hover:bg-green-600",
+                        "side-choice-selected border-green-500 bg-green-500 text-white hover:bg-green-600",
                     )}
                   >
                     R
@@ -343,16 +343,17 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
                       <Button
                         variant="outline"
                         role="combobox"
+                        aria-label="Select action"
                         aria-expanded={actionOpen}
                         size="sm"
-                        className="w-full justify-between"
+                        className="tag-action-trigger w-full justify-between"
                       >
                         {action ?? "Select..."}
                         <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-[190px] p-0" align="start">
-                      <Command>
+                      <Command className="tag-action-command">
                         <CommandInput
                           placeholder="Search action..."
                           value={actionSearch}
@@ -444,7 +445,7 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
                   ref={commentRef}
                   value={comment}
                   onChange={(event) => setComment(event.target.value)}
-                  placeholder="Comment (optional)..."
+                  placeholder="Add a note…"
                   disabled={disabled}
                   className="min-h-[52px] resize-none text-xs"
                   rows={2}
@@ -472,9 +473,15 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
                 ) : null}
                 <Button
                   type="submit"
+                  aria-label={isEditing ? "Save tag" : "Add tag"}
                   disabled={disabled || !canSubmit}
                   size="sm"
-                  className={cn("px-3", isEditing ? "h-[22px] text-[11px]" : "h-[52px]")}
+                  className={cn(
+                    "px-3",
+                    isEditing ? "h-[22px] text-[11px]" : "h-[52px] w-[52px]",
+                    !isEditing && side === "L" && "tag-submit-left",
+                    !isEditing && side === "R" && "tag-submit-right",
+                  )}
                 >
                   {isEditing ? "Save" : <Plus className="h-3.5 w-3.5" />}
                 </Button>

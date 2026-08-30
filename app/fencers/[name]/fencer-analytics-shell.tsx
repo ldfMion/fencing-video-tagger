@@ -8,13 +8,6 @@ import { FencerCharts } from "@/components/fencer-charts";
 import { StatsTable } from "@/components/stats-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Popover,
@@ -57,59 +50,28 @@ export function FencerAnalyticsShell({
   const hasFilters = Boolean(dateFrom || dateTo || selectedOpponents.length > 0);
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto max-w-4xl px-4 py-6">
-        <div className="mb-6 flex items-center gap-3">
+    <div className="app-canvas min-h-screen bg-background">
+      <div className="container mx-auto max-w-6xl px-5 py-6 sm:px-8 sm:py-10">
+        <div className="mb-12 flex items-center gap-3">
           <Button variant="ghost" size="icon" asChild>
             <Link href="/">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
-          <Swords className="h-6 w-6 text-muted-foreground" />
-          <h1 className="text-2xl font-bold">{fencerName}</h1>
+          <span className="brand-mark"><Swords className="h-4 w-4" /></span>
+          <div>
+            <p className="eyebrow">Fencer profile</p>
+            <h1 className="text-3xl font-semibold tracking-[-0.04em]">{fencerName}</h1>
+          </div>
           <div className="ml-auto">
             <AppearanceMenu />
           </div>
         </div>
 
-        <div className="mb-6 grid grid-cols-3 gap-3">
-          <Card className="gap-2 py-4">
-            <CardHeader className="px-4 pb-0">
-              <CardDescription>Bouts</CardDescription>
-            </CardHeader>
-            <CardContent className="px-4">
-              <CardTitle className="text-2xl">
-                {viewModel.filteredSessions.length}
-              </CardTitle>
-            </CardContent>
-          </Card>
-          <Card className="gap-2 py-4">
-            <CardHeader className="px-4 pb-0">
-              <CardDescription>Record</CardDescription>
-            </CardHeader>
-            <CardContent className="px-4">
-              <CardTitle className="text-2xl tabular-nums">
-                {viewModel.record.wins}W - {viewModel.record.losses}L
-              </CardTitle>
-            </CardContent>
-          </Card>
-          <Card className="gap-2 py-4">
-            <CardHeader className="px-4 pb-0">
-              <CardDescription>Win Rate</CardDescription>
-            </CardHeader>
-            <CardContent className="px-4">
-              <CardTitle className="text-2xl tabular-nums">
-                {viewModel.record.winRate != null
-                  ? `${viewModel.record.winRate}%`
-                  : "—"}
-              </CardTitle>
-              {viewModel.record.dateRangeLabel ? (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {viewModel.record.dateRangeLabel}
-                </p>
-              ) : null}
-            </CardContent>
-          </Card>
+        <div className="metric-ribbon mb-8 grid grid-cols-3">
+          <div><span>Bouts</span><strong>{viewModel.filteredSessions.length}</strong></div>
+          <div><span>Record</span><strong>{viewModel.record.wins}<i>W</i> {viewModel.record.losses}<i>L</i></strong></div>
+          <div><span>Win rate</span><strong>{viewModel.record.winRate != null ? `${viewModel.record.winRate}%` : "—"}</strong></div>
         </div>
 
         <div className="mb-6 flex flex-wrap items-center gap-2">

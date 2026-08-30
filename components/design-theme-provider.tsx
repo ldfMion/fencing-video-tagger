@@ -11,21 +11,21 @@ import {
 export const DESIGN_THEMES = [
   {
     id: "classic",
-    name: "Classic",
-    description: "Focused, neutral, and compact",
+    name: "Studio",
+    description: "Crisp, editorial, and focused",
     previewClass:
       "bg-linear-to-br from-slate-50 to-slate-300 dark:from-slate-700 dark:to-slate-950",
   },
   {
     id: "prism",
-    name: "Smoked Glass",
-    description: "Monochrome, luminous, and expressive",
+    name: "Midnight",
+    description: "Deep blue, luminous, and precise",
     previewClass: "bg-linear-to-br from-white via-zinc-400 to-black",
   },
   {
     id: "brutalist",
-    name: "Brutalist",
-    description: "Bold, structural, and contemporary",
+    name: "Piste",
+    description: "Graphic, athletic, and high contrast",
     previewClass:
       "rounded-none! border-2! border-black! bg-[linear-gradient(135deg,#60d5d0_0_50%,#050b0d_50%)] shadow-[3px_3px_0_#60d5d0]!",
   },

@@ -121,8 +121,9 @@ export function TagList({
   return (
     <div className={fillHeight ? "flex flex-col h-full" : "flex flex-col"}>
       {/* Filter bar */}
-      <div className="flex items-center gap-1.5 pb-2 flex-wrap">
+      <div className="tag-filters mb-3 flex flex-wrap items-center gap-1.5">
         <Toggle
+          variant="outline"
           size="sm"
           pressed={selectedSides.has("L")}
           onPressedChange={() => toggleSide("L")}
@@ -134,6 +135,7 @@ export function TagList({
           L
         </Toggle>
         <Toggle
+          variant="outline"
           size="sm"
           pressed={selectedSides.has("R")}
           onPressedChange={() => toggleSide("R")}
@@ -205,7 +207,7 @@ export function TagList({
 
       {/* Tag list */}
       <ScrollArea className={fillHeight ? "flex-1 min-h-0" : "h-[300px]"}>
-        <div className="space-y-2 pr-4">
+        <div className="space-y-2.5 pr-3">
           {filteredTags.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground text-sm">
               No tags match filters.
@@ -215,8 +217,10 @@ export function TagList({
               <div
                 key={tag.id}
                 className={cn(
-                  "group rounded-lg p-2 hover:bg-muted",
-                  editingTagId === tag.id && "bg-muted ring-1 ring-primary/30",
+                  "tag-card group rounded-xl border border-border/70 bg-card px-3 py-3 shadow-sm transition-all hover:-translate-y-px hover:border-foreground/20 hover:shadow-md",
+                  tag.side === "L" && "tag-card-left",
+                  tag.side === "R" && "tag-card-right",
+                  editingTagId === tag.id && "ring-2 ring-primary/30",
                 )}
               >
                 <div className="flex items-start justify-between gap-2">

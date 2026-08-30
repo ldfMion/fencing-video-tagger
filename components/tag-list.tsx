@@ -128,7 +128,7 @@ export function TagList({
           pressed={selectedSides.has("L")}
           onPressedChange={() => toggleSide("L")}
           className={cn(
-            "h-7 px-2 text-xs",
+            "tag-filter-left h-7 px-2 text-xs",
             selectedSides.has("L") && SIDE_COLORS.left.badge
           )}
         >
@@ -140,7 +140,7 @@ export function TagList({
           pressed={selectedSides.has("R")}
           onPressedChange={() => toggleSide("R")}
           className={cn(
-            "h-7 px-2 text-xs",
+            "tag-filter-right h-7 px-2 text-xs",
             selectedSides.has("R") && SIDE_COLORS.right.badge
           )}
         >
@@ -242,17 +242,21 @@ export function TagList({
                       {tag.side && (
                         <Badge
                           variant="outline"
-                          className={`text-xs px-1.5 py-0 ${
+                          className={cn(
+                            "px-1.5 py-0 text-xs",
                             tag.side === "L"
-                              ? SIDE_COLORS.left.badge
-                              : SIDE_COLORS.right.badge
-                          }`}
+                              ? cn(SIDE_COLORS.left.badge, "tag-side-badge-left")
+                              : cn(SIDE_COLORS.right.badge, "tag-side-badge-right"),
+                          )}
                         >
                           {tag.side}
                         </Badge>
                       )}
                       {tag.action && (
-                        <Badge variant="outline" className="text-xs px-1.5 py-0">
+                        <Badge
+                          variant="outline"
+                          className="tag-action-badge px-1.5 py-0 text-xs"
+                        >
                           {tag.action}
                         </Badge>
                       )}
@@ -268,8 +272,8 @@ export function TagList({
                       ) : null}
                       {tag.mistake && (
                         <Badge
-                          variant="destructive"
-                          className="text-xs px-1.5 py-0"
+                          variant="outline"
+                          className="tag-mistake-badge px-1.5 py-0 text-xs"
                         >
                           {tag.mistake}
                         </Badge>

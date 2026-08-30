@@ -222,7 +222,7 @@ export function BoutWorkspaceShell({
           tagFormRef.current?.toggleMistake("execution");
           break;
         case "enter":
-          if (!event.shiftKey) {
+          if (event.metaKey || event.ctrlKey) {
             event.preventDefault();
             tagFormRef.current?.submit();
           }
@@ -393,8 +393,8 @@ export function BoutWorkspaceShell({
           />
         </header>
 
-        <TabsContent value="tagging" className="mt-0 flex-1 overflow-hidden p-3">
-          <div className="mx-auto grid h-full max-w-[1680px] grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <TabsContent value="tagging" className="mt-0 flex-1 overflow-hidden px-3 pb-3 pt-1.5">
+          <div className="mx-auto grid h-full max-w-[1680px] grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_300px]">
             <div className="flex min-h-0 flex-col gap-3">
               {activeVideoUrl ? (
                 <div className="video-stage flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -503,7 +503,7 @@ export function BoutWorkspaceShell({
               </div>
             </div>
 
-            <aside className="tag-rail min-h-0 border-l pl-4">
+            <aside className="tag-rail min-h-0 pl-1">
               <TagList
                 tags={tags}
                 onEdit={handleEditTag}

@@ -10,24 +10,11 @@ import {
 
 export const DESIGN_THEMES = [
   {
-    id: "classic",
-    name: "Studio",
-    description: "Crisp, editorial, and focused",
+    id: "linear",
+    name: "Studio Midnight",
+    description: "Glassy, focused, and luminous",
     previewClass:
-      "bg-linear-to-br from-slate-50 to-slate-300 dark:from-slate-700 dark:to-slate-950",
-  },
-  {
-    id: "prism",
-    name: "Midnight",
-    description: "Deep blue, luminous, and precise",
-    previewClass: "bg-linear-to-br from-white via-zinc-400 to-black",
-  },
-  {
-    id: "brutalist",
-    name: "Piste",
-    description: "Graphic, athletic, and high contrast",
-    previewClass:
-      "rounded-none! border-2! border-black! bg-[linear-gradient(135deg,#60d5d0_0_50%,#050b0d_50%)] shadow-[3px_3px_0_#60d5d0]!",
+      "bg-linear-to-br from-slate-100 via-indigo-400 to-slate-950",
   },
 ] as const;
 
@@ -48,7 +35,7 @@ function isDesignTheme(value: string | null): value is DesignTheme {
 
 function getDesignThemeSnapshot(): DesignTheme {
   const storedTheme = window.localStorage.getItem(STORAGE_KEY);
-  return isDesignTheme(storedTheme) ? storedTheme : "classic";
+  return isDesignTheme(storedTheme) ? storedTheme : "linear";
 }
 
 function subscribeToDesignTheme(callback: () => void) {
@@ -62,7 +49,7 @@ function subscribeToDesignTheme(callback: () => void) {
 }
 
 function getServerDesignThemeSnapshot(): DesignTheme {
-  return "classic";
+  return "linear";
 }
 
 export function DesignThemeProvider({ children }: { children: ReactNode }) {

@@ -6,17 +6,13 @@ import {
 } from "@/lib/tagging";
 import type { VideoLibraryItem } from "@/lib/video-library";
 import {
-  type ActionCode,
   CURRENT_SCHEMA_VERSION,
-  type MatchPeriod,
-  type MistakeType,
-  type StripZone,
   StorageEnvelopeSchema,
   type StorageEnvelope,
   type Tag,
+  type TagContent,
   TagSchema,
   type TaggingOptions,
-  type Side,
   type VideoSession,
   VideoSessionSchema,
   type VideoSourceType,
@@ -76,16 +72,7 @@ const LegacySessionSchema = z
     }),
   );
 
-export interface AddTagParams {
-  comment: string;
-  timestamp?: number;
-  side?: Side;
-  action?: ActionCode;
-  mistake?: MistakeType;
-  matchPeriod?: MatchPeriod;
-  matchClock?: string;
-  stripZone?: StripZone;
-}
+export type AddTagParams = TagContent;
 
 export interface UpdateSessionParams {
   fileName?: string | null;

@@ -16,13 +16,7 @@ import {
 } from "@/lib/tagging";
 import { getSessionRepository } from "@/lib/server/session-repository";
 import {
-  ActionCodeSchema,
-  MatchClockSchema,
-  MatchPeriodSchema,
-  MistakeTypeSchema,
-  SideSchema,
-  StripZoneSchema,
-  TagSchema,
+  TagContentSchema,
   TaggingOptionsSchema,
   type VideoSession,
   VideoSessionSchema,
@@ -72,16 +66,7 @@ const UpdateSessionParamsSchema = z.object({
   taggingOptions: TaggingOptionsSchema.nullable().optional(),
 });
 
-const AddTagParamsSchema = z.object({
-  comment: z.string(),
-  timestamp: z.number().optional(),
-  side: SideSchema.optional(),
-  action: ActionCodeSchema.optional(),
-  mistake: MistakeTypeSchema.optional(),
-  matchPeriod: MatchPeriodSchema.optional(),
-  matchClock: MatchClockSchema.optional(),
-  stripZone: StripZoneSchema.optional(),
-});
+const AddTagParamsSchema = TagContentSchema;
 
 const CreateSessionInputSchema = z.object({
   sessionId: z.string().optional(),
@@ -108,10 +93,7 @@ const AddTagInputSchema = z.object({
 const UpdateTagInputSchema = z.object({
   sessionId: z.string(),
   tagId: z.string(),
-  updates: TagSchema.omit({
-    id: true,
-    createdAt: true,
-  }).partial(),
+  updates: TagContentSchema.partial(),
 });
 
 const DeleteTagInputSchema = z.object({

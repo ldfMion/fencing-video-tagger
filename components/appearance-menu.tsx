@@ -1,11 +1,7 @@
 "use client";
 
-import { Check, Monitor, Moon, Palette, Sun } from "lucide-react";
+import { Monitor, Moon, Palette, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
-import {
-  DESIGN_THEMES,
-  useDesignTheme,
-} from "@/components/design-theme-provider";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -15,7 +11,6 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
 
 const COLOR_MODES = [
   { id: "light", label: "Light", icon: Sun },
@@ -24,7 +19,6 @@ const COLOR_MODES = [
 ] as const;
 
 export function AppearanceMenu({ compact = false }: { compact?: boolean }) {
-  const { designTheme, setDesignTheme } = useDesignTheme();
   const { theme, setTheme } = useTheme();
 
   return (
@@ -40,51 +34,13 @@ export function AppearanceMenu({ compact = false }: { compact?: boolean }) {
           {compact ? null : <span>Appearance</span>}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="appearance-popover w-72">
+      <PopoverContent align="end" className="appearance-popover w-64">
         <PopoverHeader>
           <PopoverTitle>Appearance</PopoverTitle>
           <PopoverDescription className="text-foreground">
-            Choose a visual style and color mode independently.
+            Choose how Studio Midnight adapts to your display.
           </PopoverDescription>
         </PopoverHeader>
-
-        <div className="space-y-2">
-          <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-            Design
-          </p>
-          <div className="grid gap-1.5">
-            {DESIGN_THEMES.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                onClick={() => setDesignTheme(option.id)}
-                className={cn(
-                  "appearance-option flex items-center gap-3 rounded-md border px-3 py-2 text-left transition-colors hover:bg-muted",
-                  designTheme === option.id && "border-primary bg-primary/8",
-                )}
-              >
-                <span
-                  className={cn(
-                    "size-8 shrink-0 rounded-md border shadow-sm",
-                    option.previewClass,
-                  )}
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-xs font-medium">{option.name}</span>
-                  <span className="block text-[11px] text-muted-foreground">
-                    {option.description}
-                  </span>
-                </span>
-                <Check
-                  className={cn(
-                    "size-3.5 text-primary",
-                    designTheme !== option.id && "opacity-0",
-                  )}
-                />
-              </button>
-            ))}
-          </div>
-        </div>
 
         <div className="space-y-2">
           <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">

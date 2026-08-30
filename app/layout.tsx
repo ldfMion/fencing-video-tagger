@@ -8,12 +8,10 @@ const ibmPlexSans = IBM_Plex_Sans({subsets:['latin'],variable:'--font-sans'});
 
 const designThemeScript = `
   try {
-    const theme = localStorage.getItem("fencing-video-tagger-design-theme");
-    document.documentElement.dataset.designTheme = ["classic", "prism", "brutalist"].includes(theme)
-      ? theme
-      : "classic";
+    localStorage.setItem("fencing-video-tagger-design-theme", "linear");
+    document.documentElement.dataset.designTheme = "linear";
   } catch (_) {
-    document.documentElement.dataset.designTheme = "classic";
+    document.documentElement.dataset.designTheme = "linear";
   }
 `;
 

@@ -50,6 +50,7 @@ import {
   type MistakeType,
   type StripZone,
   type Tag,
+  type CompleteTagContent,
   type TaggingOptions,
 } from "@/lib/types";
 import type { AddTagParams } from "@/hooks/use-sessions";
@@ -68,7 +69,7 @@ interface TagFormProps {
   onAddTag: (params: AddTagParams) => void;
   onUpdateTag: (
     tagId: string,
-    updates: Partial<Omit<Tag, "id" | "createdAt">>,
+    updates: CompleteTagContent,
   ) => void | Promise<void>;
   onCancelEdit: () => void;
   editingTag?: Tag | null;
@@ -81,7 +82,7 @@ interface TagFormFieldsProps {
   onAddTag: (params: AddTagParams) => void;
   onUpdateTag: (
     tagId: string,
-    updates: Partial<Omit<Tag, "id" | "createdAt">>,
+    updates: CompleteTagContent,
   ) => void | Promise<void>;
   onCancelEdit: () => void;
   editingTag?: Tag | null;
@@ -109,7 +110,9 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
   const [action, setAction] = useState<ActionCode | undefined>(editingTag?.action);
   const [mistake, setMistake] = useState<MistakeType | undefined>(editingTag?.mistake);
   const [actionOpen, setActionOpen] = useState(false);
-  const [manualTime, setManualTime] = useState("");
+  const [manualTime, setManualTime] = useState(
+    editingTag?.timestamp != null ? formatTime(editingTag.timestamp) : "",
+  );
   const [matchPeriod, setMatchPeriod] = useState<MatchPeriod>(
     editingTag?.matchPeriod ?? getDefaultMatchPeriod(),
   );
@@ -176,19 +179,6 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
       if (requiresMatchClock && !normalizedMatchClock) return false;
       if (requiresStripZone && !stripZone) return false;
 
-      if (editingTag) {
-        onUpdateTag(editingTag.id, {
-          comment: comment.trim(),
-          side,
-          action,
-          mistake,
-          matchPeriod: requiresMatchClock ? matchPeriod : undefined,
-          matchClock: requiresMatchClock ? normalizedMatchClock : undefined,
-          stripZone: requiresStripZone ? stripZone : undefined,
-        });
-        return true;
-      }
-
       let timestamp: number | undefined;
       if (isVideoMode) {
         timestamp = currentTime;
@@ -196,16 +186,23 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
         timestamp = parseManualTime(manualTime);
       }
 
-      onAddTag({
-        comment: comment.trim(),
+      const tagContent: CompleteTagContent = {
         timestamp,
+        comment: comment.trim(),
         side,
         action,
         mistake,
         matchPeriod: requiresMatchClock ? matchPeriod : undefined,
         matchClock: requiresMatchClock ? normalizedMatchClock : undefined,
         stripZone: requiresStripZone ? stripZone : undefined,
-      });
+      };
+
+      if (editingTag) {
+        onUpdateTag(editingTag.id, tagContent);
+        return true;
+      }
+
+      onAddTag(tagContent);
       resetCreateFields();
       return true;
     },
@@ -245,50 +242,72 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
 
   return (
     <TooltipProvider delayDuration={300}>
-      <form onSubmit={handleSubmit} className="tag-composer space-y-2">
-        {isEditing ? (
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs text-muted-foreground">
-              Editing tag
-              {editingTag?.timestamp != null ? (
-                <>
-                  {" "}
-                  at <span className="font-mono">{formatTime(editingTag.timestamp)}</span>
-                </>
-              ) : null}
-            </p>
-            <span className="text-[11px] text-muted-foreground">
-              Time is unchanged
-            </span>
-          </div>
-        ) : isVideoMode ? (
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-muted-foreground">
-              Tag at <span className="font-mono">{formatTime(currentTime)}</span>
-            </p>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2">
-            <Label htmlFor={`manual-time-${formIdPrefix}`} className="shrink-0 text-xs">
-              Time:
-            </Label>
-            <div className="flex flex-1 items-center gap-1">
-              <Clock className="h-3 w-3 text-muted-foreground" />
-              <input
-                id={`manual-time-${formIdPrefix}`}
-                type="text"
-                placeholder="m:ss (optional)"
-                value={manualTime}
-                onChange={(event) => setManualTime(event.target.value)}
-                className="h-6 max-w-[76px] flex-1 rounded-md border border-input bg-background px-2 text-xs"
-              />
+      <form onSubmit={handleSubmit} className="tag-composer space-y-2.5">
+        <div className="tag-composer-surface">
+          {isEditing ? (
+            <div className="mb-1.5 flex items-center justify-between gap-2 px-1">
+              <p className="text-[11px] font-medium text-muted-foreground">
+                Editing tag
+                {editingTag?.timestamp != null ? (
+                  <>
+                    {" "}
+                    at <span className="font-mono">{formatTime(editingTag.timestamp)}</span>
+                  </>
+                ) : null}
+              </p>
+              <span className="text-[10px] text-muted-foreground">
+                Save updates time
+              </span>
             </div>
-          </div>
-        )}
+          ) : null}
 
-        <div className="tag-properties flex flex-wrap items-end gap-2.5">
-          <div className="space-y-1">
-            <Label className="text-xs">Side</Label>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Textarea
+                ref={commentRef}
+                value={comment}
+                onChange={(event) => setComment(event.target.value)}
+                onKeyDown={(event) => {
+                  if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+                    event.preventDefault();
+                    handleSubmit();
+                  }
+                }}
+                placeholder="Add a note about this moment…"
+                disabled={disabled}
+                autoFocus
+                className="tag-note-input min-h-[58px] resize-none border-0 bg-transparent px-1 py-1 text-sm shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
+                rows={2}
+              />
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Focus note (N)</p>
+            </TooltipContent>
+          </Tooltip>
+
+          <div className="tag-composer-meta">
+            {isVideoMode ? (
+              <span className="inline-flex items-center gap-1.5">
+                <Clock className="size-3" />
+                {formatTime(currentTime)}
+              </span>
+            ) : (
+              <label className="inline-flex items-center gap-1.5" htmlFor={`manual-time-${formIdPrefix}`}>
+                <Clock className="size-3" />
+                <input
+                  id={`manual-time-${formIdPrefix}`}
+                  type="text"
+                  placeholder="m:ss (optional)"
+                  value={manualTime}
+                  onChange={(event) => setManualTime(event.target.value)}
+                  className="w-24 border-0 bg-transparent p-0 font-mono text-[11px] outline-none placeholder:text-muted-foreground"
+                />
+              </label>
+            )}
+            <span className="ml-auto hidden text-[10px] sm:inline">⌘/Ctrl ↵ to save</span>
+          </div>
+
+          <div className="tag-properties flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-2.5">
             <div className="flex gap-1">
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -298,7 +317,7 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
                     size="sm"
                     onClick={() => setSide(side === "L" ? undefined : "L")}
                     className={cn(
-                      "side-choice side-choice-left h-9 w-12",
+                      "side-choice side-choice-left h-7 w-9",
                       side === "L" &&
                         "side-choice-selected border-red-500 bg-red-500 text-white hover:bg-red-600",
                     )}
@@ -318,7 +337,7 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
                     size="sm"
                     onClick={() => setSide(side === "R" ? undefined : "R")}
                     className={cn(
-                      "side-choice side-choice-right h-9 w-12",
+                      "side-choice side-choice-right h-7 w-9",
                       side === "R" &&
                         "side-choice-selected border-green-500 bg-green-500 text-white hover:bg-green-600",
                     )}
@@ -331,10 +350,8 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
                 </TooltipContent>
               </Tooltip>
             </div>
-          </div>
 
-          <div className="min-w-[128px] flex-1 space-y-1">
-            <Label className="text-xs">Action</Label>
+            <div className="min-w-[128px] max-w-[220px] flex-1">
             <Tooltip>
               <TooltipTrigger asChild>
                 <div>
@@ -346,7 +363,10 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
                         aria-label="Select action"
                         aria-expanded={actionOpen}
                         size="sm"
-                        className="tag-action-trigger w-full justify-between"
+                        className={cn(
+                          "tag-action-trigger w-full justify-between",
+                          action && "tag-property-action-selected",
+                        )}
                       >
                         {action ?? "Select..."}
                         <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
@@ -392,10 +412,8 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
                 <p>Search actions (/)</p>
               </TooltipContent>
             </Tooltip>
-          </div>
+            </div>
 
-          <div className="space-y-1">
-            <Label className="text-xs">Mistake</Label>
             <div className="flex gap-1">
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -406,7 +424,10 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
                     onClick={() =>
                       setMistake(mistake === "tactical" ? undefined : "tactical")
                     }
-                    className="h-7 px-2 text-[11px]"
+                    className={cn(
+                      "tag-mistake-choice h-7 px-2 text-[11px]",
+                      mistake === "tactical" && "tag-property-mistake-selected",
+                    )}
                   >
                     Tactical
                   </Button>
@@ -424,7 +445,10 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
                     onClick={() =>
                       setMistake(mistake === "execution" ? undefined : "execution")
                     }
-                    className="h-7 px-2 text-[11px]"
+                    className={cn(
+                      "tag-mistake-choice h-7 px-2 text-[11px]",
+                      mistake === "execution" && "tag-property-mistake-selected",
+                    )}
                   >
                     Execution
                   </Button>
@@ -434,38 +458,18 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
                 </TooltipContent>
               </Tooltip>
             </div>
-          </div>
-        </div>
 
-        <div className="flex gap-2">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="flex-1">
-                <Textarea
-                  ref={commentRef}
-                  value={comment}
-                  onChange={(event) => setComment(event.target.value)}
-                  placeholder="Add a note…"
-                  disabled={disabled}
-                  className="min-h-[52px] resize-none text-xs"
-                  rows={2}
-                />
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Focus comment (N)</p>
-            </TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="flex shrink-0 flex-col gap-2">
+            <div className="ml-auto flex items-center gap-1.5">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex shrink-0 items-center gap-1.5">
                 {isEditing ? (
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     disabled={disabled}
-                    className="h-[22px] px-3 text-[11px]"
+                    className="h-7 px-2.5 text-[11px]"
                     onClick={onCancelEdit}
                   >
                     Cancel
@@ -477,20 +481,21 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
                   disabled={disabled || !canSubmit}
                   size="sm"
                   className={cn(
-                    "px-3",
-                    isEditing ? "h-[22px] text-[11px]" : "h-[52px] w-[52px]",
+                    "h-7 gap-1.5 px-3 text-[11px]",
                     !isEditing && side === "L" && "tag-submit-left",
                     !isEditing && side === "R" && "tag-submit-right",
                   )}
                 >
-                  {isEditing ? "Save" : <Plus className="h-3.5 w-3.5" />}
+                  {isEditing ? "Save changes" : <><Plus className="h-3.5 w-3.5" /> Add tag</>}
                 </Button>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>{isEditing ? "Save tag (Enter)" : "Add tag (Enter)"}</p>
-            </TooltipContent>
-          </Tooltip>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{isEditing ? "Save tag (⌘/Ctrl + Enter)" : "Add tag (⌘/Ctrl + Enter)"}</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          </div>
         </div>
 
         {requiresMatchClock || requiresStripZone ? (

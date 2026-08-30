@@ -87,6 +87,39 @@ export const TagSchema = z.object({
 });
 
 export type Tag = z.infer<typeof TagSchema>;
+export const TagContentSchema = TagSchema.omit({
+  id: true,
+  seq: true,
+  createdAt: true,
+});
+export type TagContent = z.infer<typeof TagContentSchema>;
+
+// Form submissions must name every editable field, including optional ones.
+// This makes adding a field to TagSchema a compile-time failure at submission
+// sites until both create and edit flows explicitly account for it.
+export interface CompleteTagContent {
+  timestamp: TagContent["timestamp"];
+  comment: TagContent["comment"];
+  side: TagContent["side"];
+  action: TagContent["action"];
+  mistake: TagContent["mistake"];
+  matchPeriod: TagContent["matchPeriod"];
+  matchClock: TagContent["matchClock"];
+  stripZone: TagContent["stripZone"];
+}
+
+type AssertNoUnaccountedTagFields<Fields extends never> = Fields;
+type UnaccountedTagFields = AssertNoUnaccountedTagFields<
+  Exclude<keyof TagContent, keyof CompleteTagContent>
+>;
+type UnknownCompleteTagFields = AssertNoUnaccountedTagFields<
+  Exclude<keyof CompleteTagContent, keyof TagContent>
+>;
+
+// Keep the assertions part of the emitted type graph without runtime output.
+export type TagContentFieldCoverage =
+  | UnaccountedTagFields
+  | UnknownCompleteTagFields;
 
 export const VideoSessionSchema = z.object({
   id: z.string(), // serves as bout_id

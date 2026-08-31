@@ -2,6 +2,10 @@ import { readFileSync, writeFileSync } from "fs";
 import { z } from "zod";
 import { normalizeTaggingOptions } from "../lib/tagging";
 import {
+  CURRENT_SCHEMA_VERSION,
+  StorageEnvelopeSchema,
+} from "../lib/database-models";
+import {
   ACTION_CODES,
   ActionCodeSchema,
   MatchClockSchema,
@@ -10,8 +14,6 @@ import {
   SideSchema,
   MistakeTypeSchema,
   VideoSessionSchema,
-  StorageEnvelopeSchema,
-  CURRENT_SCHEMA_VERSION,
 } from "../lib/types";
 
 // --- CLI argument parsing ---

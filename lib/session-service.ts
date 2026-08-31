@@ -1,14 +1,16 @@
 import { z } from "zod";
 import { deriveBoutDateFromFileMetadata } from "@/lib/date-utils";
 import {
+  CURRENT_SCHEMA_VERSION,
+  StorageEnvelopeSchema,
+  type StorageEnvelope,
+} from "@/lib/database-models";
+import {
   assertTagMetadataMatchesSession,
   normalizeTaggingOptions,
 } from "@/lib/tagging";
 import type { VideoLibraryItem } from "@/lib/video-library";
 import {
-  CURRENT_SCHEMA_VERSION,
-  StorageEnvelopeSchema,
-  type StorageEnvelope,
   type Tag,
   type TagContent,
   TagSchema,

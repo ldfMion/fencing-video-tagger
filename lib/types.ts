@@ -139,14 +139,3 @@ export const VideoSessionSchema = z.object({
 });
 
 export type VideoSession = z.infer<typeof VideoSessionSchema>;
-
-// --- Storage versioning ---
-
-export const CURRENT_SCHEMA_VERSION = 2;
-
-export const StorageEnvelopeSchema = z.object({
-  version: z.number(),
-  sessions: z.array(VideoSessionSchema),
-});
-
-export type StorageEnvelope = z.infer<typeof StorageEnvelopeSchema>;

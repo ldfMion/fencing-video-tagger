@@ -15,6 +15,7 @@ import {
   assertTaggingOptionsAreMutable,
 } from "@/lib/tagging";
 import { getSessionRepository } from "@/lib/server/session-repository";
+import { getTouchRepository } from "@/lib/server/touch-repository";
 import {
   TagContentSchema,
   TaggingOptionsSchema,
@@ -175,60 +176,27 @@ export async function deleteSession(
 
 export async function addTag(input: AddTagInput): Promise<VideoSession> {
   const parsedInput = AddTagInputSchema.parse(input);
-  return getSessionRepository().mutateSessions((sessions) => {
-    const sessionIndex = sessions.findIndex(
-      (session) => session.id === parsedInput.sessionId,
-    );
-
-    if (sessionIndex === -1) {
-      throw new Error(`Session ${parsedInput.sessionId} was not found`);
-    }
-
-    const session = sessions[sessionIndex];
+  return getTouchRepository().mutateTouches(parsedInput.sessionId, (session, tags) => {
     const nextTag = createTagRecord(parsedInput.params, session, {
       tagId: parsedInput.tagId,
       createdAt: parsedInput.createdAt,
       seq: computeNextTagSequence(session),
     });
-    const nextSession = {
-      ...session,
-      tags: [...session.tags, nextTag],
-      lastModified: Date.now(),
-    };
-
-    return {
-      sessions: sessions.map((currentSession, index) =>
-        index === sessionIndex ? nextSession : currentSession,
-      ),
-      result: nextSession,
-    };
+    return [...tags, nextTag];
   });
 }
 
 export async function updateTag(input: UpdateTagInput): Promise<VideoSession> {
   const parsedInput = UpdateTagInputSchema.parse(input);
-  return getSessionRepository().mutateSessions((sessions) => {
-    const sessionIndex = sessions.findIndex(
-      (session) => session.id === parsedInput.sessionId,
-    );
-
-    if (sessionIndex === -1) {
-      throw new Error(`Session ${parsedInput.sessionId} was not found`);
-    }
-
-    const session = sessions[sessionIndex];
+  return getTouchRepository().mutateTouches(parsedInput.sessionId, (session, tags) => {
     let foundTag = false;
-    const nextTags = session.tags.map((tag) => {
+    const nextTags = tags.map((tag) => {
       if (tag.id !== parsedInput.tagId) {
         return tag;
       }
 
       foundTag = true;
-      const nextTag = {
-        ...tag,
-        ...parsedInput.updates,
-      };
-
+      const nextTag = { ...tag, ...parsedInput.updates };
       assertTagMetadataMatchesSession(session, nextTag);
       return nextTag;
     });
@@ -238,55 +206,13 @@ export async function updateTag(input: UpdateTagInput): Promise<VideoSession> {
         `Tag ${parsedInput.tagId} was not found in session ${parsedInput.sessionId}`,
       );
     }
-
-    const nextSession = {
-      ...session,
-      tags: nextTags,
-      lastModified: Date.now(),
-    };
-
-    return {
-      sessions: sessions.map((currentSession, index) =>
-        index === sessionIndex ? nextSession : currentSession,
-      ),
-      result: nextSession,
-    };
+    return nextTags;
   });
 }
 
 export async function deleteTag(input: DeleteTagInput): Promise<VideoSession> {
   const parsedInput = DeleteTagInputSchema.parse(input);
-  return getSessionRepository().mutateSessions((sessions) => {
-    const sessionIndex = sessions.findIndex(
-      (session) => session.id === parsedInput.sessionId,
-    );
-
-    if (sessionIndex === -1) {
-      throw new Error(`Session ${parsedInput.sessionId} was not found`);
-    }
-
-    const session = sessions[sessionIndex];
-    const nextTags = session.tags.filter((tag) => tag.id !== parsedInput.tagId);
-
-    if (nextTags.length === session.tags.length) {
-      throw new Error(
-        `Tag ${parsedInput.tagId} was not found in session ${parsedInput.sessionId}`,
-      );
-    }
-
-    const nextSession = {
-      ...session,
-      tags: nextTags,
-      lastModified: Date.now(),
-    };
-
-    return {
-      sessions: sessions.map((currentSession, index) =>
-        index === sessionIndex ? nextSession : currentSession,
-      ),
-      result: nextSession,
-    };
-  });
+  return getTouchRepository().deleteTouch(parsedInput.sessionId, parsedInput.tagId);
 }
 
 export async function importSessions(

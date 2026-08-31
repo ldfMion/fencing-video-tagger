@@ -16,7 +16,7 @@ import {
   SESSION_MIGRATION_FLAG_KEY,
   SESSION_STORAGE_KEY,
 } from "@/lib/session-service";
-import { StorageEnvelopeSchema } from "@/lib/types";
+import { StorageEnvelopeSchema } from "@/lib/database-models";
 import { useSessions } from "@/hooks/use-sessions";
 
 const MIGRATION_COMPLETED_VALUE = "completed";

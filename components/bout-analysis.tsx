@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { BoutScoreChart } from "@/components/bout-score-chart";
 import { BoutStripHeatmap } from "@/components/bout-strip-heatmap";
+import { BoutFencerCharts } from "@/components/bout-fencer-charts";
 import { SIDE_COLORS } from "@/lib/constants";
 import { computeScore, computeRunningScore } from "@/lib/score";
 import { BoutStats } from "@/components/bout-stats";
@@ -70,6 +71,12 @@ export function BoutAnalysis({
       />
 
       <BoutStripHeatmap
+        tags={tags}
+        leftFencer={leftFencer}
+        rightFencer={rightFencer}
+      />
+
+      <BoutFencerCharts
         tags={tags}
         leftFencer={leftFencer}
         rightFencer={rightFencer}

@@ -1,9 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { FencerPerspectiveToggle } from "@/components/fencer-perspective-toggle";
 import { StatsTable } from "@/components/stats-table";
-import { SIDE_COLORS } from "@/lib/constants";
 import { computeTacticalStats, computeDefMatchupStats } from "@/lib/stats";
 import type { Tag, Side } from "@/lib/types";
 
@@ -37,26 +36,12 @@ export function BoutStats({
     <div>
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-medium">Statistics</h3>
-        <ToggleGroup
-          type="single"
+        <FencerPerspectiveToggle
           value={perspective}
-          onValueChange={(v) => { if (v) setPerspective(v as Side); }}
-          variant="outline"
-          size="sm"
-        >
-          <ToggleGroupItem
-            value="L"
-            className={perspective === "L" ? SIDE_COLORS.left.text : ""}
-          >
-            {leftFencer}
-          </ToggleGroupItem>
-          <ToggleGroupItem
-            value="R"
-            className={perspective === "R" ? SIDE_COLORS.right.text : ""}
-          >
-            {rightFencer}
-          </ToggleGroupItem>
-        </ToggleGroup>
+          onValueChange={setPerspective}
+          leftFencer={leftFencer}
+          rightFencer={rightFencer}
+        />
       </div>
 
       {!hasData ? (

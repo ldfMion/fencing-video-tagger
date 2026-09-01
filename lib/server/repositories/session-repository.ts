@@ -17,12 +17,27 @@ export interface SessionRepository {
   list(): Promise<VideoSession[]>;
   findById(sessionId: string): Promise<VideoSession | null>;
   create(session: VideoSession): Promise<VideoSession>;
-  update(session: VideoSession): Promise<VideoSession>;
+  update(
+    previousSession: VideoSession,
+    session: VideoSession,
+  ): Promise<VideoSession>;
   delete(sessionId: string): Promise<boolean>;
   import(sessions: VideoSession[]): Promise<{ imported: number; skipped: number }>;
-  createTag(session: VideoSession, tag: Tag): Promise<VideoSession>;
-  updateTag(session: VideoSession, tag: Tag): Promise<VideoSession>;
-  deleteTag(session: VideoSession, tagId: string): Promise<VideoSession>;
+  createTag(
+    previousSession: VideoSession,
+    session: VideoSession,
+    tag: Tag,
+  ): Promise<VideoSession>;
+  updateTag(
+    previousSession: VideoSession,
+    session: VideoSession,
+    tag: Tag,
+  ): Promise<VideoSession>;
+  deleteTag(
+    previousSession: VideoSession,
+    session: VideoSession,
+    tagId: string,
+  ): Promise<VideoSession>;
 }
 
 class DrizzleSessionRepository implements SessionRepository {
@@ -68,12 +83,16 @@ class DrizzleSessionRepository implements SessionRepository {
     return parsedSession;
   }
 
-  async update(session: VideoSession): Promise<VideoSession> {
+  async update(
+    previousSession: VideoSession,
+    session: VideoSession,
+  ): Promise<VideoSession> {
+    const parsedPreviousSession = VideoSessionSchema.parse(previousSession);
     const parsedSession = VideoSessionSchema.parse(session);
     const result = db.update(sessionsTable).set(toSessionRow(parsedSession))
-      .where(eq(sessionsTable.id, parsedSession.id)).run();
+      .where(sessionVersionMatches(parsedPreviousSession)).run();
     if (result.changes === 0) {
-      throw new Error(`Session ${parsedSession.id} was not found`);
+      throwSessionConflict(parsedSession.id);
     }
     return parsedSession;
   }
@@ -104,12 +123,17 @@ class DrizzleSessionRepository implements SessionRepository {
     });
   }
 
-  async createTag(session: VideoSession, tag: Tag): Promise<VideoSession> {
+  async createTag(
+    previousSession: VideoSession,
+    session: VideoSession,
+    tag: Tag,
+  ): Promise<VideoSession> {
+    const parsedPreviousSession = VideoSessionSchema.parse(previousSession);
     const parsedSession = VideoSessionSchema.parse(session);
     const parsedTag = TagSchema.parse(tag);
 
     db.transaction((transaction) => {
-      updateSessionRow(transaction, parsedSession);
+      updateSessionRow(transaction, parsedPreviousSession, parsedSession);
       const lastTag = transaction.select({ position: tagsTable.position })
         .from(tagsTable)
         .where(eq(tagsTable.sessionId, parsedSession.id))
@@ -123,12 +147,17 @@ class DrizzleSessionRepository implements SessionRepository {
     return parsedSession;
   }
 
-  async updateTag(session: VideoSession, tag: Tag): Promise<VideoSession> {
+  async updateTag(
+    previousSession: VideoSession,
+    session: VideoSession,
+    tag: Tag,
+  ): Promise<VideoSession> {
+    const parsedPreviousSession = VideoSessionSchema.parse(previousSession);
     const parsedSession = VideoSessionSchema.parse(session);
     const parsedTag = TagSchema.parse(tag);
 
     db.transaction((transaction) => {
-      updateSessionRow(transaction, parsedSession);
+      updateSessionRow(transaction, parsedPreviousSession, parsedSession);
       const result = transaction.update(tagsTable)
         .set({ payload: JSON.stringify(parsedTag) })
         .where(and(
@@ -144,11 +173,16 @@ class DrizzleSessionRepository implements SessionRepository {
     return parsedSession;
   }
 
-  async deleteTag(session: VideoSession, tagId: string): Promise<VideoSession> {
+  async deleteTag(
+    previousSession: VideoSession,
+    session: VideoSession,
+    tagId: string,
+  ): Promise<VideoSession> {
+    const parsedPreviousSession = VideoSessionSchema.parse(previousSession);
     const parsedSession = VideoSessionSchema.parse(session);
 
     db.transaction((transaction) => {
-      updateSessionRow(transaction, parsedSession);
+      updateSessionRow(transaction, parsedPreviousSession, parsedSession);
       const result = transaction.delete(tagsTable).where(and(
         eq(tagsTable.sessionId, parsedSession.id),
         eq(tagsTable.id, tagId),
@@ -237,12 +271,29 @@ function insertTags(transaction: Transaction, session: VideoSession): void {
   }
 }
 
-function updateSessionRow(transaction: Transaction, session: VideoSession): void {
+function updateSessionRow(
+  transaction: Transaction,
+  previousSession: VideoSession,
+  session: VideoSession,
+): void {
   const result = transaction.update(sessionsTable).set(toSessionRow(session))
-    .where(eq(sessionsTable.id, session.id)).run();
+    .where(sessionVersionMatches(previousSession)).run();
   if (result.changes === 0) {
-    throw new Error(`Session ${session.id} was not found`);
+    throwSessionConflict(session.id);
   }
+}
+
+function sessionVersionMatches(session: VideoSession) {
+  return and(
+    eq(sessionsTable.id, session.id),
+    eq(sessionsTable.payload, toSessionRow(session).payload),
+  );
+}
+
+function throwSessionConflict(sessionId: string): never {
+  throw new Error(
+    `Session ${sessionId} changed while this request was being processed. Please retry.`,
+  );
 }
 
 function parseJson(json: string, entityName: string): unknown {

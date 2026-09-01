@@ -137,11 +137,15 @@ export async function updateSession(
   const parsedInput = UpdateSessionInputSchema.parse(input);
   const repository = getSessionRepository();
   const previousSession = await requireSession(parsedInput.sessionId);
-  const nextSession = applySessionUpdates(previousSession, parsedInput.updates);
+  const nextSession = applySessionUpdates(
+    previousSession,
+    parsedInput.updates,
+    getNextLastModified(previousSession),
+  );
 
   assertTaggingOptionsAreMutable(previousSession, nextSession.taggingOptions);
 
-  return repository.update(nextSession);
+  return repository.update(previousSession, nextSession);
 }
 
 export async function deleteSession(
@@ -171,9 +175,9 @@ export async function addTag(input: AddTagInput): Promise<VideoSession> {
   const nextSession = {
     ...session,
     tags: [...session.tags, nextTag],
-    lastModified: Date.now(),
+    lastModified: getNextLastModified(session),
   };
-  return repository.createTag(nextSession, nextTag);
+  return repository.createTag(session, nextSession, nextTag);
 }
 
 export async function updateTag(input: UpdateTagInput): Promise<VideoSession> {
@@ -192,9 +196,9 @@ export async function updateTag(input: UpdateTagInput): Promise<VideoSession> {
   const nextSession = {
     ...session,
     tags: session.tags.map((tag) => tag.id === nextTag.id ? nextTag : tag),
-    lastModified: Date.now(),
+    lastModified: getNextLastModified(session),
   };
-  return repository.updateTag(nextSession, nextTag);
+  return repository.updateTag(session, nextSession, nextTag);
 }
 
 export async function deleteTag(input: DeleteTagInput): Promise<VideoSession> {
@@ -207,8 +211,12 @@ export async function deleteTag(input: DeleteTagInput): Promise<VideoSession> {
       `Tag ${parsedInput.tagId} was not found in session ${parsedInput.sessionId}`,
     );
   }
-  const nextSession = { ...session, tags: nextTags, lastModified: Date.now() };
-  return repository.deleteTag(nextSession, parsedInput.tagId);
+  const nextSession = {
+    ...session,
+    tags: nextTags,
+    lastModified: getNextLastModified(session),
+  };
+  return repository.deleteTag(session, nextSession, parsedInput.tagId);
 }
 
 export async function importSessions(
@@ -224,6 +232,10 @@ async function requireSession(sessionId: string): Promise<VideoSession> {
     throw new Error(`Session ${sessionId} was not found`);
   }
   return session;
+}
+
+function getNextLastModified(session: VideoSession): number {
+  return Math.max(Date.now(), session.lastModified + 1);
 }
 
 function createSessionFromInput(input: {

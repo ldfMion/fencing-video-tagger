@@ -3,8 +3,9 @@ import { TagSchema, VideoSessionSchema } from "@/lib/types";
 
 export const CURRENT_SCHEMA_VERSION = 2;
 
-// These aliases name the records as they exist in the persisted database.
-// Touches remain embedded in sessions for backwards-compatible storage.
+// These aliases describe the versioned import/export envelope. SQLite
+// normalizes sessions and tags into separately validated JSON entities while
+// this envelope remains stable at the application edge.
 export const StoredTouchSchema = TagSchema;
 export const StoredSessionSchema = VideoSessionSchema.extend({
   tags: z.array(StoredTouchSchema),

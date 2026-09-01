@@ -18,17 +18,33 @@ pnpm start
 - Required for the existing server-backed video-library routes.
 - Must point to a readable local directory.
 
-`SESSION_STORE_FILE`
-- Optional path for the server-backed session JSON store.
-- Defaults to `.data/fencing-tags-sessions.json`.
+`SESSION_DATABASE_FILE`
+- Optional path for the SQLite database.
+- Defaults to `.data/fencing-tags.sqlite`.
 - Relative paths resolve from the repository root.
 
 ## Session Storage
 
-Sessions now persist on the server in a JSON file using the shared
-`StorageEnvelope` shape from `lib/types.ts`. The app loads sessions through SSR,
-hydrates the client with TanStack Query, and performs session/tag CRUD via
-server actions.
+Sessions and tags persist in separate SQLite tables through Drizzle. Their
+domain fields remain JSON documents; relational columns only enforce identity,
+tag ownership, and tag ordering. Both entity payloads are validated with their
+Zod schemas whenever they enter or leave the repository. Repository reads
+reassemble the existing session aggregate used by SSR, TanStack Query, server
+actions, and exports.
+
+Drizzle migrations are committed in `drizzle/`; run `pnpm db:generate` after
+schema changes and `pnpm db:studio` to inspect local data.
+
+To initialize an empty database from a versioned session JSON file:
+
+```bash
+pnpm db:seed path/to/sessions.json
+```
+
+The input defaults to `.data/fencing-tags-sessions.json`, and the database
+defaults to `SESSION_DATABASE_FILE` or `.data/fencing-tags.sqlite`. Use
+`--database path/to/database.sqlite` to target another file. Seeding refuses to
+modify a database that already contains sessions or tags.
 
 Older browser `localStorage` data is not imported automatically. When the
 server store is empty and valid legacy browser data exists, the library page

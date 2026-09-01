@@ -53,8 +53,8 @@ app/layout.tsx (root layout)
 ### Shared Logic (`lib/`)
 
 - **`lib/types.ts`** — Zod schemas and TypeScript types. Storage versioning with migration from v0.
-- **`lib/server/session-repository.ts`** — Server-only repository contract for session persistence.
-- **`lib/server/json-session-repository.ts`** — JSON-file repository implementation using validated envelope reads and serialized atomic writes.
+- **`lib/server/db/`** — Drizzle SQLite client, schema, and migrations.
+- **`lib/server/repositories/session-repository.ts`** — Server-only repository that assembles separately stored, Zod-validated session and tag JSON entities.
 - **`lib/server/session-service.ts`** — Server-side session/tag domain logic and request validation used by server actions and SSR loaders.
 - **`lib/utils.ts`** — `cn()` (Tailwind class merging) and `formatTime()` (seconds → `m:ss` string).
 - **`lib/score.ts`** — `computeScore(tags)` returns final left/right score; `computeRunningScore(tags)` returns event-by-event `ScoringEvent[]` timeline. `computeScore` delegates to `computeRunningScore`.

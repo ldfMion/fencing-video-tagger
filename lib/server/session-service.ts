@@ -14,8 +14,7 @@ import {
   assertTagMetadataMatchesSession,
   assertTaggingOptionsAreMutable,
 } from "@/lib/tagging";
-import { getSessionRepository } from "@/lib/server/session-repository";
-import { getTouchRepository } from "@/lib/server/touch-repository";
+import { getSessionRepository } from "@/lib/server/repositories/session-repository";
 import {
   TagContentSchema,
   TaggingOptionsSchema,
@@ -115,13 +114,13 @@ export type DeleteTagInput = z.infer<typeof DeleteTagInputSchema>;
 export type ImportSessionsInput = z.infer<typeof ImportSessionsInputSchema>;
 
 export async function listSessions(): Promise<VideoSession[]> {
-  return getSessionRepository().listSessions();
+  return getSessionRepository().list();
 }
 
 export async function getSessionById(
   sessionId: string,
 ): Promise<VideoSession | null> {
-  return getSessionRepository().getSessionById(z.string().parse(sessionId));
+  return getSessionRepository().findById(z.string().parse(sessionId));
 }
 
 export async function createSession(
@@ -129,41 +128,27 @@ export async function createSession(
 ): Promise<VideoSession> {
   const parsedInput = CreateSessionInputSchema.parse(input);
   const session = createSessionFromInput(parsedInput);
-  return getSessionRepository().createSession(session);
+  return getSessionRepository().create(session);
 }
 
 export async function updateSession(
   input: UpdateSessionInput,
 ): Promise<VideoSession> {
   const parsedInput = UpdateSessionInputSchema.parse(input);
-  return getSessionRepository().mutateSessions((sessions) => {
-    const sessionIndex = sessions.findIndex(
-      (session) => session.id === parsedInput.sessionId,
-    );
+  const repository = getSessionRepository();
+  const previousSession = await requireSession(parsedInput.sessionId);
+  const nextSession = applySessionUpdates(previousSession, parsedInput.updates);
 
-    if (sessionIndex === -1) {
-      throw new Error(`Session ${parsedInput.sessionId} was not found`);
-    }
+  assertTaggingOptionsAreMutable(previousSession, nextSession.taggingOptions);
 
-    const previousSession = sessions[sessionIndex];
-    const nextSession = applySessionUpdates(previousSession, parsedInput.updates);
-
-    assertTaggingOptionsAreMutable(previousSession, nextSession.taggingOptions);
-
-    return {
-      sessions: sessions.map((session, index) =>
-        index === sessionIndex ? nextSession : session,
-      ),
-      result: nextSession,
-    };
-  });
+  return repository.update(nextSession);
 }
 
 export async function deleteSession(
   input: DeleteSessionInput,
 ): Promise<{ sessionId: string }> {
   const parsedInput = DeleteSessionInputSchema.parse(input);
-  const deleted = await getSessionRepository().deleteSession(parsedInput.sessionId);
+  const deleted = await getSessionRepository().delete(parsedInput.sessionId);
 
   if (!deleted) {
     throw new Error(`Session ${parsedInput.sessionId} was not found`);
@@ -176,50 +161,69 @@ export async function deleteSession(
 
 export async function addTag(input: AddTagInput): Promise<VideoSession> {
   const parsedInput = AddTagInputSchema.parse(input);
-  return getTouchRepository().mutateTouches(parsedInput.sessionId, (session, tags) => {
-    const nextTag = createTagRecord(parsedInput.params, session, {
-      tagId: parsedInput.tagId,
-      createdAt: parsedInput.createdAt,
-      seq: computeNextTagSequence(session),
-    });
-    return [...tags, nextTag];
+  const repository = getSessionRepository();
+  const session = await requireSession(parsedInput.sessionId);
+  const nextTag = createTagRecord(parsedInput.params, session, {
+    tagId: parsedInput.tagId,
+    createdAt: parsedInput.createdAt,
+    seq: computeNextTagSequence(session),
   });
+  const nextSession = {
+    ...session,
+    tags: [...session.tags, nextTag],
+    lastModified: Date.now(),
+  };
+  return repository.createTag(nextSession, nextTag);
 }
 
 export async function updateTag(input: UpdateTagInput): Promise<VideoSession> {
   const parsedInput = UpdateTagInputSchema.parse(input);
-  return getTouchRepository().mutateTouches(parsedInput.sessionId, (session, tags) => {
-    let foundTag = false;
-    const nextTags = tags.map((tag) => {
-      if (tag.id !== parsedInput.tagId) {
-        return tag;
-      }
+  const repository = getSessionRepository();
+  const session = await requireSession(parsedInput.sessionId);
+  const previousTag = session.tags.find((tag) => tag.id === parsedInput.tagId);
+  if (!previousTag) {
+    throw new Error(
+      `Tag ${parsedInput.tagId} was not found in session ${parsedInput.sessionId}`,
+    );
+  }
 
-      foundTag = true;
-      const nextTag = { ...tag, ...parsedInput.updates };
-      assertTagMetadataMatchesSession(session, nextTag);
-      return nextTag;
-    });
-
-    if (!foundTag) {
-      throw new Error(
-        `Tag ${parsedInput.tagId} was not found in session ${parsedInput.sessionId}`,
-      );
-    }
-    return nextTags;
-  });
+  const nextTag = { ...previousTag, ...parsedInput.updates };
+  assertTagMetadataMatchesSession(session, nextTag);
+  const nextSession = {
+    ...session,
+    tags: session.tags.map((tag) => tag.id === nextTag.id ? nextTag : tag),
+    lastModified: Date.now(),
+  };
+  return repository.updateTag(nextSession, nextTag);
 }
 
 export async function deleteTag(input: DeleteTagInput): Promise<VideoSession> {
   const parsedInput = DeleteTagInputSchema.parse(input);
-  return getTouchRepository().deleteTouch(parsedInput.sessionId, parsedInput.tagId);
+  const repository = getSessionRepository();
+  const session = await requireSession(parsedInput.sessionId);
+  const nextTags = session.tags.filter((tag) => tag.id !== parsedInput.tagId);
+  if (nextTags.length === session.tags.length) {
+    throw new Error(
+      `Tag ${parsedInput.tagId} was not found in session ${parsedInput.sessionId}`,
+    );
+  }
+  const nextSession = { ...session, tags: nextTags, lastModified: Date.now() };
+  return repository.deleteTag(nextSession, parsedInput.tagId);
 }
 
 export async function importSessions(
   input: ImportSessionsInput,
 ): Promise<{ imported: number; skipped: number }> {
   const parsedInput = ImportSessionsInputSchema.parse(input);
-  return getSessionRepository().importSessions(parsedInput.sessions);
+  return getSessionRepository().import(parsedInput.sessions);
+}
+
+async function requireSession(sessionId: string): Promise<VideoSession> {
+  const session = await getSessionRepository().findById(sessionId);
+  if (!session) {
+    throw new Error(`Session ${sessionId} was not found`);
+  }
+  return session;
 }
 
 function createSessionFromInput(input: {

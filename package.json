@@ -7,6 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "db:generate": "drizzle-kit generate",
+    "db:seed": "tsx scripts/seed-database.ts",
+    "db:studio": "drizzle-kit studio",
     "import-csv": "tsx scripts/import-csv.ts"
   },
   "dependencies": {
@@ -14,9 +17,11 @@
     "@radix-ui/react-slot": "^1.2.4",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@tanstack/react-query": "^5.96.2",
+    "better-sqlite3": "^13.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "drizzle-orm": "^0.45.2",
     "jszip": "^3.10.1",
     "lucide-react": "^0.563.0",
     "next": "16.3.3",
@@ -31,9 +36,11 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^20",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.5",
+    "drizzle-kit": "^0.31.10",
     "eslint": "^9.39.2",
     "eslint-config-next": "16.3.3",
     "tailwindcss": "^4",

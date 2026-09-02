@@ -1,26 +1,28 @@
 import "server-only";
 
 import { and, asc, desc, eq } from "drizzle-orm";
-import { db } from "@/lib/server/db/client";
-import { sessionsTable, tagsTable } from "@/lib/server/db/schema";
+import { normalizeBoutDate } from "@/lib/bout-date";
+import { databaseReady, db } from "@/lib/server/db/client";
+import { hashComment } from "@/lib/server/db/connection";
+import {
+  boutsTable,
+  commentEmbeddingsTable,
+  commentsTable,
+  tagsTable,
+} from "@/lib/server/db/schema";
 import {
   TagSchema,
   VideoSessionSchema,
   type Tag,
+  type TaggingOptions,
   type VideoSession,
 } from "@/lib/types";
-
-const SessionPayloadSchema = VideoSessionSchema.omit({ tags: true });
-type SessionPayload = Omit<VideoSession, "tags">;
 
 export interface SessionRepository {
   list(): Promise<VideoSession[]>;
   findById(sessionId: string): Promise<VideoSession | null>;
   create(session: VideoSession): Promise<VideoSession>;
-  update(
-    previousSession: VideoSession,
-    session: VideoSession,
-  ): Promise<VideoSession>;
+  update(previousSession: VideoSession, session: VideoSession): Promise<VideoSession>;
   delete(sessionId: string): Promise<boolean>;
   import(sessions: VideoSession[]): Promise<{ imported: number; skipped: number }>;
   createTag(
@@ -40,38 +42,39 @@ export interface SessionRepository {
   ): Promise<VideoSession>;
 }
 
-class DrizzleSessionRepository implements SessionRepository {
+class LibsqlSessionRepository implements SessionRepository {
   async list(): Promise<VideoSession[]> {
-    const sessionRows = db.select().from(sessionsTable).all();
-    const tagRows = db.select().from(tagsTable)
-      .orderBy(asc(tagsTable.sessionId), asc(tagsTable.position)).all();
-    const tagsBySession = groupTagsBySession(tagRows);
+    await databaseReady;
+    const boutRows = await db.select().from(boutsTable);
+    const tagRows = await selectTagRows();
+    const tagsByBout = groupTagsByBout(tagRows);
 
-    return sessionRows.map((row) => assembleSession(
+    return boutRows.map((row) => assembleSession(
       row,
-      tagsBySession.get(row.id) ?? [],
+      tagsByBout.get(row.id) ?? [],
     ));
   }
 
   async findById(sessionId: string): Promise<VideoSession | null> {
-    const row = db.select().from(sessionsTable)
-      .where(eq(sessionsTable.id, sessionId)).get();
+    await databaseReady;
+    const row = await db.select().from(boutsTable)
+      .where(eq(boutsTable.id, sessionId)).get();
     if (!row) {
       return null;
     }
-    const tagRows = db.select().from(tagsTable)
-      .where(eq(tagsTable.sessionId, sessionId))
-      .orderBy(asc(tagsTable.position)).all();
+
+    const tagRows = await selectTagRows(sessionId);
     return assembleSession(row, tagRows.map(parseTagRow));
   }
 
   async create(session: VideoSession): Promise<VideoSession> {
+    await databaseReady;
     const parsedSession = VideoSessionSchema.parse(session);
 
     try {
-      db.transaction((transaction) => {
-        transaction.insert(sessionsTable).values(toSessionRow(parsedSession)).run();
-        insertTags(transaction, parsedSession);
+      await db.transaction(async (transaction) => {
+        await transaction.insert(boutsTable).values(toBoutRow(parsedSession));
+        await insertTags(transaction, parsedSession);
       });
     } catch (error) {
       if (isDuplicateSessionError(error)) {
@@ -87,36 +90,39 @@ class DrizzleSessionRepository implements SessionRepository {
     previousSession: VideoSession,
     session: VideoSession,
   ): Promise<VideoSession> {
+    await databaseReady;
     const parsedPreviousSession = VideoSessionSchema.parse(previousSession);
     const parsedSession = VideoSessionSchema.parse(session);
-    const result = db.update(sessionsTable).set(toSessionRow(parsedSession))
-      .where(sessionVersionMatches(parsedPreviousSession)).run();
-    if (result.changes === 0) {
+    const result = await db.update(boutsTable).set(toBoutRow(parsedSession))
+      .where(sessionVersionMatches(parsedPreviousSession));
+    if (result.rowsAffected === 0) {
       throwSessionConflict(parsedSession.id);
     }
     return parsedSession;
   }
 
   async delete(sessionId: string): Promise<boolean> {
-    const result = db.delete(sessionsTable)
-      .where(eq(sessionsTable.id, sessionId)).run();
-    return result.changes > 0;
+    await databaseReady;
+    const result = await db.delete(boutsTable)
+      .where(eq(boutsTable.id, sessionId));
+    return result.rowsAffected > 0;
   }
 
   async import(
     sessions: VideoSession[],
   ): Promise<{ imported: number; skipped: number }> {
+    await databaseReady;
     const parsedSessions = sessions.map((session) => VideoSessionSchema.parse(session));
 
-    return db.transaction((transaction) => {
+    return db.transaction(async (transaction) => {
       let imported = 0;
       for (const session of parsedSessions) {
-        const result = transaction.insert(sessionsTable)
-          .values(toSessionRow(session))
-          .onConflictDoNothing({ target: sessionsTable.id }).run();
-        imported += result.changes;
-        if (result.changes > 0) {
-          insertTags(transaction, session);
+        const result = await transaction.insert(boutsTable)
+          .values(toBoutRow(session))
+          .onConflictDoNothing({ target: boutsTable.id });
+        imported += result.rowsAffected;
+        if (result.rowsAffected > 0) {
+          await insertTags(transaction, session);
         }
       }
       return { imported, skipped: parsedSessions.length - imported };
@@ -128,21 +134,23 @@ class DrizzleSessionRepository implements SessionRepository {
     session: VideoSession,
     tag: Tag,
   ): Promise<VideoSession> {
+    await databaseReady;
     const parsedPreviousSession = VideoSessionSchema.parse(previousSession);
     const parsedSession = VideoSessionSchema.parse(session);
     const parsedTag = TagSchema.parse(tag);
 
-    db.transaction((transaction) => {
-      updateSessionRow(transaction, parsedPreviousSession, parsedSession);
-      const lastTag = transaction.select({ position: tagsTable.position })
+    await db.transaction(async (transaction) => {
+      await updateBoutRow(transaction, parsedPreviousSession, parsedSession);
+      const lastTag = await transaction.select({ position: tagsTable.position })
         .from(tagsTable)
-        .where(eq(tagsTable.sessionId, parsedSession.id))
+        .where(eq(tagsTable.boutId, parsedSession.id))
         .orderBy(desc(tagsTable.position)).limit(1).get();
-      transaction.insert(tagsTable).values(toTagRow(
+      await insertTag(
+        transaction,
         parsedSession.id,
         parsedTag,
         (lastTag?.position ?? -1) + 1,
-      )).run();
+      );
     });
     return parsedSession;
   }
@@ -152,21 +160,42 @@ class DrizzleSessionRepository implements SessionRepository {
     session: VideoSession,
     tag: Tag,
   ): Promise<VideoSession> {
+    await databaseReady;
     const parsedPreviousSession = VideoSessionSchema.parse(previousSession);
     const parsedSession = VideoSessionSchema.parse(session);
     const parsedTag = TagSchema.parse(tag);
 
-    db.transaction((transaction) => {
-      updateSessionRow(transaction, parsedPreviousSession, parsedSession);
-      const result = transaction.update(tagsTable)
-        .set({ payload: JSON.stringify(parsedTag) })
-        .where(and(
-          eq(tagsTable.sessionId, parsedSession.id),
-          eq(tagsTable.id, parsedTag.id),
-        )).run();
-      if (result.changes === 0) {
+    await db.transaction(async (transaction) => {
+      await updateBoutRow(transaction, parsedPreviousSession, parsedSession);
+      const existing = await transaction.select({
+        rowId: tagsTable.rowId,
+        commentId: commentsTable.id,
+        contentHash: commentsTable.contentHash,
+      }).from(tagsTable).innerJoin(
+        commentsTable,
+        eq(commentsTable.tagRowId, tagsTable.rowId),
+      ).where(and(
+        eq(tagsTable.boutId, parsedSession.id),
+        eq(tagsTable.id, parsedTag.id),
+      )).get();
+      if (!existing) {
         throw new Error(
           `Tag ${parsedTag.id} was not found in session ${parsedSession.id}`,
+        );
+      }
+
+      await transaction.update(tagsTable).set(toTagValues(parsedTag)).where(
+        eq(tagsTable.rowId, existing.rowId),
+      );
+      const contentHash = hashComment(parsedTag.comment);
+      await transaction.update(commentsTable).set({
+        body: parsedTag.comment,
+        contentHash,
+      }).where(eq(commentsTable.id, existing.commentId));
+
+      if (existing.contentHash !== contentHash) {
+        await transaction.delete(commentEmbeddingsTable).where(
+          eq(commentEmbeddingsTable.commentId, existing.commentId),
         );
       }
     });
@@ -178,16 +207,17 @@ class DrizzleSessionRepository implements SessionRepository {
     session: VideoSession,
     tagId: string,
   ): Promise<VideoSession> {
+    await databaseReady;
     const parsedPreviousSession = VideoSessionSchema.parse(previousSession);
     const parsedSession = VideoSessionSchema.parse(session);
 
-    db.transaction((transaction) => {
-      updateSessionRow(transaction, parsedPreviousSession, parsedSession);
-      const result = transaction.delete(tagsTable).where(and(
-        eq(tagsTable.sessionId, parsedSession.id),
+    await db.transaction(async (transaction) => {
+      await updateBoutRow(transaction, parsedPreviousSession, parsedSession);
+      const result = await transaction.delete(tagsTable).where(and(
+        eq(tagsTable.boutId, parsedSession.id),
         eq(tagsTable.id, tagId),
-      )).run();
-      if (result.changes === 0) {
+      ));
+      if (result.rowsAffected === 0) {
         throw new Error(
           `Tag ${tagId} was not found in session ${parsedSession.id}`,
         );
@@ -197,96 +227,165 @@ class DrizzleSessionRepository implements SessionRepository {
   }
 }
 
+async function selectTagRows(boutId?: string) {
+  const query = db.select({
+    tag: tagsTable,
+    comment: commentsTable.body,
+  }).from(tagsTable).innerJoin(
+    commentsTable,
+    eq(commentsTable.tagRowId, tagsTable.rowId),
+  );
+
+  return boutId
+    ? query.where(eq(tagsTable.boutId, boutId)).orderBy(asc(tagsTable.position))
+    : query.orderBy(asc(tagsTable.boutId), asc(tagsTable.position));
+}
+
+type TagRow = Awaited<ReturnType<typeof selectTagRows>>[number];
+
 function assembleSession(
-  row: typeof sessionsTable.$inferSelect,
+  row: typeof boutsTable.$inferSelect,
   tags: Tag[],
 ): VideoSession {
-  const payload = parseJson(row.payload, `Session ${row.id}`);
-  const result = SessionPayloadSchema.safeParse(payload);
-  if (!result.success) {
-    throw new Error(`Session ${row.id} is corrupt: ${result.error.message}`);
-  }
-  if (result.data.id !== row.id) {
-    throw new Error(`Session ${row.id} has a mismatched id in its JSON payload`);
-  }
-  return VideoSessionSchema.parse({ ...result.data, tags });
+  const taggingOptions = fromTaggingOptions(row);
+  return VideoSessionSchema.parse({
+    id: row.id,
+    tags,
+    lastModified: row.lastModified,
+    ...(row.fileName != null && { fileName: row.fileName }),
+    ...(row.videoRelativePath != null && { videoRelativePath: row.videoRelativePath }),
+    ...(row.videoMimeType != null && { videoMimeType: row.videoMimeType }),
+    ...(row.videoSourceType != null && { videoSourceType: row.videoSourceType }),
+    ...(row.leftFencer != null && { leftFencer: row.leftFencer }),
+    ...(row.rightFencer != null && { rightFencer: row.rightFencer }),
+    ...(row.boutDate != null && { boutDate: row.boutDate }),
+    ...(row.boutType != null && { boutType: row.boutType }),
+    ...(row.externalSource != null && { externalSource: row.externalSource }),
+    ...(taggingOptions && { taggingOptions }),
+  });
 }
 
-function parseTagRow(row: typeof tagsTable.$inferSelect): Tag {
-  const payload = parseJson(row.payload, `Tag ${row.id}`);
-  const result = TagSchema.safeParse(payload);
-  if (!result.success) {
-    throw new Error(
-      `Tag ${row.id} in session ${row.sessionId} is corrupt: ${result.error.message}`,
-    );
-  }
-  if (result.data.id !== row.id) {
-    throw new Error(
-      `Tag ${row.id} in session ${row.sessionId} has a mismatched id in its JSON payload`,
-    );
-  }
-  return result.data;
+function parseTagRow(row: TagRow): Tag {
+  return TagSchema.parse({
+    id: row.tag.id,
+    createdAt: row.tag.createdAt,
+    comment: row.comment,
+    ...(row.tag.timestamp != null && { timestamp: row.tag.timestamp }),
+    ...(row.tag.seq != null && { seq: row.tag.seq }),
+    ...(row.tag.side != null && { side: row.tag.side }),
+    ...(row.tag.action != null && { action: row.tag.action }),
+    ...(row.tag.mistake != null && { mistake: row.tag.mistake }),
+    ...(row.tag.matchPeriod != null && { matchPeriod: row.tag.matchPeriod }),
+    ...(row.tag.matchClock != null && { matchClock: row.tag.matchClock }),
+    ...(row.tag.stripZone != null && { stripZone: row.tag.stripZone }),
+  });
 }
 
-function groupTagsBySession(
-  rows: (typeof tagsTable.$inferSelect)[],
-): Map<string, Tag[]> {
+function groupTagsByBout(rows: TagRow[]): Map<string, Tag[]> {
   const grouped = new Map<string, Tag[]>();
   for (const row of rows) {
-    const tags = grouped.get(row.sessionId) ?? [];
+    const tags = grouped.get(row.tag.boutId) ?? [];
     tags.push(parseTagRow(row));
-    grouped.set(row.sessionId, tags);
+    grouped.set(row.tag.boutId, tags);
   }
   return grouped;
 }
 
-function toSessionRow(session: VideoSession): typeof sessionsTable.$inferInsert {
-  const payload = SessionPayloadSchema.parse(session) satisfies SessionPayload;
-  return { id: session.id, payload: JSON.stringify(payload) };
-}
-
-function toTagRows(session: VideoSession): (typeof tagsTable.$inferInsert)[] {
-  return session.tags.map((tag, position) => toTagRow(session.id, tag, position));
-}
-
-function toTagRow(
-  sessionId: string,
-  tag: Tag,
-  position: number,
-): typeof tagsTable.$inferInsert {
+function toBoutRow(session: VideoSession): typeof boutsTable.$inferInsert {
   return {
-    sessionId,
-    id: tag.id,
-    position,
-    payload: JSON.stringify(tag),
+    id: session.id,
+    fileName: session.fileName ?? null,
+    videoRelativePath: session.videoRelativePath ?? null,
+    videoMimeType: session.videoMimeType ?? null,
+    videoSourceType: session.videoSourceType ?? null,
+    lastModified: session.lastModified,
+    leftFencer: session.leftFencer ?? null,
+    rightFencer: session.rightFencer ?? null,
+    boutDate: session.boutDate ?? null,
+    boutDateIso: normalizeBoutDate(session.boutDate) ?? null,
+    boutType: session.boutType ?? null,
+    externalSource: session.externalSource ?? null,
+    matchClockEnabled: session.taggingOptions?.matchClockEnabled ?? null,
+    stripZoneEnabled: session.taggingOptions?.stripZoneEnabled ?? null,
+  };
+}
+
+function toTagValues(tag: Tag) {
+  return {
+    timestamp: tag.timestamp ?? null,
+    seq: tag.seq ?? null,
+    createdAt: tag.createdAt,
+    side: tag.side ?? null,
+    action: tag.action ?? null,
+    mistake: tag.mistake ?? null,
+    matchPeriod: tag.matchPeriod ?? null,
+    matchClock: tag.matchClock ?? null,
+    stripZone: tag.stripZone ?? null,
+  };
+}
+
+function fromTaggingOptions(
+  row: typeof boutsTable.$inferSelect,
+): TaggingOptions | undefined {
+  if (row.matchClockEnabled == null && row.stripZoneEnabled == null) {
+    return undefined;
+  }
+  return {
+    ...(row.matchClockEnabled != null && {
+      matchClockEnabled: row.matchClockEnabled,
+    }),
+    ...(row.stripZoneEnabled != null && {
+      stripZoneEnabled: row.stripZoneEnabled,
+    }),
   };
 }
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-function insertTags(transaction: Transaction, session: VideoSession): void {
-  const rows = toTagRows(session);
-  if (rows.length > 0) {
-    transaction.insert(tagsTable).values(rows).run();
+async function insertTags(
+  transaction: Transaction,
+  session: VideoSession,
+): Promise<void> {
+  for (const [position, tag] of session.tags.entries()) {
+    await insertTag(transaction, session.id, tag, position);
   }
 }
 
-function updateSessionRow(
+async function insertTag(
+  transaction: Transaction,
+  boutId: string,
+  tag: Tag,
+  position: number,
+): Promise<void> {
+  const inserted = await transaction.insert(tagsTable).values({
+    boutId,
+    id: tag.id,
+    position,
+    ...toTagValues(tag),
+  }).returning({ rowId: tagsTable.rowId }).get();
+  await transaction.insert(commentsTable).values({
+    tagRowId: inserted.rowId,
+    body: tag.comment,
+    contentHash: hashComment(tag.comment),
+  });
+}
+
+async function updateBoutRow(
   transaction: Transaction,
   previousSession: VideoSession,
   session: VideoSession,
-): void {
-  const result = transaction.update(sessionsTable).set(toSessionRow(session))
-    .where(sessionVersionMatches(previousSession)).run();
-  if (result.changes === 0) {
+): Promise<void> {
+  const result = await transaction.update(boutsTable).set(toBoutRow(session))
+    .where(sessionVersionMatches(previousSession));
+  if (result.rowsAffected === 0) {
     throwSessionConflict(session.id);
   }
 }
 
 function sessionVersionMatches(session: VideoSession) {
   return and(
-    eq(sessionsTable.id, session.id),
-    eq(sessionsTable.payload, toSessionRow(session).payload),
+    eq(boutsTable.id, session.id),
+    eq(boutsTable.lastModified, session.lastModified),
   );
 }
 
@@ -296,26 +395,14 @@ function throwSessionConflict(sessionId: string): never {
   );
 }
 
-function parseJson(json: string, entityName: string): unknown {
-  try {
-    return JSON.parse(json);
-  } catch (error) {
-    throw new Error(`${entityName} contains invalid JSON: ${getErrorMessage(error)}`);
-  }
-}
-
 function isDuplicateSessionError(error: unknown): boolean {
   return error instanceof Error &&
-    error.message.includes("UNIQUE constraint failed: sessions.id");
-}
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+    error.message.includes("UNIQUE constraint failed: bouts.id");
 }
 
 let repository: SessionRepository | null = null;
 
 export function getSessionRepository(): SessionRepository {
-  repository ??= new DrizzleSessionRepository();
+  repository ??= new LibsqlSessionRepository();
   return repository;
 }

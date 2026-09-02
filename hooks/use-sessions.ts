@@ -6,14 +6,14 @@ import {
 } from "@tanstack/react-query";
 import { useCallback, useMemo } from "react";
 import {
-  addTagAction,
-  createSessionAction,
-  deleteSessionAction,
-  deleteTagAction,
-  importSessionsAction,
-  updateSessionAction,
-  updateTagAction,
-} from "@/app/actions/session-actions";
+  addTag as addTagOnServer,
+  createSession as createSessionOnServer,
+  deleteSession as deleteSessionOnServer,
+  deleteTag as deleteTagOnServer,
+  importSessions as importSessionsOnServer,
+  updateSession as updateSessionOnServer,
+  updateTag as updateTagOnServer,
+} from "@/lib/server/session-service";
 import { useSessionsQuery, sessionsQueryKey } from "@/hooks/use-sessions-query";
 import {
   exportSessionToCsv,
@@ -158,7 +158,7 @@ export function useSessions(initialSessions?: VideoSession[]) {
       videoSelection,
       sessionId,
     }: CreateSessionMutationVariables) =>
-      createSessionAction({
+      createSessionOnServer({
         sessionId,
         params,
         videoSelection: serializeVideoSelection(videoSelection),
@@ -184,7 +184,7 @@ export function useSessions(initialSessions?: VideoSession[]) {
       sessionId,
       updates,
     }: UpdateSessionMutationVariables) =>
-      updateSessionAction({
+      updateSessionOnServer({
         sessionId,
         updates,
       }),
@@ -210,7 +210,7 @@ export function useSessions(initialSessions?: VideoSession[]) {
       params,
       optimisticTag,
     }: AddTagMutationVariables) =>
-      addTagAction({
+      addTagOnServer({
         sessionId,
         tagId: optimisticTag.id,
         createdAt: optimisticTag.createdAt,
@@ -240,7 +240,7 @@ export function useSessions(initialSessions?: VideoSession[]) {
       tagId,
       updates,
     }: UpdateTagMutationVariables) =>
-      updateTagAction({
+      updateTagOnServer({
         sessionId,
         tagId,
         updates,
@@ -263,7 +263,7 @@ export function useSessions(initialSessions?: VideoSession[]) {
 
   const deleteTagMutation = useMutation({
     mutationFn: async ({ sessionId, tagId }: DeleteTagMutationVariables) =>
-      deleteTagAction({
+      deleteTagOnServer({
         sessionId,
         tagId,
       }),
@@ -292,7 +292,7 @@ export function useSessions(initialSessions?: VideoSession[]) {
 
   const deleteSessionMutation = useMutation({
     mutationFn: async ({ sessionId }: DeleteSessionMutationVariables) =>
-      deleteSessionAction({
+      deleteSessionOnServer({
         sessionId,
       }),
     onMutate: async ({ sessionId }) => {
@@ -314,7 +314,7 @@ export function useSessions(initialSessions?: VideoSession[]) {
 
   const importSessionsMutation = useMutation({
     mutationFn: async (incomingSessions: VideoSession[]) =>
-      importSessionsAction({
+      importSessionsOnServer({
         sessions: incomingSessions,
       }),
     onSuccess: async () => {

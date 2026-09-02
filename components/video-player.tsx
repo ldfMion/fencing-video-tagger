@@ -1,7 +1,14 @@
 "use client";
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Tooltip,
   TooltipContent,
@@ -43,27 +50,22 @@ const SPEED_KEY_MAP: Record<string, PlaybackSpeed> = {
   "7": 3,
 };
 
-// Reverse map for tooltip display
-const SPEED_SHORTCUT_MAP: Record<PlaybackSpeed, string> = {
-  0.2: "1",
-  0.4: "2",
-  0.5: "3",
-  0.7: "4",
-  1: "5",
-  2: "6",
-  3: "7",
-};
-
 interface VideoPlayerProps {
   videoUrl: string | null;
   video: UseVideoReturn;
   maximized?: boolean;
+  playbackWindow?: {
+    start: number;
+    end: number;
+    autoPlay?: boolean;
+  };
 }
 
 export function VideoPlayer({
   videoUrl,
   video,
   maximized = false,
+  playbackWindow,
 }: VideoPlayerProps) {
   const {
     setVideoElement,
@@ -76,6 +78,9 @@ export function VideoPlayer({
     panX,
     panY,
     error,
+    play,
+    playAt,
+    pause,
     togglePlay,
     seek,
     setPlaybackSpeed,
@@ -91,14 +96,70 @@ export function VideoPlayer({
     centerPan,
     clearError,
   } = video;
+  const videoElementRef = useRef<HTMLVideoElement | null>(null);
+  const windowStart = playbackWindow?.start ?? 0;
+  const windowEnd = playbackWindow?.end ?? duration;
+  const handleVideoElement = useCallback((element: HTMLVideoElement | null) => {
+    videoElementRef.current = element;
+    setVideoElement(element);
+  }, [setVideoElement]);
+
+  const seekWithinWindow = useCallback(
+    (time: number) => {
+      seek(playbackWindow ? Math.max(windowStart, Math.min(time, windowEnd)) : time);
+    },
+    [playbackWindow, seek, windowEnd, windowStart],
+  );
+
+  const toggleWindowPlayback = useCallback(() => {
+    if (!playbackWindow) {
+      togglePlay();
+      return;
+    }
+    if (isPlaying) {
+      pause();
+      return;
+    }
+    const actualCurrentTime = videoElementRef.current?.currentTime ?? currentTime;
+    if (actualCurrentTime < windowStart || actualCurrentTime >= windowEnd - 0.05) {
+      playAt(windowStart);
+      return;
+    }
+    play();
+  }, [currentTime, isPlaying, pause, play, playAt, playbackWindow, togglePlay, windowEnd, windowStart]);
+
+  const stepWithinWindow = useCallback(
+    (direction: "forward" | "backward") => {
+      if (!playbackWindow) {
+        stepFrame(direction);
+        return;
+      }
+      pause();
+      seekWithinWindow(currentTime + (direction === "forward" ? 1 / 30 : -1 / 30));
+    },
+    [currentTime, pause, playbackWindow, seekWithinWindow, stepFrame],
+  );
+
+  const skipWithinWindow = useCallback(
+    (direction: "forward" | "backward") => {
+      if (!playbackWindow) {
+        skip(direction);
+        return;
+      }
+      seekWithinWindow(currentTime + (direction === "forward" ? 5 : -5));
+    },
+    [currentTime, playbackWindow, seekWithinWindow, skip],
+  );
 
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if user is typing in an input
+      // Ignore video shortcuts while an editable or dropdown control is active.
       if (
         e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement
+        e.target instanceof HTMLTextAreaElement ||
+        (e.target instanceof HTMLElement &&
+          e.target.closest('[data-slot^="select-"]'))
       ) {
         return;
       }
@@ -106,16 +167,16 @@ export function VideoPlayer({
       switch (e.key) {
         case " ": // Space - play/pause
           e.preventDefault();
-          togglePlay();
+          toggleWindowPlayback();
           break;
         case "ArrowLeft": // Left arrow - frame back or skip back/pan left with shift
           e.preventDefault();
           if (e.shiftKey && zoomLevel > 1) {
             panLeft();
           } else if (e.shiftKey) {
-            skip("backward");
+            skipWithinWindow("backward");
           } else {
-            stepFrame("backward");
+            stepWithinWindow("backward");
           }
           break;
         case "ArrowRight": // Right arrow - frame forward or skip forward/pan right with shift
@@ -123,9 +184,9 @@ export function VideoPlayer({
           if (e.shiftKey && zoomLevel > 1) {
             panRight();
           } else if (e.shiftKey) {
-            skip("forward");
+            skipWithinWindow("forward");
           } else {
-            stepFrame("forward");
+            stepWithinWindow("forward");
           }
           break;
         case "ArrowUp": // Up arrow - pan up with shift when zoomed
@@ -142,15 +203,15 @@ export function VideoPlayer({
           break;
         case "j": // j - skip backward
           e.preventDefault();
-          skip("backward");
+          skipWithinWindow("backward");
           break;
         case "l": // l - skip forward
           e.preventDefault();
-          skip("forward");
+          skipWithinWindow("forward");
           break;
         case "k": // k - play/pause (YouTube style)
           e.preventDefault();
-          togglePlay();
+          toggleWindowPlayback();
           break;
         case "+":
         case "=": // Plus/equals - zoom in
@@ -213,9 +274,9 @@ export function VideoPlayer({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [
-    togglePlay,
-    stepFrame,
-    skip,
+    toggleWindowPlayback,
+    stepWithinWindow,
+    skipWithinWindow,
     setPlaybackSpeed,
     zoomIn,
     zoomOut,
@@ -232,12 +293,18 @@ export function VideoPlayer({
     (e: React.MouseEvent<HTMLDivElement>) => {
       const rect = e.currentTarget.getBoundingClientRect();
       const percent = (e.clientX - rect.left) / rect.width;
-      seek(percent * duration);
+      seekWithinWindow(playbackWindow
+        ? windowStart + (percent * (windowEnd - windowStart))
+        : percent * duration);
     },
-    [duration, seek],
+    [duration, playbackWindow, seekWithinWindow, windowEnd, windowStart],
   );
 
-  const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const displayDuration = playbackWindow ? windowEnd - windowStart : duration;
+  const displayCurrentTime = playbackWindow
+    ? Math.max(0, Math.min(currentTime - windowStart, displayDuration))
+    : currentTime;
+  const progress = displayDuration > 0 ? (displayCurrentTime / displayDuration) * 100 : 0;
 
   if (!videoUrl) {
     return (
@@ -273,7 +340,7 @@ export function VideoPlayer({
           className={`${maximized ? "h-full min-h-0" : "aspect-video"} video-frame bg-black overflow-hidden flex items-center justify-center relative`}
         >
           <video
-            ref={setVideoElement}
+            ref={handleVideoElement}
             src={videoUrl}
             preload="auto"
             className="w-full h-full object-contain"
@@ -281,7 +348,19 @@ export function VideoPlayer({
               transform: `scale(${zoomLevel}) translate(${panX}%, ${panY}%)`,
               transition: "transform 0.1s ease-out",
             }}
-            onClick={togglePlay}
+            onClick={toggleWindowPlayback}
+            onLoadedMetadata={(event) => {
+              if (!playbackWindow) return;
+              event.currentTarget.currentTime = windowStart;
+              if (playbackWindow.autoPlay) {
+                void event.currentTarget.play().catch(() => undefined);
+              }
+            }}
+            onTimeUpdate={(event) => {
+              if (playbackWindow && event.currentTarget.currentTime >= windowEnd) {
+                event.currentTarget.pause();
+              }
+            }}
           />
           {isSeeking && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/30">
@@ -310,7 +389,7 @@ export function VideoPlayer({
                 variant="outline"
                 size="icon-sm"
                 aria-label="Previous frame"
-                onClick={() => stepFrame("backward")}
+                onClick={() => stepWithinWindow("backward")}
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
               </Button>
@@ -327,7 +406,7 @@ export function VideoPlayer({
                 variant="outline"
                 size="icon-sm"
                 aria-label="Back 5 seconds"
-                onClick={() => skip("backward")}
+                onClick={() => skipWithinWindow("backward")}
               >
                 <SkipBack className="h-3.5 w-3.5" />
               </Button>
@@ -344,7 +423,7 @@ export function VideoPlayer({
                 variant="outline"
                 size="icon-sm"
                 aria-label={isPlaying ? "Pause" : "Play"}
-                onClick={togglePlay}
+                onClick={toggleWindowPlayback}
               >
                 {isPlaying ? (
                   <Pause className="h-3.5 w-3.5" />
@@ -365,7 +444,7 @@ export function VideoPlayer({
                 variant="outline"
                 size="icon-sm"
                 aria-label="Forward 5 seconds"
-                onClick={() => skip("forward")}
+                onClick={() => skipWithinWindow("forward")}
               >
                 <SkipForward className="h-3.5 w-3.5" />
               </Button>
@@ -382,7 +461,7 @@ export function VideoPlayer({
                 variant="outline"
                 size="icon-sm"
                 aria-label="Next frame"
-                onClick={() => stepFrame("forward")}
+                onClick={() => stepWithinWindow("forward")}
               >
                 <ChevronRight className="h-3.5 w-3.5" />
               </Button>
@@ -394,7 +473,7 @@ export function VideoPlayer({
 
           {/* Time display */}
           <span className="px-1.5 text-xs text-muted-foreground">
-            {formatTime(currentTime)} / {formatTime(duration)}
+            {formatTime(displayCurrentTime)} / {formatTime(displayDuration)}
           </span>
 
           {/* Zoom controls */}
@@ -513,28 +592,34 @@ export function VideoPlayer({
           )}
 
           {/* Speed selector */}
-          <div className="ml-auto flex items-center gap-1">
-            <span className="mr-1 text-xs text-muted-foreground">Speed:</span>
-            {PLAYBACK_SPEEDS.map((speed) => (
-              <Tooltip key={speed}>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant={playbackSpeed === speed ? "default" : "outline"}
-                    size="xs"
-                    onClick={() => setPlaybackSpeed(speed)}
-                    className="min-w-[2.75rem] px-1.5"
-                  >
+          <div className="ml-auto flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">Speed</span>
+            <Select
+              value={String(playbackSpeed)}
+              onValueChange={(value) => {
+                const speed = Number(value) as PlaybackSpeed;
+
+                if (PLAYBACK_SPEEDS.includes(speed)) {
+                  setPlaybackSpeed(speed);
+                }
+              }}
+            >
+              <SelectTrigger
+                size="sm"
+                className="w-[4.75rem] bg-background/80"
+                aria-label="Playback speed"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent align="end" className="min-w-[6rem]">
+                {PLAYBACK_SPEEDS.map((speed) => (
+                  <SelectItem key={speed} value={String(speed)}>
                     {speed}x
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>
-                    {speed}x speed ({SPEED_SHORTCUT_MAP[speed]})
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-            ))}
-            </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           </div>
         </div>
       </div>

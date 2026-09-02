@@ -3,25 +3,34 @@ import {
   ActionCodeSchema,
   MatchPeriodSchema,
   MistakeTypeSchema,
-  SideSchema,
   StripZoneSchema,
 } from "@/lib/types";
 
 const IsoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const MultiValueSchema = <T extends z.ZodType>(schema: T) =>
+  z.array(schema).max(100).default([]);
 
 export const CommentSearchInputSchema = z.object({
-  query: z.string().trim().min(1).max(2_000),
+  query: z.string().trim().max(2_000).default(""),
   filters: z.object({
-    fencer: z.string().trim().min(1).optional(),
-    side: SideSchema.optional(),
-    action: ActionCodeSchema.optional(),
-    mistake: MistakeTypeSchema.optional(),
-    period: MatchPeriodSchema.optional(),
-    stripZone: StripZoneSchema.optional(),
+    fencers: MultiValueSchema(z.string().trim().min(1)),
+    actions: MultiValueSchema(ActionCodeSchema),
+    mistakes: MultiValueSchema(MistakeTypeSchema),
+    periods: MultiValueSchema(MatchPeriodSchema),
+    stripZones: MultiValueSchema(StripZoneSchema),
     dateFrom: IsoDateSchema.optional(),
     dateTo: IsoDateSchema.optional(),
-  }).default({}),
-  limit: z.number().int().min(1).max(100).default(20),
+    includeWithoutReplay: z.boolean().default(false),
+  }).default({
+    fencers: [],
+    actions: [],
+    mistakes: [],
+    periods: [],
+    stripZones: [],
+    includeWithoutReplay: false,
+  }),
+  limit: z.number().int().min(1).max(100).default(50),
+  offset: z.number().int().min(0).default(0),
 });
 
 export type CommentSearchInput = z.infer<typeof CommentSearchInputSchema>;
@@ -33,20 +42,25 @@ export interface CommentSearchResult {
   tagId: string;
   boutId: string;
   timestamp?: number;
-  side?: z.infer<typeof SideSchema>;
   action?: z.infer<typeof ActionCodeSchema>;
   mistake?: z.infer<typeof MistakeTypeSchema>;
   period?: z.infer<typeof MatchPeriodSchema>;
+  matchClock?: string;
   stripZone?: z.infer<typeof StripZoneSchema>;
+  taggedFencer?: string;
+  opponent?: string;
   leftFencer?: string;
   rightFencer?: string;
   boutDate?: string;
   boutDateIso?: string;
-  cosineDistance: number;
-  cosineSimilarity: number;
+  videoRelativePath?: string;
+  replayAvailable: boolean;
+  cosineDistance?: number;
+  cosineSimilarity?: number;
 }
 
 export interface CommentSearchResponse {
   results: CommentSearchResult[];
   embeddedComments: number;
+  hasMore: boolean;
 }

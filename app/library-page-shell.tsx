@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Plus, Search, Swords, X } from "lucide-react";
 import { AppearanceMenu } from "@/components/appearance-menu";
@@ -93,6 +94,12 @@ export function LibraryPageShell({ initialSessions }: LibraryPageShellProps) {
           </div>
           <div className="flex items-center gap-2">
             <AppearanceMenu compact />
+            <Button asChild variant="outline" className="hidden sm:inline-flex">
+              <Link href="/search">
+                <Search className="mr-2 h-4 w-4" />
+                Touch search
+              </Link>
+            </Button>
             <ImportButton />
             <ExportMenuButton
               exportAllToJson={exportAllToJson}

@@ -32,6 +32,7 @@ export interface UseVideoReturn {
   panY: number;
   error: string | null;
   play: () => void;
+  playAt: (time: number) => void;
   pause: () => void;
   togglePlay: () => void;
   seek: (time: number) => void;
@@ -278,6 +279,25 @@ export function useVideo(options: UseVideoOptions = {}): UseVideoReturn {
     playWithRetry(videoElement);
   }, [playWithRetry]);
 
+  const playAt = useCallback(
+    (time: number) => {
+      const videoElement = videoElementRef.current;
+      if (!videoElement) return;
+      const targetTime = clampToVideoDuration(videoElement, time);
+      videoElement.pause();
+      videoElement.currentTime = targetTime;
+      updateResumeTime(targetTime);
+
+      const beginPlayback = () => playWithRetry(videoElement);
+      if (videoElement.seeking) {
+        videoElement.addEventListener("seeked", beginPlayback, { once: true });
+      } else {
+        beginPlayback();
+      }
+    },
+    [clampToVideoDuration, playWithRetry, updateResumeTime],
+  );
+
   const pause = useCallback(() => {
     videoElementRef.current?.pause();
   }, []);
@@ -475,6 +495,7 @@ export function useVideo(options: UseVideoOptions = {}): UseVideoReturn {
     panY,
     error,
     play,
+    playAt,
     pause,
     togglePlay,
     seek,

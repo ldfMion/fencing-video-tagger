@@ -217,7 +217,7 @@ export function TagList({
               <div
                 key={tag.id}
                 className={cn(
-                  "tag-card group rounded-xl border border-border/70 bg-card px-3 py-3 shadow-sm transition-all hover:-translate-y-px hover:border-foreground/20 hover:shadow-md",
+                  "tag-card group rounded-lg border border-border/70 bg-card px-3 py-3 transition-colors hover:border-foreground/20",
                   tag.side === "L" && "tag-card-left",
                   tag.side === "R" && "tag-card-right",
                   editingTagId === tag.id && "ring-2 ring-primary/30",

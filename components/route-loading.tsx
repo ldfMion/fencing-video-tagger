@@ -9,7 +9,7 @@ export function RouteLoading({ compact = false }: { compact?: boolean }) {
           : "min-h-screen bg-background px-4 py-6"
       }
     >
-      <div className="mx-auto flex max-w-4xl items-center justify-center gap-3 rounded-xl border bg-card/70 px-5 py-4 text-sm text-muted-foreground shadow-sm backdrop-blur-xl">
+      <div className="mx-auto flex max-w-4xl items-center justify-center gap-3 rounded-lg border bg-card px-5 py-4 text-sm text-muted-foreground">
         <span className="relative">
           <Swords className="size-5" />
           <Loader2 className="absolute -right-2 -top-2 size-3 animate-spin text-primary" />

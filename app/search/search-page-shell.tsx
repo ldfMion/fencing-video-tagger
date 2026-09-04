@@ -193,7 +193,7 @@ export function SearchPageShell({ initialParams, fencers }: SearchPageShellProps
 
   return (
     <div className="app-canvas min-h-screen bg-background">
-      <header className="border-b bg-background/85 backdrop-blur-xl">
+      <header className="border-b bg-background">
         <div className="mx-auto flex h-16 max-w-[1500px] items-center justify-between px-4 sm:px-8">
           <Link href="/" className="flex items-center gap-2.5">
             <span className="brand-mark"><Swords className="h-4 w-4" /></span>
@@ -208,7 +208,7 @@ export function SearchPageShell({ initialParams, fencers }: SearchPageShellProps
 
       <main className={cn("mx-auto max-w-[1500px] px-4 transition-[padding] duration-300 ease-out sm:px-8", hasApplied ? "py-4" : "flex min-h-[calc(100vh-4rem)] items-start justify-center pt-[16vh]")}>
         <div className="w-full">
-          <section className={cn(hasApplied && "sticky top-0 z-30 -mx-4 animate-in border-b bg-background/90 px-4 py-3 fade-in slide-in-from-top-2 duration-300 backdrop-blur-xl sm:-mx-8 sm:px-8")}>
+          <section className={cn(hasApplied && "sticky top-0 z-30 -mx-4 animate-in border-b bg-background px-4 py-3 fade-in slide-in-from-top-2 duration-300 sm:-mx-8 sm:px-8")}>
             <div className={cn("mx-auto", hasApplied ? "max-w-[1500px]" : "max-w-3xl text-center")}>
               {!hasApplied && <div className="mb-8"><p className="eyebrow">Touch search</p><h1 className="mt-3 text-3xl font-semibold tracking-[-0.045em] sm:text-4xl">Find the moment that matters.</h1><p className="mt-3 text-sm text-muted-foreground">Search your tagged touches by meaning, fencer, action, mistake, or date.</p></div>}
               <form className="flex gap-2" onSubmit={(event) => { event.preventDefault(); submitQuery(); }}>
@@ -233,8 +233,8 @@ export function SearchPageShell({ initialParams, fencers }: SearchPageShellProps
             <section className="min-w-0">
               {error && <div className="mb-4 flex gap-3 rounded-lg border border-destructive/25 bg-destructive/5 p-3 text-sm"><CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-destructive" /><p>{error}</p></div>}
               <div className="mb-3 flex items-center justify-between"><p className="text-sm font-medium">{isPending && results.length === 0 ? "Searching…" : `${results.length}${hasMore ? "+" : ""} touch${results.length === 1 ? "" : "es"}`}</p><p className="text-xs text-muted-foreground">{submittedQuery && !semanticFallback ? "Sorted by relevance" : "Newest first"}</p></div>
-              {isPending && results.length === 0 ? <ResultsSkeleton /> : !isPending && results.length === 0 ? <div className="animate-in rounded-xl border border-dashed py-20 text-center fade-in duration-300"><Search className="mx-auto h-7 w-7 text-muted-foreground" /><h2 className="mt-4 text-base font-medium">No touches found</h2><p className="mt-1 text-sm text-muted-foreground">No tagged touches match this search.</p></div> :
-                <div className="animate-in overflow-hidden rounded-xl border bg-card/45 fade-in slide-in-from-bottom-3 duration-300">{results.map((result) => <ResultRow key={`${result.boutId}:${result.tagId}`} result={result} selected={`${result.boutId}:${result.tagId}` === selectedId} onClick={() => chooseResult(result)} />)}</div>}
+              {isPending && results.length === 0 ? <ResultsSkeleton /> : !isPending && results.length === 0 ? <div className="animate-in rounded-lg border border-dashed py-20 text-center fade-in duration-300"><Search className="mx-auto h-7 w-7 text-muted-foreground" /><h2 className="mt-4 text-base font-medium">No touches found</h2><p className="mt-1 text-sm text-muted-foreground">No tagged touches match this search.</p></div> :
+                <div className="animate-in overflow-hidden rounded-lg border bg-card fade-in slide-in-from-bottom-3 duration-300">{results.map((result) => <ResultRow key={`${result.boutId}:${result.tagId}`} result={result} selected={`${result.boutId}:${result.tagId}` === selectedId} onClick={() => chooseResult(result)} />)}</div>}
               {hasMore && <div className="mt-5 text-center"><Button variant="outline" disabled={isPending} onClick={() => runSearch(submittedQuery, filters, true)}>Load more</Button></div>}
             </section>
             {selected && <TouchReplay result={selected} onClose={closeReplay} />}
@@ -246,7 +246,7 @@ export function SearchPageShell({ initialParams, fencers }: SearchPageShellProps
 }
 
 function ResultsSkeleton() {
-  return <div className="animate-in overflow-hidden rounded-xl border bg-card/35 fade-in duration-200">{Array.from({ length: 4 }, (_, index) => <div key={index} className="border-b p-4 last:border-b-0"><div className="h-4 w-48 animate-pulse rounded bg-muted" /><div className="mt-3 h-3 w-3/4 animate-pulse rounded bg-muted/80" /><div className="mt-3 h-3 w-24 animate-pulse rounded bg-muted/70" /></div>)}</div>;
+  return <div className="animate-in overflow-hidden rounded-lg border bg-card fade-in duration-200">{Array.from({ length: 4 }, (_, index) => <div key={index} className="border-b p-4 last:border-b-0"><div className="h-4 w-48 animate-pulse rounded bg-muted" /><div className="mt-3 h-3 w-3/4 animate-pulse rounded bg-muted/80" /><div className="mt-3 h-3 w-24 animate-pulse rounded bg-muted/70" /></div>)}</div>;
 }
 
 function MultiSelect({ label, values, options, onChange, searchable = false }: { label: string; values: string[]; options: string[]; onChange: (values: string[]) => void; searchable?: boolean }) {

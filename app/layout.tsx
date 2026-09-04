@@ -1,10 +1,6 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, IBM_Plex_Sans } from "next/font/google";
 import { AppProviders } from "@/components/app-providers";
 import "./globals.css";
-import { cn } from "@/lib/utils";
-
-const ibmPlexSans = IBM_Plex_Sans({subsets:['latin'],variable:'--font-sans'});
 
 const designThemeScript = `
   try {
@@ -14,16 +10,6 @@ const designThemeScript = `
     document.documentElement.dataset.designTheme = "linear";
   }
 `;
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "Fencing Video Tagger",
@@ -39,12 +25,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn(
-        "font-sans",
-        ibmPlexSans.variable,
-        geistSans.variable,
-        geistMono.variable,
-      )}
+      className="font-sans"
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: designThemeScript }} />

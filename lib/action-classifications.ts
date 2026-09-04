@@ -54,6 +54,7 @@ const CLASSIFICATIONS: Record<ActionCode, ActionClassification> = {
   "C,R-CT": { tacticalIntent: "defense", scoringDefAlt: "C" },
   "L-A": { tacticalIntent: "defense", scoringDefAlt: "AP" },
   "R,R": { tacticalIntent: "defense", scoringDefAlt: "P" },
+  "R,R,R": { tacticalIntent: "defense", scoringDefAlt: "P" },
   "R-AP,P": { tacticalIntent: "offense", receivingDefAlt: "AP" },
   "R-AP,R": { tacticalIntent: "offense", receivingDefAlt: "AP" },
   "R-CT,R": { tacticalIntent: "defense" },

@@ -4,7 +4,8 @@ import { connection } from "next/server";
 import { BoutWorkspaceShell } from "@/app/bouts/[id]/bout-workspace-shell";
 import { RouteLoading } from "@/components/route-loading";
 import { getBoutDisplayLabel } from "@/lib/session-selectors";
-import { getSessionById, listSessions } from "@/lib/server/session-service";
+import { listSearchFencers } from "@/lib/server/comment-search-service";
+import { getSessionById } from "@/lib/server/session-service";
 import {
   findTagById,
   getDefaultBoutDescription,
@@ -72,13 +73,17 @@ async function BoutPageContent(props: BoutPageProps) {
   await connection();
   const { id } = await props.params;
   const searchParams = await props.searchParams;
-  const initialSessions = await listSessions();
+  const [initialSession, initialFencerNames] = await Promise.all([
+    getSessionById(id),
+    listSearchFencers(),
+  ]);
   const initialTagId = getSingleSearchParamValue(searchParams.tag) ?? null;
 
   return (
     <BoutWorkspaceShell
       boutId={id}
-      initialSessions={initialSessions}
+      initialFencerNames={initialFencerNames}
+      initialSession={initialSession}
       initialTagId={initialTagId}
     />
   );

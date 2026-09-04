@@ -15,6 +15,13 @@
       "when": 1788277200000,
       "tag": "0001_relational_libsql_search",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1788547720899,
+      "tag": "0002_dapper_maelstrom",
+      "breakpoints": true
     }
   ]
 }

@@ -14,7 +14,12 @@ import {
   updateSession as updateSessionOnServer,
   updateTag as updateTagOnServer,
 } from "@/lib/server/session-service";
-import { useSessionsQuery, sessionsQueryKey } from "@/hooks/use-sessions-query";
+import {
+  sessionQueryKey,
+  sessionsQueryKey,
+  useSessionQuery,
+  useSessionsQuery,
+} from "@/hooks/use-sessions-query";
 import {
   exportSessionToCsv,
   exportSessionsToJson,
@@ -61,6 +66,11 @@ interface CreateSessionEntryOptions {
   sessionId?: string;
 }
 
+interface SessionDetailQueryOptions {
+  sessionId: string;
+  initialSession?: VideoSession | null;
+}
+
 interface CreateSessionMutationVariables {
   params: SessionDraftParams;
   videoSelection: SessionVideoSelection;
@@ -102,16 +112,39 @@ interface DeleteSessionMutationVariables {
   previousIndex: number;
 }
 
-export function useSessions(initialSessions?: VideoSession[]) {
+export function useSessions(
+  initialSessions?: VideoSession[],
+  detailQuery?: SessionDetailQueryOptions,
+) {
   const queryClient = useQueryClient();
-  const { sessions, status, error } = useSessionsQuery(initialSessions);
+  const listQuery = useSessionsQuery(initialSessions, !detailQuery);
+  const detailResult = useSessionQuery(
+    detailQuery?.sessionId ?? "",
+    detailQuery?.initialSession,
+    Boolean(detailQuery),
+  );
+  const sessions = useMemo(
+    () => detailQuery
+      ? detailResult.data
+        ? [detailResult.data]
+        : []
+      : listQuery.sessions,
+    [detailQuery, detailResult.data, listQuery.sessions],
+  );
+  const { status, error } = detailQuery ? detailResult : listQuery;
 
   const getCachedSessions = useCallback(
     () =>
-      queryClient.getQueryData<VideoSession[]>(sessionsQueryKey) ??
+      (detailQuery
+        ? optionalSessionAsArray(
+            queryClient.getQueryData<VideoSession | null>(
+              sessionQueryKey(detailQuery.sessionId),
+            ),
+          )
+        : queryClient.getQueryData<VideoSession[]>(sessionsQueryKey)) ??
       initialSessions ??
       [],
-    [initialSessions, queryClient],
+    [detailQuery, initialSessions, queryClient],
   );
 
   const setCachedSessions = useCallback(
@@ -121,31 +154,71 @@ export function useSessions(initialSessions?: VideoSession[]) {
         | ((previousSessions: VideoSession[]) => VideoSession[]),
     ) => {
       queryClient.setQueryData<VideoSession[]>(sessionsQueryKey, (previousSessions) => {
+        if (detailQuery && !previousSessions) {
+          return previousSessions;
+        }
         const currentSessions = previousSessions ?? initialSessions ?? [];
         return typeof updater === "function"
           ? updater(currentSessions)
           : updater;
       });
+
+      if (detailQuery) {
+        queryClient.setQueryData<VideoSession | null>(
+          sessionQueryKey(detailQuery.sessionId),
+          (previousSession) => {
+            const currentSessions = optionalSessionAsArray(
+              previousSession ?? detailQuery.initialSession,
+            );
+            const nextSessions = typeof updater === "function"
+              ? updater(currentSessions)
+              : updater;
+            return selectSessionById(nextSessions, detailQuery.sessionId) ?? null;
+          },
+        );
+      }
     },
-    [initialSessions, queryClient],
+    [detailQuery, initialSessions, queryClient],
   );
 
   const cancelSessionsQuery = useCallback(
     () =>
-      queryClient.cancelQueries({
-        queryKey: sessionsQueryKey,
-      }),
+      Promise.all([
+        queryClient.cancelQueries({ queryKey: sessionsQueryKey, exact: true }),
+        ...(detailQuery
+          ? [queryClient.cancelQueries({ queryKey: sessionQueryKey(detailQuery.sessionId) })]
+          : []),
+      ]),
+    [detailQuery, queryClient],
+  );
+
+  const syncCachedSessionDetail = useCallback(
+    (session: VideoSession) => {
+      const queryKey = sessionQueryKey(session.id);
+
+      if (queryClient.getQueryState(queryKey)) {
+        queryClient.setQueryData<VideoSession | null>(queryKey, session);
+      }
+    },
     [queryClient],
   );
 
   const refetchSessions = useCallback(async () => {
+    if (detailQuery) {
+      await queryClient.invalidateQueries({
+        queryKey: sessionQueryKey(detailQuery.sessionId),
+      });
+      return;
+    }
     await queryClient.invalidateQueries({
       queryKey: sessionsQueryKey,
+      exact: true,
     });
     await queryClient.refetchQueries({
       queryKey: sessionsQueryKey,
+      exact: true,
     });
-  }, [queryClient]);
+  }, [detailQuery, queryClient]);
 
   const getSessionById = useCallback(
     (sessionId: string) => selectSessionById(getCachedSessions(), sessionId),
@@ -176,6 +249,7 @@ export function useSessions(initialSessions?: VideoSession[]) {
       setCachedSessions((currentSessions) =>
         replaceSession(currentSessions, sessionId, serverSession),
       );
+      syncCachedSessionDetail(serverSession);
     },
   });
 
@@ -201,6 +275,7 @@ export function useSessions(initialSessions?: VideoSession[]) {
       setCachedSessions((currentSessions) =>
         replaceSession(currentSessions, sessionId, serverSession),
       );
+      syncCachedSessionDetail(serverSession);
     },
   });
 
@@ -231,6 +306,7 @@ export function useSessions(initialSessions?: VideoSession[]) {
       setCachedSessions((currentSessions) =>
         replaceSession(currentSessions, sessionId, serverSession),
       );
+      syncCachedSessionDetail(serverSession);
     },
   });
 
@@ -258,6 +334,7 @@ export function useSessions(initialSessions?: VideoSession[]) {
       setCachedSessions((currentSessions) =>
         replaceSession(currentSessions, sessionId, serverSession),
       );
+      syncCachedSessionDetail(serverSession);
     },
   });
 
@@ -287,6 +364,7 @@ export function useSessions(initialSessions?: VideoSession[]) {
       setCachedSessions((currentSessions) =>
         replaceSession(currentSessions, sessionId, serverSession),
       );
+      syncCachedSessionDetail(serverSession);
     },
   });
 
@@ -299,6 +377,10 @@ export function useSessions(initialSessions?: VideoSession[]) {
       await cancelSessionsQuery();
       setCachedSessions((currentSessions) =>
         currentSessions.filter((session) => session.id !== sessionId),
+      );
+      queryClient.setQueryData<VideoSession | null>(
+        sessionQueryKey(sessionId),
+        null,
       );
     },
     onError: (_error, { previousSession, previousIndex }) => {
@@ -667,6 +749,12 @@ function replaceSession(
   });
 
   return found ? nextSessions : [...nextSessions, nextSession];
+}
+
+function optionalSessionAsArray(
+  session: VideoSession | null | undefined,
+): VideoSession[] {
+  return session ? [session] : [];
 }
 
 function restoreDeletedSession(

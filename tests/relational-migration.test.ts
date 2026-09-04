@@ -104,6 +104,28 @@ test("migrates legacy JSON sessions without loss and creates a native vector ind
       content_hash: hashComment(tag.comment),
     });
 
+    const participants = await client.execute(`
+      SELECT p.side, p.display_name_snapshot, f.canonical_name, f.normalized_name
+      FROM bout_participants AS p
+      INNER JOIN fencers AS f ON f.id = p.fencer_id
+      WHERE p.bout_id = 'bout-1'
+      ORDER BY p.side
+    `);
+    assert.deepEqual(participants.rows, [
+      {
+        side: "L",
+        display_name_snapshot: "Esgrimista A",
+        canonical_name: "Esgrimista A",
+        normalized_name: "esgrimista a",
+      },
+      {
+        side: "R",
+        display_name_snapshot: "Fencer B",
+        canonical_name: "Fencer B",
+        normalized_name: "fencer b",
+      },
+    ]);
+
     const vector = JSON.stringify(Array.from({ length: 256 }, (_, index) =>
       index === 0 ? 1 : 0
     ));

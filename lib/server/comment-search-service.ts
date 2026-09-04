@@ -14,13 +14,9 @@ import { embedQuery } from "@/lib/server/embeddings/model";
 export async function listSearchFencers(): Promise<string[]> {
   await databaseReady;
   const result = await databaseClient.execute(`
-    SELECT name FROM (
-      SELECT trim(left_fencer) AS name FROM bouts
-      UNION
-      SELECT trim(right_fencer) AS name FROM bouts
-    )
-    WHERE name IS NOT NULL AND name <> ''
-    ORDER BY name COLLATE NOCASE
+    SELECT canonical_name AS name
+    FROM fencers
+    ORDER BY canonical_name COLLATE NOCASE
   `);
 
   return result.rows.map((row) => String(row.name));

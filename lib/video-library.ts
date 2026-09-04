@@ -14,15 +14,7 @@ export interface VideoLibraryResponse {
 }
 
 export function buildSessionVideoUrl(
-  session: Pick<VideoSession, "id" | "videoRelativePath">,
-): string | null {
-  if (!session.videoRelativePath) {
-    return null;
-  }
-
-  const params = new URLSearchParams({
-    path: session.videoRelativePath,
-  });
-
-  return `/api/videos/${encodeURIComponent(session.id)}?${params.toString()}`;
+  session: Pick<VideoSession, "id">,
+): string {
+  return `/api/videos/${encodeURIComponent(session.id)}`;
 }

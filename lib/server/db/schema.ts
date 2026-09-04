@@ -50,6 +50,37 @@ export const boutsTable = sqliteTable(
   ],
 );
 
+export const fencersTable = sqliteTable(
+  "fencers",
+  {
+    id: text("id").primaryKey(),
+    canonicalName: text("canonical_name").notNull(),
+    normalizedName: text("normalized_name").notNull(),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("fencers_normalized_name_unique").on(table.normalizedName),
+  ],
+);
+
+export const boutParticipantsTable = sqliteTable(
+  "bout_participants",
+  {
+    boutId: text("bout_id").notNull()
+      .references(() => boutsTable.id, { onDelete: "cascade" }),
+    side: text("side").notNull(),
+    fencerId: text("fencer_id").notNull()
+      .references(() => fencersTable.id, { onDelete: "restrict" }),
+    displayNameSnapshot: text("display_name_snapshot").notNull(),
+  },
+  (table) => [
+    uniqueIndex("bout_participants_bout_side_unique").on(table.boutId, table.side),
+    index("bout_participants_fencer_id_idx").on(table.fencerId),
+    check("bout_participants_side_valid", sql`${table.side} IN ('L', 'R')`),
+  ],
+);
+
 export const tagsTable = sqliteTable(
   "tags",
   {
@@ -128,6 +159,8 @@ export const commentEmbeddingsTable = sqliteTable(
 
 export const databaseSchema = {
   boutsTable,
+  fencersTable,
+  boutParticipantsTable,
   tagsTable,
   commentsTable,
   commentEmbeddingsTable,

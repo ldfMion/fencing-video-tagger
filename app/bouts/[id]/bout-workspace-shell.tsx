@@ -43,7 +43,8 @@ import type { VideoLibraryItem } from "@/lib/video-library";
 
 interface BoutWorkspaceShellProps {
   boutId: string;
-  initialSessions: VideoSession[];
+  initialFencerNames: string[];
+  initialSession: VideoSession | null;
   initialTagId: string | null;
 }
 
@@ -51,7 +52,8 @@ type BoutWorkspaceTab = "tagging" | "analysis";
 
 export function BoutWorkspaceShell({
   boutId,
-  initialSessions,
+  initialFencerNames,
+  initialSession,
   initialTagId,
 }: BoutWorkspaceShellProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -72,8 +74,10 @@ export function BoutWorkspaceShell({
     deleteTag,
     exportSessionCsv,
     updateSessionEntry,
-    allFencerNames,
-  } = useSessions(initialSessions);
+  } = useSessions(undefined, {
+    sessionId: boutId,
+    initialSession,
+  });
 
   const session = getSessionById(boutId);
   const tags = session?.tags ?? [];
@@ -389,7 +393,7 @@ export function BoutWorkspaceShell({
               await updateSessionEntry(session.id, params, videoSelection);
               handlePersistedVideoSelection(videoSelection);
             }}
-            fencerNames={allFencerNames}
+            fencerNames={initialFencerNames}
           />
         </header>
 

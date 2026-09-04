@@ -40,7 +40,6 @@ export function useBoutVideo({ onSourceChange, session }: UseBoutVideoOptions) {
       session && sessionVideoRelativePath
         ? buildSessionVideoUrl({
             id: session.id,
-            videoRelativePath: sessionVideoRelativePath,
           })
         : null,
     [session, sessionVideoRelativePath],
@@ -144,7 +143,7 @@ export function useBoutVideo({ onSourceChange, session }: UseBoutVideoOptions) {
   const currentSourceKey = hasTemporaryOverride
     ? `blob:${videoUrl}`
     : sessionVideoUrl && libraryVideoState === "available"
-      ? `server:${sessionVideoUrl}`
+      ? `server:${sessionVideoUrl}:${sessionVideoRelativePath}`
       : null;
 
   const getNextSourceKey = useCallback(
@@ -159,10 +158,9 @@ export function useBoutVideo({ onSourceChange, session }: UseBoutVideoOptions) {
 
       const nextServerUrl = buildSessionVideoUrl({
         id: session.id,
-        videoRelativePath: selection.video.relativePath,
       });
 
-      return `server:${nextServerUrl}`;
+      return `server:${nextServerUrl}:${selection.video.relativePath}`;
     },
     [currentSourceKey, hasTemporaryOverride, session],
   );

@@ -19,7 +19,7 @@ export function TouchReplay({ result, onClose }: { result: CommentSearchResult; 
   const timestamp = result.timestamp ?? 0;
   const start = Math.max(0, timestamp - BEFORE_SECONDS);
   const end = timestamp + AFTER_SECONDS;
-  const videoUrl = result.videoRelativePath ? buildSessionVideoUrl({ id: result.boutId, videoRelativePath: result.videoRelativePath }) : null;
+  const videoUrl = result.videoRelativePath ? buildSessionVideoUrl({ id: result.boutId }) : null;
 
   const replay = () => {
     video.playAt(start);

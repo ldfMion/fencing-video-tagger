@@ -1,4 +1,5 @@
 import { createReadStream } from "node:fs";
+import { getSessionById } from "@/lib/server/session-service";
 import { resolveVideoLibraryFile } from "@/lib/server/video-library";
 
 function buildBaseHeaders(mimeType: string, size: number): Headers {
@@ -100,19 +101,28 @@ function createVideoStream(
   });
 }
 
-async function getVideoResponse(request: Request, method: "GET" | "HEAD") {
-  const requestUrl = new URL(request.url);
-  const relativePath = requestUrl.searchParams.get("path");
+async function getVideoResponse(
+  request: Request,
+  method: "GET" | "HEAD",
+  sessionId: string,
+) {
+  const session = await getSessionById(sessionId);
 
-  if (!relativePath) {
+  if (
+    !session ||
+    session.videoSourceType !== "library" ||
+    !session.videoRelativePath
+  ) {
     return Response.json(
-      { error: "Missing required video path" },
-      { status: 400 },
+      { error: "Attached library video not found" },
+      { status: 404 },
     );
   }
 
   try {
-    const { absolutePath, mimeType, size } = await resolveVideoLibraryFile(relativePath);
+    const { absolutePath, mimeType, size } = await resolveVideoLibraryFile(
+      session.videoRelativePath,
+    );
     const baseHeaders = buildBaseHeaders(mimeType, size);
     const rangeHeader = request.headers.get("range");
 
@@ -172,14 +182,14 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ sessionId: string }> },
 ) {
-  await context.params;
-  return getVideoResponse(request, "GET");
+  const { sessionId } = await context.params;
+  return getVideoResponse(request, "GET", sessionId);
 }
 
 export async function HEAD(
   request: Request,
   context: { params: Promise<{ sessionId: string }> },
 ) {
-  await context.params;
-  return getVideoResponse(request, "HEAD");
+  const { sessionId } = await context.params;
+  return getVideoResponse(request, "HEAD", sessionId);
 }

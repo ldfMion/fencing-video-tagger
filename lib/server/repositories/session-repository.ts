@@ -1,13 +1,16 @@
 import "server-only";
 
+import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { normalizeBoutDate } from "@/lib/bout-date";
 import { databaseReady, db } from "@/lib/server/db/client";
 import { hashComment } from "@/lib/server/db/connection";
 import {
   boutsTable,
+  boutParticipantsTable,
   commentEmbeddingsTable,
   commentsTable,
+  fencersTable,
   tagsTable,
 } from "@/lib/server/db/schema";
 import {
@@ -48,10 +51,12 @@ class LibsqlSessionRepository implements SessionRepository {
     const boutRows = await db.select().from(boutsTable);
     const tagRows = await selectTagRows();
     const tagsByBout = groupTagsByBout(tagRows);
+    const participantsByBout = groupParticipantsByBout(await selectParticipantRows());
 
     return boutRows.map((row) => assembleSession(
       row,
       tagsByBout.get(row.id) ?? [],
+      participantsByBout.get(row.id),
     ));
   }
 
@@ -64,7 +69,8 @@ class LibsqlSessionRepository implements SessionRepository {
     }
 
     const tagRows = await selectTagRows(sessionId);
-    return assembleSession(row, tagRows.map(parseTagRow));
+    const participants = groupParticipantsByBout(await selectParticipantRows(sessionId));
+    return assembleSession(row, tagRows.map(parseTagRow), participants.get(sessionId));
   }
 
   async create(session: VideoSession): Promise<VideoSession> {
@@ -74,6 +80,7 @@ class LibsqlSessionRepository implements SessionRepository {
     try {
       await db.transaction(async (transaction) => {
         await transaction.insert(boutsTable).values(toBoutRow(parsedSession));
+        await syncParticipants(transaction, parsedSession);
         await insertTags(transaction, parsedSession);
       });
     } catch (error) {
@@ -93,11 +100,10 @@ class LibsqlSessionRepository implements SessionRepository {
     await databaseReady;
     const parsedPreviousSession = VideoSessionSchema.parse(previousSession);
     const parsedSession = VideoSessionSchema.parse(session);
-    const result = await db.update(boutsTable).set(toBoutRow(parsedSession))
-      .where(sessionVersionMatches(parsedPreviousSession));
-    if (result.rowsAffected === 0) {
-      throwSessionConflict(parsedSession.id);
-    }
+    await db.transaction(async (transaction) => {
+      await updateBoutRow(transaction, parsedPreviousSession, parsedSession);
+      await syncParticipants(transaction, parsedSession);
+    });
     return parsedSession;
   }
 
@@ -122,6 +128,7 @@ class LibsqlSessionRepository implements SessionRepository {
           .onConflictDoNothing({ target: boutsTable.id });
         imported += result.rowsAffected;
         if (result.rowsAffected > 0) {
+          await syncParticipants(transaction, session);
           await insertTags(transaction, session);
         }
       }
@@ -243,9 +250,40 @@ async function selectTagRows(boutId?: string) {
 
 type TagRow = Awaited<ReturnType<typeof selectTagRows>>[number];
 
+async function selectParticipantRows(boutId?: string) {
+  const query = db.select({
+    boutId: boutParticipantsTable.boutId,
+    side: boutParticipantsTable.side,
+    displayNameSnapshot: boutParticipantsTable.displayNameSnapshot,
+  }).from(boutParticipantsTable);
+
+  return boutId
+    ? query.where(eq(boutParticipantsTable.boutId, boutId))
+    : query;
+}
+
+type Participants = { leftFencer?: string; rightFencer?: string };
+
+function groupParticipantsByBout(
+  rows: Awaited<ReturnType<typeof selectParticipantRows>>,
+): Map<string, Participants> {
+  const grouped = new Map<string, Participants>();
+  for (const row of rows) {
+    const participants = grouped.get(row.boutId) ?? {};
+    if (row.side === "L") {
+      participants.leftFencer = row.displayNameSnapshot;
+    } else if (row.side === "R") {
+      participants.rightFencer = row.displayNameSnapshot;
+    }
+    grouped.set(row.boutId, participants);
+  }
+  return grouped;
+}
+
 function assembleSession(
   row: typeof boutsTable.$inferSelect,
   tags: Tag[],
+  participants?: Participants,
 ): VideoSession {
   const taggingOptions = fromTaggingOptions(row);
   return VideoSessionSchema.parse({
@@ -256,8 +294,12 @@ function assembleSession(
     ...(row.videoRelativePath != null && { videoRelativePath: row.videoRelativePath }),
     ...(row.videoMimeType != null && { videoMimeType: row.videoMimeType }),
     ...(row.videoSourceType != null && { videoSourceType: row.videoSourceType }),
-    ...(row.leftFencer != null && { leftFencer: row.leftFencer }),
-    ...(row.rightFencer != null && { rightFencer: row.rightFencer }),
+    ...((participants?.leftFencer ?? row.leftFencer) != null && {
+      leftFencer: participants?.leftFencer ?? row.leftFencer,
+    }),
+    ...((participants?.rightFencer ?? row.rightFencer) != null && {
+      rightFencer: participants?.rightFencer ?? row.rightFencer,
+    }),
     ...(row.boutDate != null && { boutDate: row.boutDate }),
     ...(row.boutType != null && { boutType: row.boutType }),
     ...(row.externalSource != null && { externalSource: row.externalSource }),
@@ -348,6 +390,55 @@ async function insertTags(
 ): Promise<void> {
   for (const [position, tag] of session.tags.entries()) {
     await insertTag(transaction, session.id, tag, position);
+  }
+}
+
+function normalizeFencerName(name: string): string {
+  // Keep runtime identity normalization identical to SQLite's built-in lower(),
+  // which is used by the migration that backfills existing bout names.
+  return name.trim().replace(/[A-Z]/g, (character) => character.toLowerCase());
+}
+
+async function syncParticipants(
+  transaction: Transaction,
+  session: VideoSession,
+): Promise<void> {
+  await transaction.delete(boutParticipantsTable).where(
+    eq(boutParticipantsTable.boutId, session.id),
+  );
+
+  const participants = [
+    { side: "L", name: session.leftFencer },
+    { side: "R", name: session.rightFencer },
+  ] as const;
+  for (const participant of participants) {
+    const displayName = participant.name;
+    const canonicalName = displayName?.trim();
+    if (!displayName || !canonicalName) {
+      continue;
+    }
+
+    const normalizedName = normalizeFencerName(canonicalName);
+    await transaction.insert(fencersTable).values({
+      id: randomUUID(),
+      canonicalName,
+      normalizedName,
+      createdAt: session.lastModified,
+      updatedAt: session.lastModified,
+    }).onConflictDoNothing({ target: fencersTable.normalizedName });
+    const fencer = await transaction.select({ id: fencersTable.id })
+      .from(fencersTable)
+      .where(eq(fencersTable.normalizedName, normalizedName))
+      .get();
+    if (!fencer) {
+      throw new Error(`Unable to resolve fencer ${displayName}`);
+    }
+    await transaction.insert(boutParticipantsTable).values({
+      boutId: session.id,
+      side: participant.side,
+      fencerId: fencer.id,
+      displayNameSnapshot: displayName,
+    });
   }
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   AlertCircle,
@@ -36,7 +36,10 @@ import {
 } from "@/hooks/use-sessions";
 import { getTodayIsoDate } from "@/lib/date-utils";
 import { useVideo } from "@/hooks/use-video";
-import { getBoutDisplayLabel } from "@/lib/session-selectors";
+import {
+  getAllFencerNames,
+  getBoutDisplayLabel,
+} from "@/lib/session-selectors";
 import { listSearchFencers } from "@/lib/server/comment-search-service";
 import { findTagById, getSharedTagHref } from "@/lib/tag-share";
 import type { VideoSession } from "@/lib/types";
@@ -84,6 +87,15 @@ export function BoutWorkspaceShell({
   });
 
   const session = getSessionById(boutId);
+  const availableFencerNames = useMemo(
+    () => Array.from(new Set([
+      ...fencerNames,
+      ...getAllFencerNames(session ? [session] : []),
+    ])).sort((left, right) =>
+      left.localeCompare(right, undefined, { sensitivity: "base" })
+    ),
+    [fencerNames, session],
+  );
   const tags = session?.tags ?? [];
   const editingTag = findTagById(session, editingTagId);
   const activeEditingTagId = editingTag ? editingTagId : null;
@@ -411,7 +423,7 @@ export function BoutWorkspaceShell({
                 }
               }
             }}
-            fencerNames={fencerNames}
+            fencerNames={availableFencerNames}
           />
         </header>
 

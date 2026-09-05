@@ -205,9 +205,16 @@ export function useSessions(
 
   const refetchSessions = useCallback(async () => {
     if (detailQuery) {
-      await queryClient.invalidateQueries({
-        queryKey: sessionQueryKey(detailQuery.sessionId),
-      });
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: sessionQueryKey(detailQuery.sessionId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: sessionsQueryKey,
+          exact: true,
+          refetchType: "all",
+        }),
+      ]);
       return;
     }
     await queryClient.invalidateQueries({

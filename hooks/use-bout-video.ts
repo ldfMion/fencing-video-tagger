@@ -223,6 +223,7 @@ export function useBoutVideo({
   return {
     activeVideoBadge,
     activeVideoFileName,
+    activeVideoKey: currentSourceKey,
     activeVideoUrl,
     handlePersistedVideoSelection,
     hasAttachedLibraryVideo,

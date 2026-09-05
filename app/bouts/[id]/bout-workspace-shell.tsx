@@ -87,6 +87,7 @@ export function BoutWorkspaceShell({
   const {
     activeVideoBadge,
     activeVideoFileName,
+    activeVideoKey,
     activeVideoUrl,
     handlePersistedVideoSelection,
     hasAttachedLibraryVideo,
@@ -420,7 +421,12 @@ export function BoutWorkspaceShell({
                     ) : null}
                   </div>
                   <div className="min-h-0 flex-1">
-                    <VideoPlayer videoUrl={activeVideoUrl} video={video} maximized />
+                    <VideoPlayer
+                      key={activeVideoKey}
+                      videoUrl={activeVideoUrl}
+                      video={video}
+                      maximized
+                    />
                   </div>
                 </div>
               ) : showLibraryLoadingState ? (

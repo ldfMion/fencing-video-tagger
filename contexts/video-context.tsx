@@ -5,6 +5,8 @@ import {
   useContext,
   useState,
   useCallback,
+  useEffect,
+  useRef,
   type ReactNode,
 } from "react";
 
@@ -24,12 +26,25 @@ interface VideoContextType extends VideoState {
 const VideoContext = createContext<VideoContextType | null>(null);
 
 export function VideoProvider({ children }: { children: ReactNode }) {
+  const blobUrlRef = useRef<string | null>(null);
   const [state, setState] = useState<VideoState>({
     sessionId: null,
     videoUrl: null,
     fileName: null,
     urlSource: null,
   });
+
+  useEffect(() => {
+    blobUrlRef.current = state.urlSource === "blob" ? state.videoUrl : null;
+  }, [state.urlSource, state.videoUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+      }
+    };
+  }, []);
 
   const setVideo = useCallback(
     (

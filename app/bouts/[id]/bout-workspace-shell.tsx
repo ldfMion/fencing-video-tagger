@@ -37,6 +37,7 @@ import {
 import { getTodayIsoDate } from "@/lib/date-utils";
 import { useVideo } from "@/hooks/use-video";
 import { getBoutDisplayLabel } from "@/lib/session-selectors";
+import { listSearchFencers } from "@/lib/server/comment-search-service";
 import { findTagById, getSharedTagHref } from "@/lib/tag-share";
 import type { VideoSession } from "@/lib/types";
 import type { VideoLibraryItem } from "@/lib/video-library";
@@ -65,6 +66,7 @@ export function BoutWorkspaceShell({
   const [activeTab, setActiveTab] = useState<BoutWorkspaceTab>("tagging");
   const [editingTagId, setEditingTagId] = useState<string | null>(null);
   const [copyFeedback, setCopyFeedback] = useState<"idle" | "copied" | "error">("idle");
+  const [fencerNames, setFencerNames] = useState(initialFencerNames);
 
   const video = useVideo();
   const {
@@ -393,10 +395,21 @@ export function BoutWorkspaceShell({
               params: SessionDraftParams,
               videoSelection: PersistedSessionVideoSelection,
             ) => {
+              const participantsChanged =
+                params.leftFencer !== session.leftFencer ||
+                params.rightFencer !== session.rightFencer;
               await updateSessionEntry(session.id, params, videoSelection);
               handlePersistedVideoSelection(videoSelection);
+              if (participantsChanged) {
+                const refreshedFencerNames = await listSearchFencers().catch(
+                  () => null,
+                );
+                if (refreshedFencerNames) {
+                  setFencerNames(refreshedFencerNames);
+                }
+              }
             }}
-            fencerNames={initialFencerNames}
+            fencerNames={fencerNames}
           />
         </header>
 

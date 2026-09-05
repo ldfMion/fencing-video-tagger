@@ -73,6 +73,7 @@ export function BoutWorkspaceShell({
     updateTag,
     deleteTag,
     exportSessionCsv,
+    setSessionVideoSelection,
     updateSessionEntry,
   } = useSessions(undefined, {
     sessionId: boutId,
@@ -97,6 +98,7 @@ export function BoutWorkspaceShell({
     showUnavailableState,
   } = useBoutVideo({
     session,
+    setSessionVideoSelection,
     onSourceChange: () => {
       video.resetZoom();
       video.resetPlaybackState();

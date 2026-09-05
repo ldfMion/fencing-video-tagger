@@ -6,7 +6,6 @@ import type {
   SessionVideoSelection,
   PersistedSessionVideoSelection,
 } from "@/hooks/use-sessions";
-import { useSessions } from "@/hooks/use-sessions";
 import type { VideoSession } from "@/lib/types";
 import { buildSessionVideoUrl } from "@/lib/video-library";
 
@@ -15,9 +14,17 @@ type LibraryVideoState = "idle" | "checking" | "available" | "missing";
 interface UseBoutVideoOptions {
   onSourceChange?: () => void;
   session?: VideoSession;
+  setSessionVideoSelection: (
+    sessionId: string,
+    videoSelection: SessionVideoSelection,
+  ) => Promise<VideoSession>;
 }
 
-export function useBoutVideo({ onSourceChange, session }: UseBoutVideoOptions) {
+export function useBoutVideo({
+  onSourceChange,
+  session,
+  setSessionVideoSelection,
+}: UseBoutVideoOptions) {
   const {
     sessionId: contextSessionId,
     videoUrl,
@@ -27,7 +34,6 @@ export function useBoutVideo({ onSourceChange, session }: UseBoutVideoOptions) {
     playTemporaryVideo,
     clearVideo,
   } = useVideoContext();
-  const { setSessionVideoSelection } = useSessions();
   const [libraryVideoCheck, setLibraryVideoCheck] = useState<{
     relativePath: string;
     status: Exclude<LibraryVideoState, "idle" | "checking">;

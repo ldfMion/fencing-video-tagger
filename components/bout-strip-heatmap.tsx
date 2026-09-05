@@ -76,7 +76,7 @@ export function BoutStripHeatmap({
             <span>Absolute strip orientation</span>
             <span>Left to right</span>
           </div>
-          <div className="overflow-hidden rounded-xl border bg-background">
+          <div className="overflow-hidden rounded-lg border bg-background">
             <div className="flex min-h-28">
               {STRIP_ZONES.map((zone, index) => {
                 const zoneStats = summary.zones.find((item) => item.zone === zone);

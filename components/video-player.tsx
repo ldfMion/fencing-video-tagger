@@ -592,8 +592,7 @@ export function VideoPlayer({
           )}
 
           {/* Speed selector */}
-          <div className="ml-auto flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground">Speed</span>
+          <div className="ml-auto flex items-center">
             <Select
               value={String(playbackSpeed)}
               onValueChange={(value) => {
@@ -606,7 +605,7 @@ export function VideoPlayer({
             >
               <SelectTrigger
                 size="sm"
-                className="w-[4.75rem] bg-background/80"
+                className="video-speed-trigger w-[3.75rem]"
                 aria-label="Playback speed"
               >
                 <SelectValue />

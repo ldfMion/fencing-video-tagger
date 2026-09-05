@@ -75,6 +75,7 @@ export function BoutWorkspaceShell({
     updateTag,
     deleteTag,
     exportSessionCsv,
+    isSessionUpdatePending,
     setSessionVideoSelection,
     updateSessionEntry,
   } = useSessions(undefined, {
@@ -100,6 +101,7 @@ export function BoutWorkspaceShell({
     showLibraryLoadingState,
     showUnavailableState,
   } = useBoutVideo({
+    isSessionUpdatePending,
     session,
     setSessionVideoSelection,
     onSourceChange: () => {

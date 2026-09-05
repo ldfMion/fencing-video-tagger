@@ -385,10 +385,10 @@ export function useSessions(
       setCachedSessions((currentSessions) =>
         currentSessions.filter((session) => session.id !== sessionId),
       );
-      queryClient.setQueryData<VideoSession | null>(
-        sessionQueryKey(sessionId),
-        null,
-      );
+      const detailKey = sessionQueryKey(sessionId);
+      if (queryClient.getQueryState(detailKey)) {
+        queryClient.setQueryData<VideoSession | null>(detailKey, null);
+      }
     },
     onError: (_error, { previousSession, previousIndex }) => {
       setCachedSessions((currentSessions) =>
@@ -398,6 +398,7 @@ export function useSessions(
           previousIndex,
         ),
       );
+      syncCachedSessionDetail(previousSession);
     },
   });
 
@@ -656,6 +657,7 @@ export function useSessions(
     () => ({
       sessions,
       status,
+      isSessionUpdatePending: sessionPatchMutation.isPending,
       error,
       allFencerNames: getAllFencerNames(sessions),
       getSessionById,
@@ -682,6 +684,7 @@ export function useSessions(
       exportSessionCsv,
       getSessionById,
       importSessions,
+      sessionPatchMutation.isPending,
       sessions,
       setSessionVideoSelection,
       status,

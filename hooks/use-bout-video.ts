@@ -12,6 +12,7 @@ import { buildSessionVideoUrl } from "@/lib/video-library";
 type LibraryVideoState = "idle" | "checking" | "available" | "missing";
 
 interface UseBoutVideoOptions {
+  isSessionUpdatePending: boolean;
   onSourceChange?: () => void;
   session?: VideoSession;
   setSessionVideoSelection: (
@@ -21,6 +22,7 @@ interface UseBoutVideoOptions {
 }
 
 export function useBoutVideo({
+  isSessionUpdatePending,
   onSourceChange,
   session,
   setSessionVideoSelection,
@@ -60,7 +62,12 @@ export function useBoutVideo({
       : "checking";
 
   useEffect(() => {
-    if (!session?.id || !sessionVideoRelativePath || !sessionVideoUrl) {
+    if (
+      isSessionUpdatePending ||
+      !session?.id ||
+      !sessionVideoRelativePath ||
+      !sessionVideoUrl
+    ) {
       return;
     }
 
@@ -90,7 +97,12 @@ export function useBoutVideo({
     return () => {
       isCancelled = true;
     };
-  }, [session?.id, sessionVideoRelativePath, sessionVideoUrl]);
+  }, [
+    isSessionUpdatePending,
+    session?.id,
+    sessionVideoRelativePath,
+    sessionVideoUrl,
+  ]);
 
   useEffect(() => {
     if (!session?.id || !sessionVideoUrl) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { FencerCharts } from "@/components/fencer-charts";
 import { FencerPerspectiveToggle } from "@/components/fencer-perspective-toggle";
 import { computeDefMatchupStats, computeTacticalStats } from "@/lib/stats";
@@ -8,17 +8,19 @@ import type { Side, Tag } from "@/lib/types";
 
 interface BoutFencerChartsProps {
   tags: Tag[];
+  perspective: Side;
+  onPerspectiveChange: (perspective: Side) => void;
   leftFencer?: string;
   rightFencer?: string;
 }
 
 export function BoutFencerCharts({
   tags,
+  perspective,
+  onPerspectiveChange,
   leftFencer = "Left",
   rightFencer = "Right",
 }: BoutFencerChartsProps) {
-  const [perspective, setPerspective] = useState<Side>("L");
-
   const tacticalStats = useMemo(
     () => computeTacticalStats(tags, perspective),
     [tags, perspective],
@@ -39,7 +41,7 @@ export function BoutFencerCharts({
         </div>
         <FencerPerspectiveToggle
           value={perspective}
-          onValueChange={setPerspective}
+          onValueChange={onPerspectiveChange}
           leftFencer={leftFencer}
           rightFencer={rightFencer}
         />

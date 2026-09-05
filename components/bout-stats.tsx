@@ -1,24 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { FencerPerspectiveToggle } from "@/components/fencer-perspective-toggle";
+import { useMemo } from "react";
 import { StatsTable } from "@/components/stats-table";
 import { computeTacticalStats, computeDefMatchupStats } from "@/lib/stats";
 import type { Tag, Side } from "@/lib/types";
 
 interface BoutStatsProps {
   tags: Tag[];
-  leftFencer?: string;
-  rightFencer?: string;
+  perspective: Side;
 }
 
 export function BoutStats({
   tags,
-  leftFencer = "Left",
-  rightFencer = "Right",
+  perspective,
 }: BoutStatsProps) {
-  const [perspective, setPerspective] = useState<Side>("L");
-
   const tacticalStats = useMemo(
     () => computeTacticalStats(tags, perspective),
     [tags, perspective],
@@ -34,14 +29,8 @@ export function BoutStats({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-3">
+      <div className="mb-3">
         <h3 className="text-sm font-medium">Statistics</h3>
-        <FencerPerspectiveToggle
-          value={perspective}
-          onValueChange={setPerspective}
-          leftFencer={leftFencer}
-          rightFencer={rightFencer}
-        />
       </div>
 
       {!hasData ? (

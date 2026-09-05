@@ -4,8 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   AlertCircle,
+  Columns2,
   Library,
   Loader2,
+  PanelRight,
   Upload,
   Video,
 } from "lucide-react";
@@ -28,6 +30,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useBoutVideo } from "@/hooks/use-bout-video";
 import {
   useSessions,
@@ -58,6 +61,9 @@ interface BoutWorkspaceShellProps {
 }
 
 type BoutWorkspaceTab = "tagging" | "analysis";
+type TaggingLayout = "rail" | "split";
+
+const TAGGING_LAYOUT_STORAGE_KEY = "fencing-video-tagger-layout";
 
 export function BoutWorkspaceShell({
   boutId,
@@ -79,6 +85,7 @@ export function BoutWorkspaceShell({
   const [heartRateData, setHeartRateData] = useState(initialHeartRateData);
   const [heartRateError, setHeartRateError] = useState<string | null>(null);
   const [isMatchingHeartRate, setIsMatchingHeartRate] = useState(false);
+  const [taggingLayout, setTaggingLayout] = useState<TaggingLayout>("rail");
 
   const video = useVideo();
   const {
@@ -240,6 +247,23 @@ export function BoutWorkspaceShell({
   }, [activeTab]);
 
   useEffect(() => {
+    const storedLayout = window.localStorage.getItem(TAGGING_LAYOUT_STORAGE_KEY);
+
+    if (storedLayout === "rail" || storedLayout === "split") {
+      setTaggingLayout(storedLayout);
+    }
+  }, []);
+
+  const handleLayoutChange = useCallback((nextLayout: string) => {
+    if (nextLayout !== "rail" && nextLayout !== "split") {
+      return;
+    }
+
+    setTaggingLayout(nextLayout);
+    window.localStorage.setItem(TAGGING_LAYOUT_STORAGE_KEY, nextLayout);
+  }, []);
+
+  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (activeTabRef.current !== "tagging") {
         return;
@@ -362,6 +386,132 @@ export function BoutWorkspaceShell({
     );
   }
 
+  const videoPanel = activeVideoUrl ? (
+    <div className="video-stage flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="mb-1 flex shrink-0 flex-wrap items-center gap-1.5 px-0.5">
+        <Badge variant={hasTemporaryOverride ? "secondary" : "outline"}>
+          {activeVideoBadge}
+        </Badge>
+        {activeVideoFileName ? (
+          <span className="max-w-[280px] truncate text-xs text-muted-foreground">
+            {activeVideoFileName}
+          </span>
+        ) : null}
+        {hasTemporaryOverride ? (
+          <span className="text-xs text-muted-foreground">
+            Temporary file will be lost on refresh.
+          </span>
+        ) : null}
+      </div>
+      <div className="min-h-0 flex-1">
+        <VideoPlayer
+          key={activeVideoKey}
+          videoUrl={activeVideoUrl}
+          video={video}
+          maximized
+        />
+      </div>
+    </div>
+  ) : showLibraryLoadingState ? (
+    <div className="flex h-[124px] flex-none flex-col items-center justify-center gap-2 rounded-lg border bg-card p-2 text-muted-foreground">
+      <Loader2 className="h-4 w-4 animate-spin" />
+      <p className="text-xs">Checking attached video...</p>
+    </div>
+  ) : showUnavailableState ? (
+    <div className="flex h-[144px] flex-none flex-col items-center justify-center gap-2.5 rounded-lg border bg-card p-2.5 text-center">
+      <AlertCircle className="h-5 w-5 text-destructive" />
+      <div className="space-y-1">
+        <p className="text-xs font-medium text-foreground">
+          Attached video is unavailable
+        </p>
+        {session.fileName ? (
+          <p className="text-xs text-muted-foreground">
+            Stored filename: {session.fileName}
+          </p>
+        ) : null}
+      </div>
+      <div className="flex flex-wrap justify-center gap-2">
+        <Button variant="outline" size="sm" onClick={() => setIsLibraryPickerOpen(true)}>
+          Replace From Library
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+          Load Temporary File
+        </Button>
+        <Button variant="ghost" size="sm" onClick={handleRemoveAttachedVideo}>
+          Remove Attached Video
+        </Button>
+      </div>
+    </div>
+  ) : (
+    <div className="flex h-[144px] flex-none flex-col items-center justify-center gap-2.5 rounded-lg border bg-card p-2.5 text-center">
+      <p className="text-xs">
+        {isTemporaryOnly
+          ? "Temporary video metadata exists for this bout, but the file is not loaded."
+          : "No video attached to this bout"}
+      </p>
+      <div className="flex flex-wrap justify-center gap-2">
+        <Button variant="outline" size="sm" onClick={() => setIsLibraryPickerOpen(true)}>
+          Attach From Library
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+          Load Temporary File
+        </Button>
+      </div>
+      {isTemporaryOnly ? (
+        <p className="text-xs text-muted-foreground">
+          Temporary files need to be loaded again after refresh.
+        </p>
+      ) : null}
+    </div>
+  );
+
+  const heartRatePanel = (
+    <HeartRateCard
+      canMatch={hasAttachedLibraryVideo}
+      currentTime={video.currentTime}
+      data={heartRateData}
+      error={heartRateError}
+      isMatching={isMatchingHeartRate}
+      onMatch={handleMatchHeartRate}
+      onSeek={activeVideoUrl ? video.seek : undefined}
+    />
+  );
+
+  const tagFormPanel = (
+    <div className="tagging-dock shrink-0 py-1">
+      <TagForm
+        ref={tagFormRef}
+        onAddTag={handleAddTag}
+        onUpdateTag={handleUpdateTag}
+        onCancelEdit={handleCancelEdit}
+        editingTag={editingTag}
+        currentTime={activeVideoUrl ? video.currentTime : undefined}
+        taggingOptions={session.taggingOptions}
+      />
+    </div>
+  );
+
+  const tagListPanel = (
+    <aside className="tag-rail min-h-0 flex-1 pl-1">
+      <TagList
+        tags={tags}
+        onEdit={handleEditTag}
+        onDelete={handleDeleteTag}
+        onSeek={activeVideoUrl ? video.seek : undefined}
+        onShareTag={handleCopyTagLink}
+        editingTagId={activeEditingTagId}
+        fillHeight
+      />
+      {copyFeedback !== "idle" ? (
+        <p className="mt-1.5 px-1 text-xs text-muted-foreground">
+          {copyFeedback === "copied"
+            ? "Link copied to clipboard."
+            : "Could not copy the link."}
+        </p>
+      ) : null}
+    </aside>
+  );
+
   return (
     <>
       <Tabs
@@ -393,6 +543,23 @@ export function BoutWorkspaceShell({
           </TabsList>
 
           <div className="flex items-center justify-end gap-1.5">
+            <ToggleGroup
+              type="single"
+              value={taggingLayout}
+              onValueChange={handleLayoutChange}
+              variant="outline"
+              size="sm"
+              aria-label="Tagging page layout"
+            >
+              <ToggleGroupItem value="rail" aria-label="Rail layout" title="Rail layout">
+                <PanelRight className="h-3.5 w-3.5" />
+                <span className="hidden xl:inline">Rail</span>
+              </ToggleGroupItem>
+              <ToggleGroupItem value="split" aria-label="Side-by-side layout" title="Side-by-side layout">
+                <Columns2 className="h-3.5 w-3.5" />
+                <span className="hidden xl:inline">Split</span>
+              </ToggleGroupItem>
+            </ToggleGroup>
             <AppearanceMenu compact />
             <BoutExportButton
               exportBoutToCsv={() => exportSessionCsv(session.id)}
@@ -453,149 +620,25 @@ export function BoutWorkspaceShell({
         </header>
 
         <TabsContent value="tagging" className="mt-0 flex-1 overflow-hidden px-3 pb-3 pt-1.5">
-          <div className="mx-auto grid h-full max-w-[1680px] grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_300px]">
-            <div className="flex min-h-0 flex-col gap-3">
-              {activeVideoUrl ? (
-                <div className="video-stage flex min-h-0 flex-1 flex-col overflow-hidden">
-                  <div className="mb-1 flex shrink-0 flex-wrap items-center gap-1.5 px-0.5">
-                    <Badge variant={hasTemporaryOverride ? "secondary" : "outline"}>
-                      {activeVideoBadge}
-                    </Badge>
-                    {activeVideoFileName ? (
-                      <span className="max-w-[280px] truncate text-xs text-muted-foreground">
-                        {activeVideoFileName}
-                      </span>
-                    ) : null}
-                    {hasTemporaryOverride ? (
-                      <span className="text-xs text-muted-foreground">
-                        Temporary file will be lost on refresh.
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="min-h-0 flex-1">
-                    <VideoPlayer
-                      key={activeVideoKey}
-                      videoUrl={activeVideoUrl}
-                      video={video}
-                      maximized
-                    />
-                  </div>
-                </div>
-              ) : showLibraryLoadingState ? (
-                <div className="flex h-[124px] flex-none flex-col items-center justify-center gap-2 rounded-lg border bg-card p-2 text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <p className="text-xs">Checking attached video...</p>
-                </div>
-              ) : showUnavailableState ? (
-                <div className="flex h-[144px] flex-none flex-col items-center justify-center gap-2.5 rounded-lg border bg-card p-2.5 text-center">
-                  <AlertCircle className="h-5 w-5 text-destructive" />
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium text-foreground">
-                      Attached video is unavailable
-                    </p>
-                    {session.fileName ? (
-                      <p className="text-xs text-muted-foreground">
-                        Stored filename: {session.fileName}
-                      </p>
-                    ) : null}
-                  </div>
-                  <div className="flex flex-wrap justify-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setIsLibraryPickerOpen(true)}
-                    >
-                      Replace From Library
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      Load Temporary File
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleRemoveAttachedVideo}
-                    >
-                      Remove Attached Video
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex h-[144px] flex-none flex-col items-center justify-center gap-2.5 rounded-lg border bg-card p-2.5 text-center">
-                  <p className="text-xs">
-                    {isTemporaryOnly
-                      ? "Temporary video metadata exists for this bout, but the file is not loaded."
-                      : "No video attached to this bout"}
-                  </p>
-                  <div className="flex flex-wrap justify-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setIsLibraryPickerOpen(true)}
-                    >
-                      Attach From Library
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      Load Temporary File
-                    </Button>
-                  </div>
-                  {isTemporaryOnly ? (
-                    <p className="text-xs text-muted-foreground">
-                      Temporary files need to be loaded again after refresh.
-                    </p>
-                  ) : null}
-                </div>
-              )}
-
-              <HeartRateCard
-                canMatch={hasAttachedLibraryVideo}
-                currentTime={video.currentTime}
-                data={heartRateData}
-                error={heartRateError}
-                isMatching={isMatchingHeartRate}
-                onMatch={handleMatchHeartRate}
-                onSeek={activeVideoUrl ? video.seek : undefined}
-              />
-
-              <div className="tagging-dock shrink-0 py-1">
-                <TagForm
-                  ref={tagFormRef}
-                  onAddTag={handleAddTag}
-                  onUpdateTag={handleUpdateTag}
-                  onCancelEdit={handleCancelEdit}
-                  editingTag={editingTag}
-                  currentTime={activeVideoUrl ? video.currentTime : undefined}
-                  taggingOptions={session.taggingOptions}
-                />
+          {taggingLayout === "split" ? (
+            <div className="mx-auto grid h-full max-w-[1800px] grid-cols-1 gap-3 lg:grid-cols-2">
+              <div className="flex min-h-0 flex-col">{videoPanel}</div>
+              <div className="flex min-h-0 flex-col gap-3 overflow-hidden">
+                {heartRatePanel}
+                {tagFormPanel}
+                {tagListPanel}
               </div>
             </div>
-
-            <aside className="tag-rail min-h-0 pl-1">
-              <TagList
-                tags={tags}
-                onEdit={handleEditTag}
-                onDelete={handleDeleteTag}
-                onSeek={activeVideoUrl ? video.seek : undefined}
-                onShareTag={handleCopyTagLink}
-                editingTagId={activeEditingTagId}
-                fillHeight
-              />
-              {copyFeedback !== "idle" ? (
-                <p className="mt-1.5 px-1 text-xs text-muted-foreground">
-                  {copyFeedback === "copied"
-                    ? "Link copied to clipboard."
-                    : "Could not copy the link."}
-                </p>
-              ) : null}
-            </aside>
-          </div>
+          ) : (
+            <div className="mx-auto grid h-full max-w-[1680px] grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_300px]">
+              <div className="flex min-h-0 flex-col gap-3">
+                {videoPanel}
+                {heartRatePanel}
+                {tagFormPanel}
+              </div>
+              {tagListPanel}
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="analysis" className="mt-0 flex-1 overflow-auto p-4">

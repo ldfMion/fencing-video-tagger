@@ -39,6 +39,7 @@ const CLASSIFICATIONS: Record<ActionCode, ActionClassification> = {
   "Cc-A": { tacticalIntent: "defense", scoringDefAlt: "C" },
   "Cc-AP": { tacticalIntent: "defense", scoringDefAlt: "C" },
   "Cc-CT": { tacticalIntent: "defense", scoringDefAlt: "C" },
+  "CCR,R": { tacticalIntent: "defense", scoringDefAlt: "P" },
   "CCR-R": { tacticalIntent: "defense", scoringDefAlt: "P" },
   "CCR-P": { tacticalIntent: "defense", scoringDefAlt: "P" },
   "C,R": { tacticalIntent: "defense", scoringDefAlt: "C" },

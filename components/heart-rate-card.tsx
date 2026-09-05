@@ -24,7 +24,8 @@ interface HeartRateCardProps {
 
 const CHART_WIDTH = 1000;
 const CHART_HEIGHT = 92;
-const MIN_BPM = 45;
+const CHART_BPM_PADDING = 10;
+const MIN_CHART_BPM_RANGE = 30;
 
 export function HeartRateCard({
   canMatch,
@@ -124,11 +125,20 @@ function HeartRateChart({
   data: HeartRateData;
   onSeek?: (timestamp: number) => void;
 }) {
+  const lowestBpm = data.samples.length
+    ? Math.min(...data.samples.map((sample) => sample.bpm))
+    : data.maxHeartRate - MIN_CHART_BPM_RANGE;
   const highestBpm = Math.max(data.maxHeartRate, ...data.samples.map((sample) => sample.bpm));
+  const minimumBpm = Math.max(
+    0,
+    Math.floor((lowestBpm - CHART_BPM_PADDING) / 10) * 10,
+  );
   const maximumBpm = Math.ceil((highestBpm + 5) / 10) * 10;
+  const chartMinimumBpm = Math.min(minimumBpm, maximumBpm - MIN_CHART_BPM_RANGE);
   const x = (timestamp: number) => (timestamp / data.videoDuration) * CHART_WIDTH;
   const y = (bpm: number) =>
-    CHART_HEIGHT - ((bpm - MIN_BPM) / (maximumBpm - MIN_BPM)) * CHART_HEIGHT;
+    CHART_HEIGHT -
+    ((bpm - chartMinimumBpm) / (maximumBpm - chartMinimumBpm)) * CHART_HEIGHT;
   const markerX = x(Math.max(0, Math.min(currentTime, data.videoDuration)));
 
   const handleChartClick = (event: React.MouseEvent<SVGSVGElement>) => {
@@ -148,7 +158,7 @@ function HeartRateChart({
         onClick={handleChartClick}
       >
         {HEART_RATE_ZONES.map((zone) => {
-          const low = Math.max(MIN_BPM, zone.minimum * data.maxHeartRate);
+          const low = Math.max(chartMinimumBpm, zone.minimum * data.maxHeartRate);
           const high = Math.min(maximumBpm, zone.maximum * data.maxHeartRate);
           if (high <= low) return null;
           return (

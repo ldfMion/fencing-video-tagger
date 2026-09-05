@@ -23,6 +23,7 @@ export const ACTION_CODES = [
   "Cc-A",
   "Cc-AP",
   "Cc-CT",
+  "CCR,R",
   "CCR-R",
   "CCR-P",
   "CR,R",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { BoutScoreChart } from "@/components/bout-score-chart";
@@ -10,7 +10,7 @@ import { SIDE_COLORS } from "@/lib/constants";
 import { computeScore, computeRunningScore } from "@/lib/score";
 import { BoutStats } from "@/components/bout-stats";
 import { formatMatchPeriodLabel } from "@/lib/tagging";
-import type { Tag } from "@/lib/types";
+import type { Side, Tag } from "@/lib/types";
 
 interface BoutAnalysisProps {
   tags: Tag[];
@@ -23,6 +23,7 @@ export function BoutAnalysis({
   leftFencer = "Left",
   rightFencer = "Right",
 }: BoutAnalysisProps) {
+  const [fencerPerspective, setFencerPerspective] = useState<Side>("L");
   const scoringEvents = useMemo(() => computeRunningScore(tags), [tags]);
 
   const { left: finalLeft, right: finalRight } = computeScore(tags);
@@ -78,6 +79,8 @@ export function BoutAnalysis({
 
       <BoutFencerCharts
         tags={tags}
+        perspective={fencerPerspective}
+        onPerspectiveChange={setFencerPerspective}
         leftFencer={leftFencer}
         rightFencer={rightFencer}
       />
@@ -87,8 +90,7 @@ export function BoutAnalysis({
         {/* Stats Table */}
         <BoutStats
           tags={tags}
-          leftFencer={leftFencer}
-          rightFencer={rightFencer}
+          perspective={fencerPerspective}
         />
 
         {/* Events Timeline */}

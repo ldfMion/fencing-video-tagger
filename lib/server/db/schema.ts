@@ -137,6 +137,50 @@ export const commentsTable = sqliteTable(
   (table) => [index("comments_tag_row_id_idx").on(table.tagRowId)],
 );
 
+export const heartRateImportsTable = sqliteTable("heart_rate_imports", {
+  boutId: text("bout_id").primaryKey()
+    .references(() => boutsTable.id, { onDelete: "cascade" }),
+  videoStartedAt: integer("video_started_at").notNull(),
+  videoDuration: real("video_duration").notNull(),
+  timingSource: text("timing_source").notNull(),
+  sourceName: text("source_name"),
+  birthDate: text("birth_date"),
+  maxHeartRate: integer("max_heart_rate").notNull(),
+  extractedAt: integer("extracted_at").notNull(),
+}, (table) => [
+  check(
+    "heart_rate_imports_timing_source_valid",
+    sql`${table.timingSource} IN ('embedded', 'fileModified')`,
+  ),
+  check("heart_rate_imports_duration_positive", sql`${table.videoDuration} > 0`),
+]);
+
+export const heartRateSamplesTable = sqliteTable(
+  "heart_rate_samples",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    boutId: text("bout_id").notNull()
+      .references(() => heartRateImportsTable.boutId, { onDelete: "cascade" }),
+    timestamp: real("timestamp").notNull(),
+    recordedAt: integer("recorded_at").notNull(),
+    bpm: real("bpm").notNull(),
+    zone: text("zone").notNull(),
+  },
+  (table) => [
+    uniqueIndex("heart_rate_samples_bout_recorded_unique").on(
+      table.boutId,
+      table.recordedAt,
+    ),
+    index("heart_rate_samples_bout_timestamp_idx").on(table.boutId, table.timestamp),
+    check("heart_rate_samples_timestamp_nonnegative", sql`${table.timestamp} >= 0`),
+    check("heart_rate_samples_bpm_positive", sql`${table.bpm} > 0`),
+    check(
+      "heart_rate_samples_zone_valid",
+      sql`${table.zone} IN ('zone1', 'zone2', 'zone3', 'zone4', 'zone5')`,
+    ),
+  ],
+);
+
 export const commentEmbeddingsTable = sqliteTable(
   "comment_embeddings",
   {
@@ -163,5 +207,7 @@ export const databaseSchema = {
   boutParticipantsTable,
   tagsTable,
   commentsTable,
+  heartRateImportsTable,
+  heartRateSamplesTable,
   commentEmbeddingsTable,
 };

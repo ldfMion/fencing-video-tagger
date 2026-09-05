@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { BoutAnalysis } from "@/components/bout-analysis";
 import { BoutExportButton } from "@/components/export-button";
+import { HeartRateCard } from "@/components/heart-rate-card";
 import { NewBoutDialog } from "@/components/new-bout-dialog";
 import { TagForm, type TagFormHandle } from "@/components/tag-form";
 import { TagList } from "@/components/tag-list";
@@ -43,12 +44,15 @@ import {
 } from "@/lib/session-selectors";
 import { listSearchFencers } from "@/lib/server/comment-search-service";
 import { findTagById, getSharedTagHref } from "@/lib/tag-share";
+import { matchBoutHeartRate } from "@/lib/server/heart-rate-service";
+import type { HeartRateData } from "@/lib/heart-rate";
 import type { VideoSession } from "@/lib/types";
 import type { VideoLibraryItem } from "@/lib/video-library";
 
 interface BoutWorkspaceShellProps {
   boutId: string;
   initialFencerNames: string[];
+  initialHeartRateData: HeartRateData | null;
   initialSession: VideoSession | null;
   initialTagId: string | null;
 }
@@ -58,6 +62,7 @@ type BoutWorkspaceTab = "tagging" | "analysis";
 export function BoutWorkspaceShell({
   boutId,
   initialFencerNames,
+  initialHeartRateData,
   initialSession,
   initialTagId,
 }: BoutWorkspaceShellProps) {
@@ -71,6 +76,9 @@ export function BoutWorkspaceShell({
   const [editingTagId, setEditingTagId] = useState<string | null>(null);
   const [copyFeedback, setCopyFeedback] = useState<"idle" | "copied" | "error">("idle");
   const [fencerNames, setFencerNames] = useState(initialFencerNames);
+  const [heartRateData, setHeartRateData] = useState(initialHeartRateData);
+  const [heartRateError, setHeartRateError] = useState<string | null>(null);
+  const [isMatchingHeartRate, setIsMatchingHeartRate] = useState(false);
 
   const video = useVideo();
   const {
@@ -118,6 +126,8 @@ export function BoutWorkspaceShell({
     onSourceChange: () => {
       video.resetZoom();
       video.resetPlaybackState();
+      setHeartRateData(null);
+      setHeartRateError(null);
     },
   });
 
@@ -162,6 +172,22 @@ export function BoutWorkspaceShell({
     await updateSessionEntry(session.id, {}, { kind: "none" });
     handlePersistedVideoSelection({ kind: "none" });
   }, [handlePersistedVideoSelection, session, updateSessionEntry]);
+
+  const handleMatchHeartRate = useCallback(async () => {
+    if (!session) return;
+    setHeartRateError(null);
+    setIsMatchingHeartRate(true);
+    try {
+      const matched = await matchBoutHeartRate({ sessionId: session.id });
+      setHeartRateData(matched);
+    } catch (error) {
+      setHeartRateError(
+        error instanceof Error ? error.message : "Could not match heart-rate data.",
+      );
+    } finally {
+      setIsMatchingHeartRate(false);
+    }
+  }, [session]);
 
   const handleAddTag = useCallback(
     async (params: AddTagParams) => {
@@ -527,6 +553,16 @@ export function BoutWorkspaceShell({
                   ) : null}
                 </div>
               )}
+
+              <HeartRateCard
+                canMatch={hasAttachedLibraryVideo}
+                currentTime={video.currentTime}
+                data={heartRateData}
+                error={heartRateError}
+                isMatching={isMatchingHeartRate}
+                onMatch={handleMatchHeartRate}
+                onSeek={activeVideoUrl ? video.seek : undefined}
+              />
 
               <div className="tagging-dock shrink-0 py-1">
                 <TagForm

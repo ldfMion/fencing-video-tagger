@@ -12,6 +12,7 @@ import {
   commentEmbeddingsTable,
   commentsTable,
   fencersTable,
+  heartRateImportsTable,
   tagsTable,
 } from "@/lib/server/db/schema";
 import {
@@ -115,6 +116,14 @@ class LibsqlSessionRepository implements SessionRepository {
     const parsedSession = VideoSessionSchema.parse(session);
     await db.transaction(async (transaction) => {
       await updateBoutRow(transaction, parsedPreviousSession, parsedSession);
+      if (
+        parsedPreviousSession.videoRelativePath !== parsedSession.videoRelativePath ||
+        parsedPreviousSession.videoSourceType !== parsedSession.videoSourceType
+      ) {
+        await transaction.delete(heartRateImportsTable).where(
+          eq(heartRateImportsTable.boutId, parsedSession.id),
+        );
+      }
       await syncParticipants(transaction, parsedSession, parsedPreviousSession);
     });
     return parsedSession;

@@ -3,6 +3,7 @@
 .codex
 *.csv
 .data/
+/export.xml
 
 # dependencies
 /node_modules

@@ -5,6 +5,7 @@ import { BoutWorkspaceShell } from "@/app/bouts/[id]/bout-workspace-shell";
 import { RouteLoading } from "@/components/route-loading";
 import { getBoutDisplayLabel } from "@/lib/session-selectors";
 import { listSearchFencers } from "@/lib/server/comment-search-service";
+import { getBoutHeartRate } from "@/lib/server/heart-rate-service";
 import { getSessionById } from "@/lib/server/session-service";
 import {
   findTagById,
@@ -73,9 +74,10 @@ async function BoutPageContent(props: BoutPageProps) {
   await connection();
   const { id } = await props.params;
   const searchParams = await props.searchParams;
-  const [initialSession, initialFencerNames] = await Promise.all([
+  const [initialSession, initialFencerNames, initialHeartRateData] = await Promise.all([
     getSessionById(id),
     listSearchFencers(),
+    getBoutHeartRate(id),
   ]);
   const initialTagId = getSingleSearchParamValue(searchParams.tag) ?? null;
 
@@ -83,6 +85,7 @@ async function BoutPageContent(props: BoutPageProps) {
     <BoutWorkspaceShell
       boutId={id}
       initialFencerNames={initialFencerNames}
+      initialHeartRateData={initialHeartRateData}
       initialSession={initialSession}
       initialTagId={initialTagId}
     />

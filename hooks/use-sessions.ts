@@ -252,7 +252,10 @@ export function useSessions(
         currentSessions.filter((session) => session.id !== sessionId),
       );
     },
-    onSuccess: (serverSession, { sessionId }) => {
+    onSuccess: async (serverSession, { sessionId }) => {
+      await queryClient.cancelQueries({
+        queryKey: sessionQueryKey(sessionId),
+      });
       setCachedSessions((currentSessions) =>
         replaceSession(currentSessions, sessionId, serverSession),
       );

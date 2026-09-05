@@ -123,6 +123,10 @@ export async function getSessionById(
   return getSessionRepository().findById(z.string().parse(sessionId));
 }
 
+export async function getSessionVideoAttachment(sessionId: string) {
+  return getSessionRepository().findVideoAttachment(z.string().parse(sessionId));
+}
+
 export async function createSession(
   input: CreateSessionInput,
 ): Promise<VideoSession> {

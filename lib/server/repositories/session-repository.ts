@@ -24,6 +24,10 @@ import {
 export interface SessionRepository {
   list(): Promise<VideoSession[]>;
   findById(sessionId: string): Promise<VideoSession | null>;
+  findVideoAttachment(sessionId: string): Promise<{
+    videoRelativePath: string | null;
+    videoSourceType: string | null;
+  } | null>;
   create(session: VideoSession): Promise<VideoSession>;
   update(previousSession: VideoSession, session: VideoSession): Promise<VideoSession>;
   delete(sessionId: string): Promise<boolean>;
@@ -73,6 +77,14 @@ class LibsqlSessionRepository implements SessionRepository {
     return assembleSession(row, tagRows.map(parseTagRow), participants.get(sessionId));
   }
 
+  async findVideoAttachment(sessionId: string) {
+    await databaseReady;
+    return await db.select({
+      videoRelativePath: boutsTable.videoRelativePath,
+      videoSourceType: boutsTable.videoSourceType,
+    }).from(boutsTable).where(eq(boutsTable.id, sessionId)).get() ?? null;
+  }
+
   async create(session: VideoSession): Promise<VideoSession> {
     await databaseReady;
     const parsedSession = VideoSessionSchema.parse(session);
@@ -102,7 +114,7 @@ class LibsqlSessionRepository implements SessionRepository {
     const parsedSession = VideoSessionSchema.parse(session);
     await db.transaction(async (transaction) => {
       await updateBoutRow(transaction, parsedPreviousSession, parsedSession);
-      await syncParticipants(transaction, parsedSession);
+      await syncParticipants(transaction, parsedSession, parsedPreviousSession);
     });
     return parsedSession;
   }
@@ -402,14 +414,23 @@ function normalizeFencerName(name: string): string {
 async function syncParticipants(
   transaction: Transaction,
   session: VideoSession,
+  previousSession?: VideoSession,
 ): Promise<void> {
   await transaction.delete(boutParticipantsTable).where(
     eq(boutParticipantsTable.boutId, session.id),
   );
 
   const participants = [
-    { side: "L", name: session.leftFencer },
-    { side: "R", name: session.rightFencer },
+    {
+      side: "L",
+      name: session.leftFencer,
+      previousName: previousSession?.leftFencer,
+    },
+    {
+      side: "R",
+      name: session.rightFencer,
+      previousName: previousSession?.rightFencer,
+    },
   ] as const;
   for (const participant of participants) {
     const displayName = participant.name;
@@ -432,6 +453,12 @@ async function syncParticipants(
       .get();
     if (!fencer) {
       throw new Error(`Unable to resolve fencer ${displayName}`);
+    }
+    if (previousSession && participant.previousName !== displayName) {
+      await transaction.update(fencersTable).set({
+        canonicalName,
+        updatedAt: session.lastModified,
+      }).where(eq(fencersTable.id, fencer.id));
     }
     await transaction.insert(boutParticipantsTable).values({
       boutId: session.id,

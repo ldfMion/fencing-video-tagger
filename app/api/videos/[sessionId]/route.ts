@@ -1,5 +1,5 @@
 import { createReadStream } from "node:fs";
-import { getSessionById } from "@/lib/server/session-service";
+import { getSessionVideoAttachment } from "@/lib/server/session-service";
 import { resolveVideoLibraryFile } from "@/lib/server/video-library";
 
 function buildBaseHeaders(mimeType: string, size: number): Headers {
@@ -106,7 +106,7 @@ async function getVideoResponse(
   method: "GET" | "HEAD",
   sessionId: string,
 ) {
-  const session = await getSessionById(sessionId);
+  const session = await getSessionVideoAttachment(sessionId);
 
   if (
     !session ||

@@ -35,6 +35,7 @@ import {
   type SessionDraftParams,
 } from "@/hooks/use-sessions";
 import { getTodayIsoDate } from "@/lib/date-utils";
+import { getUniqueFencerNames } from "@/lib/fencer-name";
 import { useVideo } from "@/hooks/use-video";
 import {
   getAllFencerNames,
@@ -88,12 +89,10 @@ export function BoutWorkspaceShell({
 
   const session = getSessionById(boutId);
   const availableFencerNames = useMemo(
-    () => Array.from(new Set([
+    () => getUniqueFencerNames([
       ...fencerNames,
       ...getAllFencerNames(session ? [session] : []),
-    ])).sort((left, right) =>
-      left.localeCompare(right, undefined, { sensitivity: "base" })
-    ),
+    ]),
     [fencerNames, session],
   );
   const tags = session?.tags ?? [];

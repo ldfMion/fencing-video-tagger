@@ -3,6 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { normalizeBoutDate } from "@/lib/bout-date";
+import { normalizeFencerName } from "@/lib/fencer-name";
 import { databaseReady, db } from "@/lib/server/db/client";
 import { hashComment } from "@/lib/server/db/connection";
 import {
@@ -403,12 +404,6 @@ async function insertTags(
   for (const [position, tag] of session.tags.entries()) {
     await insertTag(transaction, session.id, tag, position);
   }
-}
-
-function normalizeFencerName(name: string): string {
-  // Keep runtime identity normalization identical to SQLite's built-in lower(),
-  // which is used by the migration that backfills existing bout names.
-  return name.trim().replace(/[A-Z]/g, (character) => character.toLowerCase());
 }
 
 async function syncParticipants(

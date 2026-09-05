@@ -1,5 +1,6 @@
 import type { VideoSession } from "@/lib/types";
 import { formatSessionDisplayDate, getSessionDisplayDateValue } from "@/lib/date-utils";
+import { getUniqueFencerNames } from "@/lib/fencer-name";
 
 export interface SessionListFilters {
   search?: string;
@@ -22,21 +23,19 @@ export function getSessionById(
 }
 
 export function getAllFencerNames(sessions: VideoSession[]): string[] {
-  const names = new Set<string>();
+  const names: string[] = [];
 
   for (const session of sessions) {
     if (session.leftFencer?.trim()) {
-      names.add(session.leftFencer.trim());
+      names.push(session.leftFencer);
     }
 
     if (session.rightFencer?.trim()) {
-      names.add(session.rightFencer.trim());
+      names.push(session.rightFencer);
     }
   }
 
-  return Array.from(names).sort((left, right) =>
-    left.localeCompare(right, undefined, { sensitivity: "base" }),
-  );
+  return getUniqueFencerNames(names);
 }
 
 export function filterSessionsBySearchAndDate(

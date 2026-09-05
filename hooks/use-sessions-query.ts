@@ -37,7 +37,7 @@ export function useSessionQuery(
   return useQuery({
     queryKey: sessionQueryKey(sessionId),
     queryFn: () => getSessionById(sessionId),
-    initialData: initialSession,
+    initialData: initialSession ?? undefined,
     enabled,
   });
 }

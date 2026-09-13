@@ -12,6 +12,8 @@ test("accepts filter-only touch searches with replay-first defaults", () => {
     fencers: [],
     actions: [],
     mistakes: [],
+    failureModes: [],
+    failureCauses: [],
     periods: [],
     stripZones: [],
     includeWithoutReplay: false,
@@ -25,6 +27,8 @@ test("preserves multi-select touch search filters", () => {
       fencers: ["Mion", "Marostega"],
       actions: ["A-P", "CT-P"],
       mistakes: ["tactical"],
+      failureModes: ["distance", "action-choice"],
+      failureCauses: ["read", "experiment"],
       periods: ["1", "priority"],
       stripZones: ["2", "4"],
       includeWithoutReplay: true,
@@ -34,5 +38,7 @@ test("preserves multi-select touch search filters", () => {
   assert.equal(input.query, "second intention");
   assert.deepEqual(input.filters.fencers, ["Mion", "Marostega"]);
   assert.deepEqual(input.filters.actions, ["A-P", "CT-P"]);
+  assert.deepEqual(input.filters.failureModes, ["distance", "action-choice"]);
+  assert.deepEqual(input.filters.failureCauses, ["read", "experiment"]);
   assert.equal(input.filters.includeWithoutReplay, true);
 });

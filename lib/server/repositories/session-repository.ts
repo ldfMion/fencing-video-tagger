@@ -310,6 +310,7 @@ function assembleSession(
   const taggingOptions = fromTaggingOptions(row);
   return VideoSessionSchema.parse({
     id: row.id,
+    failureClassificationVersion: row.failureClassificationVersion,
     tags,
     lastModified: row.lastModified,
     ...(row.fileName != null && { fileName: row.fileName }),
@@ -339,6 +340,8 @@ function parseTagRow(row: TagRow): Tag {
     ...(row.tag.side != null && { side: row.tag.side }),
     ...(row.tag.action != null && { action: row.tag.action }),
     ...(row.tag.mistake != null && { mistake: row.tag.mistake }),
+    ...(row.tag.failureMode != null && { failureMode: row.tag.failureMode }),
+    ...(row.tag.failureCause != null && { failureCause: row.tag.failureCause }),
     ...(row.tag.matchPeriod != null && { matchPeriod: row.tag.matchPeriod }),
     ...(row.tag.matchClock != null && { matchClock: row.tag.matchClock }),
     ...(row.tag.stripZone != null && { stripZone: row.tag.stripZone }),
@@ -358,6 +361,7 @@ function groupTagsByBout(rows: TagRow[]): Map<string, Tag[]> {
 function toBoutRow(session: VideoSession): typeof boutsTable.$inferInsert {
   return {
     id: session.id,
+    failureClassificationVersion: session.failureClassificationVersion,
     fileName: session.fileName ?? null,
     videoRelativePath: session.videoRelativePath ?? null,
     videoMimeType: session.videoMimeType ?? null,
@@ -382,6 +386,8 @@ function toTagValues(tag: Tag) {
     side: tag.side ?? null,
     action: tag.action ?? null,
     mistake: tag.mistake ?? null,
+    failureMode: tag.failureMode ?? null,
+    failureCause: tag.failureCause ?? null,
     matchPeriod: tag.matchPeriod ?? null,
     matchClock: tag.matchClock ?? null,
     stripZone: tag.stripZone ?? null,

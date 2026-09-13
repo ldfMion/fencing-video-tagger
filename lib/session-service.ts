@@ -172,6 +172,7 @@ export function createSessionRecord(
 ): VideoSession {
   return {
     id: options?.sessionId ?? generateSessionId(),
+    failureClassificationVersion: 2,
     tags: [],
     lastModified: options?.now ?? Date.now(),
     ...withDefinedValues({
@@ -219,7 +220,10 @@ export function createSessionRecordWithLibraryVideo(
 
 export function createTagRecord(
   params: AddTagParams,
-  session?: Pick<VideoSession, "taggingOptions">,
+  session?: Pick<
+    VideoSession,
+    "failureClassificationVersion" | "taggingOptions"
+  >,
   options?: CreateTagRecordOptions,
 ): Tag {
   const nextTag: Tag = {
@@ -231,6 +235,8 @@ export function createTagRecord(
     side: params.side,
     action: params.action,
     mistake: params.mistake,
+    failureMode: params.failureMode,
+    failureCause: params.failureCause,
     matchPeriod: params.matchPeriod,
     matchClock: params.matchClock,
     stripZone: params.stripZone,
@@ -336,7 +342,9 @@ export function setTemporaryVideoMetadataOnSession(
 
 function migrateV0(raw: unknown): VideoSession[] {
   const result = z.array(LegacySessionSchema).safeParse(raw);
-  return result.success ? result.data : [];
+  return result.success
+    ? result.data.map((session) => VideoSessionSchema.parse(session))
+    : [];
 }
 
 export function parseStoredSessionsFromRaw(raw: unknown): ParsedStoredSessions {

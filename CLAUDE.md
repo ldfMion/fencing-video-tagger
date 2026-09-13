@@ -62,11 +62,13 @@ app/layout.tsx (root layout)
 
 ### Types (`lib/types.ts`)
 
-- `Tag`: { id, timestamp, comment, createdAt, side?, action?, mistake? }
-- `VideoSession`: { id, fileName, tags[], lastModified, leftFencer?, rightFencer?, boutDate? }
+- `Tag`: { id, timestamp, comment, createdAt, side?, action?, mistake?, failureMode?, failureCause? }
+- `VideoSession`: { id, failureClassificationVersion, fileName, tags[], lastModified, leftFencer?, rightFencer?, boutDate? }
 - `ActionCode`: Union of fencing action notation strings (e.g., "A-P", "R-R", "yc", "rc")
 - `Side`: "L" | "R"
 - `MistakeType`: "tactical" | "execution"
+- `FailureMode`: "technique" | "distance" | "timing" | "action-choice"
+- `FailureCause`: "read" | "knowledge-gap" | "experiment" | "discipline" | "lapse" | "skill-gap"
 
 ### UI Components
 

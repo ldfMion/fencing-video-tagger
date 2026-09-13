@@ -16,6 +16,7 @@ import {
 } from "@/lib/tagging";
 import { getSessionRepository } from "@/lib/server/repositories/session-repository";
 import {
+  TagContentFieldsSchema,
   TagContentSchema,
   TaggingOptionsSchema,
   type VideoSession,
@@ -93,7 +94,7 @@ const AddTagInputSchema = z.object({
 const UpdateTagInputSchema = z.object({
   sessionId: z.string(),
   tagId: z.string(),
-  updates: TagContentSchema.partial(),
+  updates: TagContentFieldsSchema.partial(),
 });
 
 const DeleteTagInputSchema = z.object({

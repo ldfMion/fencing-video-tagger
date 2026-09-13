@@ -79,8 +79,10 @@ test("migrates legacy JSON sessions without loss and creates a native vector ind
 
     const migrated = await client.execute(`
       SELECT
-        b.id, b.left_fencer, b.right_fencer, b.bout_date, b.bout_date_iso,
-        t.id AS tag_id, t.side, t.action, t.mistake, t.match_period,
+        b.id, b.failure_classification_version, b.left_fencer, b.right_fencer,
+        b.bout_date, b.bout_date_iso,
+        t.id AS tag_id, t.side, t.action, t.mistake, t.failure_mode,
+        t.failure_cause, t.match_period,
         t.match_clock, t.strip_zone, c.body, c.content_hash
       FROM bouts AS b
       INNER JOIN tags AS t ON t.bout_id = b.id
@@ -89,6 +91,7 @@ test("migrates legacy JSON sessions without loss and creates a native vector ind
     assert.equal(migrated.rows.length, 1);
     assert.deepEqual(migrated.rows[0], {
       id: session.id,
+      failure_classification_version: 1,
       left_fencer: session.leftFencer,
       right_fencer: session.rightFencer,
       bout_date: session.boutDate,
@@ -97,6 +100,8 @@ test("migrates legacy JSON sessions without loss and creates a native vector ind
       side: tag.side,
       action: tag.action,
       mistake: tag.mistake,
+      failure_mode: null,
+      failure_cause: null,
       match_period: tag.matchPeriod,
       match_clock: tag.matchClock,
       strip_zone: tag.stripZone,

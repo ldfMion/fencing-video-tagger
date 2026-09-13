@@ -52,6 +52,24 @@ export const ACTION_CODES = [
 export const ActionCodeSchema = z.enum(ACTION_CODES);
 export const SideSchema = z.enum(["L", "R"]);
 export const MistakeTypeSchema = z.enum(["tactical", "execution"]);
+export const FailureClassificationVersionSchema = z.union([
+  z.literal(1),
+  z.literal(2),
+]);
+export const FailureModeSchema = z.enum([
+  "technique",
+  "distance",
+  "timing",
+  "action-choice",
+]);
+export const FailureCauseSchema = z.enum([
+  "read",
+  "knowledge-gap",
+  "experiment",
+  "discipline",
+  "lapse",
+  "skill-gap",
+]);
 export const VideoSourceTypeSchema = z.enum(["library", "temporary"]);
 export const MATCH_PERIODS = ["1", "2", "3", "priority"] as const;
 export const STRIP_ZONES = ["1", "2", "3", "4", "5"] as const;
@@ -67,13 +85,18 @@ export const TaggingOptionsSchema = z.object({
 export type ActionCode = z.infer<typeof ActionCodeSchema>;
 export type Side = z.infer<typeof SideSchema>;
 export type MistakeType = z.infer<typeof MistakeTypeSchema>;
+export type FailureClassificationVersion = z.infer<
+  typeof FailureClassificationVersionSchema
+>;
+export type FailureMode = z.infer<typeof FailureModeSchema>;
+export type FailureCause = z.infer<typeof FailureCauseSchema>;
 export type VideoSourceType = z.infer<typeof VideoSourceTypeSchema>;
 export type MatchPeriod = z.infer<typeof MatchPeriodSchema>;
 export type MatchClock = z.infer<typeof MatchClockSchema>;
 export type StripZone = z.infer<typeof StripZoneSchema>;
 export type TaggingOptions = z.infer<typeof TaggingOptionsSchema>;
 
-export const TagSchema = z.object({
+const TagFieldsSchema = z.object({
   id: z.string(),
   timestamp: z.number().optional(), // seconds into video (optional for videoless tags)
   seq: z.number().optional(), // insertion order for videoless tags or tiebreaker for video tags
@@ -82,18 +105,35 @@ export const TagSchema = z.object({
   // Optional fields for statistics
   side: SideSchema.optional(), // required for statistics, optional for notes
   action: ActionCodeSchema.optional(), // only for statistics
-  mistake: MistakeTypeSchema.optional(), // only for statistics
+  mistake: MistakeTypeSchema.optional(), // version 1 failure classification
+  failureMode: FailureModeSchema.optional(), // version 2 failure classification
+  failureCause: FailureCauseSchema.optional(), // version 2 diagnostic cause
   matchPeriod: MatchPeriodSchema.optional(),
   matchClock: MatchClockSchema.optional(),
   stripZone: StripZoneSchema.optional(),
 });
 
+export const TagSchema = TagFieldsSchema.refine(
+  (tag) => !tag.failureCause || tag.failureMode,
+  {
+    message: "A failure cause requires a failure mode",
+    path: ["failureCause"],
+  },
+);
+
 export type Tag = z.infer<typeof TagSchema>;
-export const TagContentSchema = TagSchema.omit({
+export const TagContentFieldsSchema = TagFieldsSchema.omit({
   id: true,
   seq: true,
   createdAt: true,
 });
+export const TagContentSchema = TagContentFieldsSchema.refine(
+  (tag) => !tag.failureCause || tag.failureMode,
+  {
+    message: "A failure cause requires a failure mode",
+    path: ["failureCause"],
+  },
+);
 export type TagContent = z.infer<typeof TagContentSchema>;
 
 // Form submissions must name every editable field, including optional ones.
@@ -105,6 +145,8 @@ export interface CompleteTagContent {
   side: TagContent["side"];
   action: TagContent["action"];
   mistake: TagContent["mistake"];
+  failureMode: TagContent["failureMode"];
+  failureCause: TagContent["failureCause"];
   matchPeriod: TagContent["matchPeriod"];
   matchClock: TagContent["matchClock"];
   stripZone: TagContent["stripZone"];
@@ -125,6 +167,7 @@ export type TagContentFieldCoverage =
 
 export const VideoSessionSchema = z.object({
   id: z.string(), // serves as bout_id
+  failureClassificationVersion: FailureClassificationVersionSchema.default(1),
   fileName: z.string().optional(), // optional for videoless bouts
   videoRelativePath: z.string().optional(),
   videoMimeType: z.string().optional(),
@@ -138,6 +181,27 @@ export const VideoSessionSchema = z.object({
   boutType: z.string().optional(), // e.g. "pool", "DE", "team"
   externalSource: z.string().optional(), // URL or reference note
   taggingOptions: TaggingOptionsSchema.optional(),
+}).superRefine((session, context) => {
+  session.tags.forEach((tag, tagIndex) => {
+    if (
+      session.failureClassificationVersion === 1 &&
+      (tag.failureMode || tag.failureCause)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Version 1 bouts cannot contain version 2 failure classifications",
+        path: ["tags", tagIndex, "failureMode"],
+      });
+    }
+
+    if (session.failureClassificationVersion === 2 && tag.mistake) {
+      context.addIssue({
+        code: "custom",
+        message: "Version 2 bouts cannot contain legacy mistake classifications",
+        path: ["tags", tagIndex, "mistake"],
+      });
+    }
+  });
 });
 
 export type VideoSession = z.infer<typeof VideoSessionSchema>;

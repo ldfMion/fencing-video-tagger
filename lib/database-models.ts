@@ -7,9 +7,7 @@ export const CURRENT_SCHEMA_VERSION = 2;
 // normalizes sessions and tags into separately validated JSON entities while
 // this envelope remains stable at the application edge.
 export const StoredTouchSchema = TagSchema;
-export const StoredSessionSchema = VideoSessionSchema.extend({
-  tags: z.array(StoredTouchSchema),
-});
+export const StoredSessionSchema = VideoSessionSchema;
 
 export const DatabaseSchema = z.object({
   version: z.number(),

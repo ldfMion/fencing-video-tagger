@@ -8,6 +8,9 @@ import {
 import {
   ACTION_CODES,
   ActionCodeSchema,
+  FailureCauseSchema,
+  FailureClassificationVersionSchema,
+  FailureModeSchema,
   MatchClockSchema,
   MatchPeriodSchema,
   StripZoneSchema,
@@ -108,6 +111,8 @@ const EXPECTED_BOUT_COLUMNS = [
   "link",
 ];
 
+const OPTIONAL_BOUT_COLUMNS = ["failure_classification_version"];
+
 const EXPECTED_TAG_COLUMNS = [
   "bout_id",
   "side",
@@ -117,6 +122,8 @@ const EXPECTED_TAG_COLUMNS = [
 ];
 
 const OPTIONAL_TAG_COLUMNS = [
+  "failure_mode",
+  "failure_cause",
   "match_period",
   "match_clock",
   "strip_zone",
@@ -162,7 +169,12 @@ if (boutRows.length === 0) {
 const boutHeaders = Object.keys(boutRows[0]);
 const tagHeaders = tagRows.length > 0 ? Object.keys(tagRows[0]) : [];
 
-validateColumns(boutHeaders, EXPECTED_BOUT_COLUMNS, [], boutsPath);
+validateColumns(
+  boutHeaders,
+  EXPECTED_BOUT_COLUMNS,
+  OPTIONAL_BOUT_COLUMNS,
+  boutsPath,
+);
 if (tagRows.length > 0) {
   validateColumns(tagHeaders, EXPECTED_TAG_COLUMNS, OPTIONAL_TAG_COLUMNS, tagsPath);
 }
@@ -170,6 +182,7 @@ if (tagRows.length > 0) {
 // Validate all rows - collect errors, then reject all-or-nothing
 const errors: string[] = [];
 const boutIds = new Set<string>();
+const boutClassificationVersions = new Map<string, 1 | 2>();
 
 // Filter out rows with empty bout_id (trailing blank rows from spreadsheets)
 const validBoutRows = boutRows.filter((row) => row.bout_id?.trim());
@@ -181,7 +194,20 @@ if (skippedBoutRows > 0) {
 // Validate bouts
 for (let i = 0; i < validBoutRows.length; i++) {
   const row = validBoutRows[i];
-  boutIds.add(row.bout_id.trim());
+  const boutId = row.bout_id.trim();
+  boutIds.add(boutId);
+
+  const rawVersion = row.failure_classification_version?.trim();
+  const parsedVersion = FailureClassificationVersionSchema.safeParse(
+    rawVersion ? Number(rawVersion) : 1,
+  );
+  if (!parsedVersion.success) {
+    errors.push(
+      `Bouts row ${i + 2}: invalid failure_classification_version "${rawVersion}" (must be 1 or 2)`,
+    );
+  } else {
+    boutClassificationVersions.set(boutId, parsedVersion.data);
+  }
 }
 
 // Filter out tag rows with empty bout_id
@@ -223,6 +249,9 @@ for (let i = 0; i < validTagRows.length; i++) {
   }
 
   const mistake = row.mistake?.trim();
+  const failureMode = row.failure_mode?.trim();
+  const failureCause = row.failure_cause?.trim();
+  const classificationVersion = boutClassificationVersions.get(boutId) ?? 1;
   if (mistake) {
     const mistakeResult = MistakeTypeSchema.safeParse(mistake);
     if (!mistakeResult.success) {
@@ -230,6 +259,30 @@ for (let i = 0; i < validTagRows.length; i++) {
         `Tags row ${lineNum}: invalid mistake "${mistake}" (must be "tactical" or "execution")`
       );
     }
+  }
+
+  if (failureMode && !FailureModeSchema.safeParse(failureMode).success) {
+    errors.push(`Tags row ${lineNum}: invalid failure_mode "${failureMode}"`);
+  }
+
+  if (failureCause && !FailureCauseSchema.safeParse(failureCause).success) {
+    errors.push(`Tags row ${lineNum}: invalid failure_cause "${failureCause}"`);
+  }
+
+  if (failureCause && !failureMode) {
+    errors.push(`Tags row ${lineNum}: failure_cause requires failure_mode`);
+  }
+
+  if (classificationVersion === 1 && (failureMode || failureCause)) {
+    errors.push(
+      `Tags row ${lineNum}: version 1 bouts cannot use failure_mode or failure_cause`,
+    );
+  }
+
+  if (classificationVersion === 2 && mistake) {
+    errors.push(
+      `Tags row ${lineNum}: version 2 bouts cannot use legacy mistake values`,
+    );
   }
 
   const matchPeriod = row.match_period?.trim();
@@ -337,6 +390,8 @@ const sessions = validBoutRows.map((bout) => {
     const action = tagRow.action_new?.trim() || undefined;
     const side = tagRow.side?.trim() || undefined;
     const mistake = tagRow.mistake?.trim() || undefined;
+    const failureMode = tagRow.failure_mode?.trim() || undefined;
+    const failureCause = tagRow.failure_cause?.trim() || undefined;
     const matchPeriod = tagRow.match_period?.trim() || undefined;
     const matchClock = tagRow.match_clock?.trim() || undefined;
     const stripZone = tagRow.strip_zone?.trim() || undefined;
@@ -350,6 +405,12 @@ const sessions = validBoutRows.map((bout) => {
       ...(action && { action: action as z.infer<typeof ActionCodeSchema> }),
       ...(mistake && {
         mistake: mistake as "tactical" | "execution",
+      }),
+      ...(failureMode && {
+        failureMode: failureMode as z.infer<typeof FailureModeSchema>,
+      }),
+      ...(failureCause && {
+        failureCause: failureCause as z.infer<typeof FailureCauseSchema>,
       }),
       ...(matchPeriod && { matchPeriod: matchPeriod as z.infer<typeof MatchPeriodSchema> }),
       ...(matchClock && { matchClock }),
@@ -367,6 +428,7 @@ const sessions = validBoutRows.map((bout) => {
 
   return {
     id: boutId,
+    failureClassificationVersion: boutClassificationVersions.get(boutId) ?? 1,
     tags,
     lastModified: now,
     ...(bout.left_fencer?.trim() && { leftFencer: bout.left_fencer.trim() }),

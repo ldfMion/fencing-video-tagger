@@ -20,6 +20,11 @@ import {
 import { Check, Copy, ChevronDown, Pencil, Trash2, X } from "lucide-react";
 import { SIDE_COLORS } from "@/lib/constants";
 import {
+  formatFailureCause,
+  formatFailureMode,
+  LEGACY_MISTAKE_LABELS,
+} from "@/lib/failure-classification";
+import {
   formatMatchPeriodLabel,
   formatStripZoneLabel,
 } from "@/lib/tagging";
@@ -275,7 +280,23 @@ export function TagList({
                           variant="outline"
                           className="tag-mistake-badge px-1.5 py-0 text-xs"
                         >
-                          {tag.mistake}
+                          {LEGACY_MISTAKE_LABELS[tag.mistake]}
+                        </Badge>
+                      )}
+                      {tag.failureMode && (
+                        <Badge
+                          variant="outline"
+                          className="tag-failure-mode-badge px-1.5 py-0 text-xs"
+                        >
+                          {formatFailureMode(tag.failureMode)}
+                        </Badge>
+                      )}
+                      {tag.failureCause && (
+                        <Badge
+                          variant="secondary"
+                          className="tag-failure-cause-badge px-1.5 py-0 text-xs"
+                        >
+                          {formatFailureCause(tag.failureCause)}
                         </Badge>
                       )}
                     </div>

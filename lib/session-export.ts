@@ -1,4 +1,5 @@
 import JSZip from "jszip";
+import { createStorageEnvelope } from "@/lib/session-service";
 import type { VideoSession } from "@/lib/types";
 import { formatTime } from "@/lib/utils";
 
@@ -17,6 +18,7 @@ function stringifyValue(value: number | string | undefined): string {
 function getSingleTableHeaders(): string[] {
   return [
     "bout_id",
+    "failure_classification_version",
     "file_name",
     "video_relative_path",
     "video_mime_type",
@@ -40,6 +42,8 @@ function getSingleTableHeaders(): string[] {
     "strip_zone",
     "comment",
     "mistake",
+    "failure_mode",
+    "failure_cause",
     "created_at",
   ];
 }
@@ -50,6 +54,7 @@ function createSingleTableRow(
 ): string[] {
   return [
     session.id,
+    stringifyValue(session.failureClassificationVersion),
     session.fileName ?? "",
     session.videoRelativePath ?? "",
     session.videoMimeType ?? "",
@@ -73,12 +78,14 @@ function createSingleTableRow(
     tag?.stripZone ?? "",
     tag?.comment ?? "",
     tag?.mistake ?? "",
+    tag?.failureMode ?? "",
+    tag?.failureCause ?? "",
     stringifyValue(tag?.createdAt),
   ];
 }
 
 export function exportSessionsToJson(sessions: VideoSession[]): string {
-  return `${JSON.stringify(sessions, null, 2)}\n`;
+  return `${JSON.stringify(createStorageEnvelope(sessions), null, 2)}\n`;
 }
 
 export function exportSessionToCsv(session: VideoSession): string {
@@ -102,6 +109,7 @@ export function exportSessionsToNormalizedCsvFiles(
   const sessionRows: string[][] = [
     [
       "session_id",
+      "failure_classification_version",
       "file_name",
       "video_relative_path",
       "video_mime_type",
@@ -130,6 +138,8 @@ export function exportSessionsToNormalizedCsvFiles(
       "strip_zone",
       "comment",
       "mistake",
+      "failure_mode",
+      "failure_cause",
       "created_at",
     ],
   ];
@@ -137,6 +147,7 @@ export function exportSessionsToNormalizedCsvFiles(
   for (const session of sessions) {
     sessionRows.push([
       session.id,
+      stringifyValue(session.failureClassificationVersion),
       session.fileName ?? "",
       session.videoRelativePath ?? "",
       session.videoMimeType ?? "",
@@ -165,6 +176,8 @@ export function exportSessionsToNormalizedCsvFiles(
         tag.stripZone ?? "",
         tag.comment,
         tag.mistake ?? "",
+        tag.failureMode ?? "",
+        tag.failureCause ?? "",
         stringifyValue(tag.createdAt),
       ]);
     }

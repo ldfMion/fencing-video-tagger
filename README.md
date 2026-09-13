@@ -85,19 +85,24 @@ The backend exposes the `searchComments` server function from
 {
   "query": "perdi o equilíbrio depois do ataque",
   "filters": {
-    "fencer": "Mion",
-    "mistake": "execution",
+    "fencers": ["Mion"],
+    "failureModes": ["technique"],
+    "failureCauses": ["lapse"],
     "dateFrom": "2026-01-01"
   },
   "limit": 20
 }
 ```
 
-Supported SQL filters are `fencer`, `side`, `action`, `mistake`, `period`,
-`stripZone`, `dateFrom`, and `dateTo`. Semantic candidates come from libSQL's
+Supported SQL filters include fencers, actions, Version 2 failure modes and
+causes, the separate legacy mistake classification, periods, strip zones, and
+date ranges. Semantic candidates come from libSQL's
 native cosine vector index. Search automatically regenerates missing or stale
 comment embeddings before querying. A future client search component can import
 and call this server action directly; no public search route handler is needed.
+
+See [`docs/failure-classification-model.md`](docs/failure-classification-model.md)
+for the per-bout Version 1/Version 2 classification rules.
 
 ## Notes
 

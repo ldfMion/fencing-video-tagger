@@ -31,7 +31,22 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Plus, Check, ChevronsUpDown, Clock } from "lucide-react";
+import {
+  FAILURE_CAUSES,
+  FAILURE_CAUSE_DESCRIPTIONS,
+  FAILURE_CAUSE_LABELS,
+  FAILURE_MODES,
+  FAILURE_MODE_DESCRIPTIONS,
+  FAILURE_MODE_LABELS,
+} from "@/lib/failure-classification";
 import {
   getDefaultMatchPeriod,
   isMatchClockEnabled,
@@ -46,6 +61,9 @@ import {
   STRIP_ZONES,
   type Side,
   type ActionCode,
+  type FailureCause,
+  type FailureClassificationVersion,
+  type FailureMode,
   type MatchPeriod,
   type MistakeType,
   type StripZone,
@@ -59,6 +77,7 @@ import { cn, formatTime } from "@/lib/utils";
 export interface TagFormHandle {
   setSide: (side: Side) => void;
   toggleMistake: (type: MistakeType) => void;
+  openFailureClassification: () => void;
   submit: () => boolean;
   focusAction: () => void;
   focusComment: () => void;
@@ -73,6 +92,7 @@ interface TagFormProps {
   ) => void | Promise<void>;
   onCancelEdit: () => void;
   editingTag?: Tag | null;
+  failureClassificationVersion: FailureClassificationVersion;
   taggingOptions?: TaggingOptions;
   disabled?: boolean;
 }
@@ -86,6 +106,7 @@ interface TagFormFieldsProps {
   ) => void | Promise<void>;
   onCancelEdit: () => void;
   editingTag?: Tag | null;
+  failureClassificationVersion: FailureClassificationVersion;
   taggingOptions?: TaggingOptions;
   disabled?: boolean;
   formIdPrefix: string;
@@ -98,6 +119,7 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
     onUpdateTag,
     onCancelEdit,
     editingTag,
+    failureClassificationVersion,
     taggingOptions,
     disabled,
     formIdPrefix,
@@ -109,7 +131,16 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
   const [side, setSide] = useState<Side | undefined>(editingTag?.side);
   const [action, setAction] = useState<ActionCode | undefined>(editingTag?.action);
   const [mistake, setMistake] = useState<MistakeType | undefined>(editingTag?.mistake);
+  const [failureMode, setFailureMode] = useState<FailureMode | undefined>(
+    editingTag?.failureMode,
+  );
+  const [failureCause, setFailureCause] = useState<FailureCause | undefined>(
+    editingTag?.failureCause,
+  );
   const [actionOpen, setActionOpen] = useState(false);
+  const [failureModeOpen, setFailureModeOpen] = useState(false);
+  const [failureCauseOpen, setFailureCauseOpen] = useState(false);
+  const shouldOpenFailureCauseRef = useRef(false);
   const [manualTime, setManualTime] = useState(
     editingTag?.timestamp != null ? formatTime(editingTag.timestamp) : "",
   );
@@ -148,6 +179,8 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
     setSide(undefined);
     setAction(undefined);
     setMistake(undefined);
+    setFailureMode(undefined);
+    setFailureCause(undefined);
     setManualTime("");
   }, []);
 
@@ -192,6 +225,8 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
         side,
         action,
         mistake,
+        failureMode,
+        failureCause,
         matchPeriod: requiresMatchClock ? matchPeriod : undefined,
         matchClock: requiresMatchClock ? normalizedMatchClock : undefined,
         stripZone: requiresStripZone ? stripZone : undefined,
@@ -215,6 +250,8 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
       manualTime,
       matchPeriod,
       mistake,
+      failureMode,
+      failureCause,
       normalizedMatchClock,
       onAddTag,
       onUpdateTag,
@@ -231,6 +268,11 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
       setSide((previousSide) => (previousSide === nextSide ? undefined : nextSide)),
     toggleMistake: (type: MistakeType) =>
       setMistake((previousMistake) => (previousMistake === type ? undefined : type)),
+    openFailureClassification: () => {
+      if (failureClassificationVersion === 2) {
+        setFailureModeOpen(true);
+      }
+    },
     submit: () => handleSubmit(),
     focusAction: () => {
       setActionOpen(true);
@@ -352,69 +394,184 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
             </div>
 
             <div className="min-w-[128px] max-w-[220px] flex-1">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div>
-                  <Popover open={actionOpen} onOpenChange={setActionOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-label="Select action"
-                        aria-expanded={actionOpen}
-                        size="sm"
-                        className={cn(
-                          "tag-action-trigger w-full justify-between",
-                          action && "tag-property-action-selected",
-                        )}
-                      >
-                        {action ?? "Select..."}
-                        <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[190px] p-0" align="start">
-                      <Command className="tag-action-command">
-                        <CommandInput
-                          placeholder="Search action..."
-                          value={actionSearch}
-                          onValueChange={setActionSearch}
-                        />
-                        <CommandList>
-                          <CommandEmpty>No action found.</CommandEmpty>
-                          <CommandGroup>
-                            {filteredActions.map((code) => (
-                              <CommandItem
-                                key={code}
-                                value={code}
-                                onSelect={() => {
-                                  setAction(action === code ? undefined : (code as ActionCode));
-                                  setActionOpen(false);
-                                  setActionSearch("");
-                                }}
-                              >
-                                <Check
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    action === code ? "opacity-100" : "opacity-0",
-                                  )}
-                                />
-                                {code}
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Search actions (/)</p>
-              </TooltipContent>
-            </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div>
+                    <Popover open={actionOpen} onOpenChange={setActionOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-label="Select action"
+                          aria-expanded={actionOpen}
+                          size="sm"
+                          className={cn(
+                            "tag-action-trigger w-full justify-between",
+                            action && "tag-property-action-selected",
+                          )}
+                        >
+                          {action ?? "Select..."}
+                          <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[190px] p-0" align="start">
+                        <Command className="tag-action-command">
+                          <CommandInput
+                            placeholder="Search action..."
+                            value={actionSearch}
+                            onValueChange={setActionSearch}
+                          />
+                          <CommandList>
+                            <CommandEmpty>No action found.</CommandEmpty>
+                            <CommandGroup>
+                              {filteredActions.map((code) => (
+                                <CommandItem
+                                  key={code}
+                                  value={code}
+                                  onSelect={() => {
+                                    setAction(
+                                      action === code
+                                        ? undefined
+                                        : (code as ActionCode),
+                                    );
+                                    setActionOpen(false);
+                                    setActionSearch("");
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      action === code
+                                        ? "opacity-100"
+                                        : "opacity-0",
+                                    )}
+                                  />
+                                  {code}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Search actions (/)</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
 
-            <div className="flex gap-1">
+            {failureClassificationVersion === 2 ? (
+              <div className="flex min-w-[250px] flex-1 items-center gap-1.5">
+                <Select
+                  open={failureModeOpen}
+                  onOpenChange={(open) => {
+                    setFailureModeOpen(open);
+                    if (!open && shouldOpenFailureCauseRef.current) {
+                      shouldOpenFailureCauseRef.current = false;
+                      window.setTimeout(() => setFailureCauseOpen(true), 100);
+                    }
+                  }}
+                  value={failureMode ?? ""}
+                  onValueChange={(value) => {
+                    if (value === "none") {
+                      setFailureMode(undefined);
+                      setFailureCause(undefined);
+                      return;
+                    }
+
+                    setFailureMode(value as FailureMode);
+                    shouldOpenFailureCauseRef.current = true;
+                  }}
+                >
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <SelectTrigger
+                        size="sm"
+                        aria-label="Failure mode"
+                        className={cn(
+                          "h-7 min-w-0 flex-1 text-[11px]",
+                          failureMode && "border-primary/40 bg-primary/5",
+                        )}
+                      >
+                        <SelectValue placeholder="Failure mode" />
+                      </SelectTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>
+                        {failureMode
+                          ? FAILURE_MODE_DESCRIPTIONS[failureMode]
+                          : "Failure mode (F)"}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                  <SelectContent align="start">
+                    <SelectItem value="none">None</SelectItem>
+                    {FAILURE_MODES.map((mode) => (
+                      <SelectItem
+                        key={mode}
+                        value={mode}
+                        title={FAILURE_MODE_DESCRIPTIONS[mode]}
+                      >
+                        {FAILURE_MODE_LABELS[mode]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select
+                  open={failureCauseOpen}
+                  onOpenChange={setFailureCauseOpen}
+                  value={failureCause ?? ""}
+                  disabled={!failureMode}
+                  onValueChange={(value) => {
+                    setFailureCause(
+                      value === "none" ? undefined : (value as FailureCause),
+                    );
+                  }}
+                >
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <SelectTrigger
+                        size="sm"
+                        aria-label="Failure cause"
+                        className={cn(
+                          "h-7 min-w-0 flex-1 text-[11px]",
+                          failureCause && "border-primary/40 bg-primary/5",
+                        )}
+                      >
+                        <SelectValue placeholder="Cause" />
+                      </SelectTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>
+                        {failureCause
+                          ? FAILURE_CAUSE_DESCRIPTIONS[failureCause]
+                          : failureMode
+                            ? "Cause (optional)"
+                            : "Select a failure mode first"}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                  <SelectContent align="start">
+                    <SelectItem value="none">None</SelectItem>
+                    {FAILURE_CAUSES.map((cause) => (
+                      <SelectItem
+                        key={cause}
+                        value={cause}
+                        title={FAILURE_CAUSE_DESCRIPTIONS[cause]}
+                      >
+                        {FAILURE_CAUSE_LABELS[cause]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
+
+            {failureClassificationVersion === 1 ? (
+              <div className="flex gap-1">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -457,7 +614,8 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
                   <p>Execution mistake (Y)</p>
                 </TooltipContent>
               </Tooltip>
-            </div>
+              </div>
+            ) : null}
 
             <div className="ml-auto flex items-center gap-1.5">
               <Tooltip>
@@ -603,6 +761,8 @@ export const TagForm = forwardRef<TagFormHandle, TagFormProps>(function TagForm(
     () => ({
       setSide: (side: Side) => activeFormRef.current?.setSide(side),
       toggleMistake: (type: MistakeType) => activeFormRef.current?.toggleMistake(type),
+      openFailureClassification: () =>
+        activeFormRef.current?.openFailureClassification(),
       submit: () => activeFormRef.current?.submit() ?? false,
       focusAction: () => {
         activeFormRef.current?.focusAction();

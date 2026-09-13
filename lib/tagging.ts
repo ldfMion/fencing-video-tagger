@@ -108,8 +108,16 @@ export function getDefaultMatchPeriod(): NonNullable<Tag["matchPeriod"]> {
 }
 
 export function assertTagMetadataMatchesSession(
-  session: Pick<VideoSession, "taggingOptions">,
-  tag: Pick<Tag, "matchPeriod" | "matchClock" | "stripZone">,
+  session: Pick<VideoSession, "failureClassificationVersion" | "taggingOptions">,
+  tag: Pick<
+    Tag,
+    | "failureCause"
+    | "failureMode"
+    | "matchClock"
+    | "matchPeriod"
+    | "mistake"
+    | "stripZone"
+  >,
 ): void {
   const requiresMatchClock = isMatchClockEnabled(session);
   const requiresStripZone = isStripZoneEnabled(session);
@@ -121,6 +129,25 @@ export function assertTagMetadataMatchesSession(
 
   if (requiresStripZone) {
     StripZoneSchema.parse(tag.stripZone);
+  }
+
+  if (session.failureClassificationVersion === 1) {
+    if (tag.failureMode || tag.failureCause) {
+      throw new Error(
+        "Version 1 bouts cannot contain version 2 failure classifications.",
+      );
+    }
+    return;
+  }
+
+  if (tag.mistake) {
+    throw new Error(
+      "Version 2 bouts cannot contain legacy mistake classifications.",
+    );
+  }
+
+  if (tag.failureCause && !tag.failureMode) {
+    throw new Error("A failure cause requires a failure mode.");
   }
 }
 

@@ -25,6 +25,9 @@ export const boutsTable = sqliteTable(
   "bouts",
   {
     id: text("id").primaryKey(),
+    failureClassificationVersion: integer("failure_classification_version")
+      .notNull()
+      .default(1),
     fileName: text("file_name"),
     videoRelativePath: text("video_relative_path"),
     videoMimeType: text("video_mime_type"),
@@ -46,6 +49,10 @@ export const boutsTable = sqliteTable(
     check(
       "bouts_video_source_type_valid",
       sql`${table.videoSourceType} IS NULL OR ${table.videoSourceType} IN ('library', 'temporary')`,
+    ),
+    check(
+      "bouts_failure_classification_version_valid",
+      sql`${table.failureClassificationVersion} IN (1, 2)`,
     ),
   ],
 );
@@ -95,6 +102,8 @@ export const tagsTable = sqliteTable(
     side: text("side"),
     action: text("action"),
     mistake: text("mistake"),
+    failureMode: text("failure_mode"),
+    failureCause: text("failure_cause"),
     matchPeriod: text("match_period"),
     matchClock: text("match_clock"),
     stripZone: text("strip_zone"),
@@ -106,6 +115,8 @@ export const tagsTable = sqliteTable(
     index("tags_side_idx").on(table.side),
     index("tags_action_idx").on(table.action),
     index("tags_mistake_idx").on(table.mistake),
+    index("tags_failure_mode_idx").on(table.failureMode),
+    index("tags_failure_cause_idx").on(table.failureCause),
     index("tags_match_period_idx").on(table.matchPeriod),
     index("tags_strip_zone_idx").on(table.stripZone),
     check("tags_position_nonnegative", sql`${table.position} >= 0`),
@@ -113,6 +124,18 @@ export const tagsTable = sqliteTable(
     check(
       "tags_mistake_valid",
       sql`${table.mistake} IS NULL OR ${table.mistake} IN ('tactical', 'execution')`,
+    ),
+    check(
+      "tags_failure_mode_valid",
+      sql`${table.failureMode} IS NULL OR ${table.failureMode} IN ('technique', 'distance', 'timing', 'action-choice')`,
+    ),
+    check(
+      "tags_failure_cause_valid",
+      sql`${table.failureCause} IS NULL OR ${table.failureCause} IN ('read', 'knowledge-gap', 'experiment', 'discipline', 'lapse', 'skill-gap')`,
+    ),
+    check(
+      "tags_failure_cause_requires_mode",
+      sql`${table.failureCause} IS NULL OR ${table.failureMode} IS NOT NULL`,
     ),
     check(
       "tags_match_period_valid",

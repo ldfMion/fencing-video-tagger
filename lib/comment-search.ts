@@ -1,6 +1,8 @@
 import { z } from "zod";
 import {
   ActionCodeSchema,
+  FailureCauseSchema,
+  FailureModeSchema,
   MatchPeriodSchema,
   MistakeTypeSchema,
   StripZoneSchema,
@@ -16,6 +18,8 @@ export const CommentSearchInputSchema = z.object({
     fencers: MultiValueSchema(z.string().trim().min(1)),
     actions: MultiValueSchema(ActionCodeSchema),
     mistakes: MultiValueSchema(MistakeTypeSchema),
+    failureModes: MultiValueSchema(FailureModeSchema),
+    failureCauses: MultiValueSchema(FailureCauseSchema),
     periods: MultiValueSchema(MatchPeriodSchema),
     stripZones: MultiValueSchema(StripZoneSchema),
     dateFrom: IsoDateSchema.optional(),
@@ -25,6 +29,8 @@ export const CommentSearchInputSchema = z.object({
     fencers: [],
     actions: [],
     mistakes: [],
+    failureModes: [],
+    failureCauses: [],
     periods: [],
     stripZones: [],
     includeWithoutReplay: false,
@@ -44,6 +50,8 @@ export interface CommentSearchResult {
   timestamp?: number;
   action?: z.infer<typeof ActionCodeSchema>;
   mistake?: z.infer<typeof MistakeTypeSchema>;
+  failureMode?: z.infer<typeof FailureModeSchema>;
+  failureCause?: z.infer<typeof FailureCauseSchema>;
   period?: z.infer<typeof MatchPeriodSchema>;
   matchClock?: string;
   stripZone?: z.infer<typeof StripZoneSchema>;

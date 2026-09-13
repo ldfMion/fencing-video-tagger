@@ -271,7 +271,9 @@ export function BoutWorkspaceShell({
 
       if (
         event.target instanceof HTMLInputElement ||
-        event.target instanceof HTMLTextAreaElement
+        event.target instanceof HTMLTextAreaElement ||
+        (event.target instanceof HTMLElement &&
+          event.target.closest('[data-slot^="select-"]'))
       ) {
         return;
       }
@@ -286,12 +288,22 @@ export function BoutWorkspaceShell({
           tagFormRef.current?.setSide("R");
           break;
         case "t":
-          event.preventDefault();
-          tagFormRef.current?.toggleMistake("tactical");
+          if (session?.failureClassificationVersion === 1) {
+            event.preventDefault();
+            tagFormRef.current?.toggleMistake("tactical");
+          }
           break;
         case "y":
-          event.preventDefault();
-          tagFormRef.current?.toggleMistake("execution");
+          if (session?.failureClassificationVersion === 1) {
+            event.preventDefault();
+            tagFormRef.current?.toggleMistake("execution");
+          }
+          break;
+        case "f":
+          if (session?.failureClassificationVersion === 2) {
+            event.preventDefault();
+            tagFormRef.current?.openFailureClassification();
+          }
           break;
         case "enter":
           if (event.metaKey || event.ctrlKey) {
@@ -312,7 +324,7 @@ export function BoutWorkspaceShell({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [session?.failureClassificationVersion]);
 
   useEffect(() => {
     if (!initialTagId || hasAppliedInitialTagRef.current) {
@@ -486,6 +498,7 @@ export function BoutWorkspaceShell({
         onCancelEdit={handleCancelEdit}
         editingTag={editingTag}
         currentTime={activeVideoUrl ? video.currentTime : undefined}
+        failureClassificationVersion={session.failureClassificationVersion}
         taggingOptions={session.taggingOptions}
       />
     </div>

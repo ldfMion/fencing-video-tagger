@@ -50,6 +50,7 @@ async function main(): Promise<void> {
       for (const session of envelope.data.sessions) {
         await transaction.insert(boutsTable).values({
           id: session.id,
+          failureClassificationVersion: session.failureClassificationVersion,
           fileName: session.fileName ?? null,
           videoRelativePath: session.videoRelativePath ?? null,
           videoMimeType: session.videoMimeType ?? null,
@@ -76,6 +77,8 @@ async function main(): Promise<void> {
             side: tag.side ?? null,
             action: tag.action ?? null,
             mistake: tag.mistake ?? null,
+            failureMode: tag.failureMode ?? null,
+            failureCause: tag.failureCause ?? null,
             matchPeriod: tag.matchPeriod ?? null,
             matchClock: tag.matchClock ?? null,
             stripZone: tag.stripZone ?? null,

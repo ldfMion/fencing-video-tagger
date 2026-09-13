@@ -4,6 +4,7 @@ import {
   formatStripZoneLabel,
 } from "@/lib/tagging";
 import type { Tag, VideoSession } from "@/lib/types";
+import { formatFailureCause, formatFailureMode } from "@/lib/failure-classification";
 import { formatTime } from "@/lib/utils";
 
 const MAX_DESCRIPTION_LENGTH = 160;
@@ -42,6 +43,8 @@ export function getTagShareDescription(tag: Tag): string {
     tag.side,
     tag.action,
     tag.mistake,
+    tag.failureMode && formatFailureMode(tag.failureMode),
+    tag.failureCause && formatFailureCause(tag.failureCause),
     tag.matchClock && formatMatchPeriodLabel(tag.matchPeriod)
       ? `${formatMatchPeriodLabel(tag.matchPeriod)} ${tag.matchClock}`
       : null,

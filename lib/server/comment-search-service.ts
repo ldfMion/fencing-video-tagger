@@ -92,6 +92,8 @@ function createFilters(input: ReturnType<typeof CommentSearchInputSchema.parse>)
   }
   addMultiFilter(conditions, args, "t.action", filters.actions);
   addMultiFilter(conditions, args, "t.mistake", filters.mistakes);
+  addMultiFilter(conditions, args, "t.failure_mode", filters.failureModes);
+  addMultiFilter(conditions, args, "t.failure_cause", filters.failureCauses);
   addMultiFilter(conditions, args, "t.match_period", filters.periods);
   addMultiFilter(conditions, args, "t.strip_zone", filters.stripZones);
   if (filters.dateFrom) {
@@ -161,6 +163,7 @@ function resultSelect(extra = "") {
     ${extra}
     c.id AS comment_id, c.body AS comment, c.content_hash AS comment_hash,
     t.id AS tag_id, t.bout_id, t.timestamp, t.side, t.action, t.mistake,
+    t.failure_mode, t.failure_cause,
     t.match_period, t.match_clock, t.strip_zone,
     b.left_fencer, b.right_fencer, b.bout_date, b.bout_date_iso,
     b.video_relative_path, b.video_source_type`;
@@ -182,6 +185,12 @@ function mapResult(row: Record<string, unknown>): CommentSearchResult {
     ...(row.timestamp != null && { timestamp: Number(row.timestamp) }),
     ...(row.action != null && { action: String(row.action) as CommentSearchResult["action"] }),
     ...(row.mistake != null && { mistake: String(row.mistake) as CommentSearchResult["mistake"] }),
+    ...(row.failure_mode != null && {
+      failureMode: String(row.failure_mode) as CommentSearchResult["failureMode"],
+    }),
+    ...(row.failure_cause != null && {
+      failureCause: String(row.failure_cause) as CommentSearchResult["failureCause"],
+    }),
     ...(row.match_period != null && { period: String(row.match_period) as CommentSearchResult["period"] }),
     ...(row.match_clock != null && { matchClock: String(row.match_clock) }),
     ...(row.strip_zone != null && { stripZone: String(row.strip_zone) as CommentSearchResult["stripZone"] }),

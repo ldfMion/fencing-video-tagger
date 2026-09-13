@@ -20,7 +20,24 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { TouchReplay } from "@/app/search/touch-replay";
-import { ACTION_CODES, MATCH_PERIODS, STRIP_ZONES, type ActionCode, type MatchPeriod, type MistakeType, type StripZone } from "@/lib/types";
+import {
+  FAILURE_CAUSES,
+  FAILURE_MODES,
+  formatFailureCause,
+  formatFailureMode,
+  LEGACY_MISTAKE_LABELS,
+} from "@/lib/failure-classification";
+import {
+  ACTION_CODES,
+  MATCH_PERIODS,
+  STRIP_ZONES,
+  type ActionCode,
+  type FailureCause,
+  type FailureMode,
+  type MatchPeriod,
+  type MistakeType,
+  type StripZone,
+} from "@/lib/types";
 import type { CommentSearchInput, CommentSearchResult } from "@/lib/comment-search";
 import { searchComments } from "@/lib/server/comment-search-service";
 import { STRIP_ZONE_FLEX_WEIGHTS, STRIP_ZONE_LABELS } from "@/lib/tagging";
@@ -32,6 +49,8 @@ interface Filters {
   fencers: string[];
   actions: ActionCode[];
   mistakes: MistakeType[];
+  failureModes: FailureMode[];
+  failureCauses: FailureCause[];
   periods: MatchPeriod[];
   stripZones: StripZone[];
   dateFrom: string;
@@ -58,6 +77,12 @@ function initialFilters(params: SearchPageShellProps["initialParams"]): Filters 
     fencers: getAll(params, "fencer"),
     actions: getAll(params, "action").filter((value): value is ActionCode => ACTION_CODES.includes(value as ActionCode)),
     mistakes: getAll(params, "mistake").filter((value): value is MistakeType => value === "tactical" || value === "execution"),
+    failureModes: getAll(params, "failure_mode").filter(
+      (value): value is FailureMode => FAILURE_MODES.includes(value as FailureMode),
+    ),
+    failureCauses: getAll(params, "failure_cause").filter(
+      (value): value is FailureCause => FAILURE_CAUSES.includes(value as FailureCause),
+    ),
     periods: getAll(params, "period").filter((value): value is MatchPeriod => MATCH_PERIODS.includes(value as MatchPeriod)),
     stripZones: getAll(params, "zone").filter((value): value is StripZone => STRIP_ZONES.includes(value as StripZone)),
     dateFrom: getOne(params, "from"),
@@ -68,6 +93,7 @@ function initialFilters(params: SearchPageShellProps["initialParams"]): Filters 
 
 function hasFilters(filters: Filters) {
   return filters.fencers.length > 0 || filters.actions.length > 0 || filters.mistakes.length > 0 ||
+    filters.failureModes.length > 0 || filters.failureCauses.length > 0 ||
     filters.periods.length > 0 || filters.stripZones.length > 0 || Boolean(filters.dateFrom || filters.dateTo) ||
     filters.includeWithoutReplay;
 }
@@ -79,6 +105,8 @@ function toSearchInput(query: string, filters: Filters, offset = 0): CommentSear
       fencers: filters.fencers,
       actions: filters.actions,
       mistakes: filters.mistakes,
+      failureModes: filters.failureModes,
+      failureCauses: filters.failureCauses,
       periods: filters.periods,
       stripZones: filters.stripZones,
       ...(filters.dateFrom && { dateFrom: filters.dateFrom }),
@@ -113,6 +141,8 @@ export function SearchPageShell({ initialParams, fencers }: SearchPageShellProps
     nextFilters.fencers.forEach((value) => params.append("fencer", value));
     nextFilters.actions.forEach((value) => params.append("action", value));
     nextFilters.mistakes.forEach((value) => params.append("mistake", value));
+    nextFilters.failureModes.forEach((value) => params.append("failure_mode", value));
+    nextFilters.failureCauses.forEach((value) => params.append("failure_cause", value));
     nextFilters.periods.forEach((value) => params.append("period", value));
     nextFilters.stripZones.forEach((value) => params.append("zone", value));
     if (nextFilters.dateFrom) params.set("from", nextFilters.dateFrom);
@@ -210,7 +240,7 @@ export function SearchPageShell({ initialParams, fencers }: SearchPageShellProps
         <div className="w-full">
           <section className={cn(hasApplied && "sticky top-0 z-30 -mx-4 animate-in border-b bg-background px-4 py-3 fade-in slide-in-from-top-2 duration-300 sm:-mx-8 sm:px-8")}>
             <div className={cn("mx-auto", hasApplied ? "max-w-[1500px]" : "max-w-3xl text-center")}>
-              {!hasApplied && <div className="mb-8"><p className="eyebrow">Touch search</p><h1 className="mt-3 text-3xl font-semibold tracking-[-0.045em] sm:text-4xl">Find the moment that matters.</h1><p className="mt-3 text-sm text-muted-foreground">Search your tagged touches by meaning, fencer, action, mistake, or date.</p></div>}
+              {!hasApplied && <div className="mb-8"><p className="eyebrow">Touch search</p><h1 className="mt-3 text-3xl font-semibold tracking-[-0.045em] sm:text-4xl">Find the moment that matters.</h1><p className="mt-3 text-sm text-muted-foreground">Search your tagged touches by meaning, fencer, action, failure, or date.</p></div>}
               <form className="flex gap-2" onSubmit={(event) => { event.preventDefault(); submitQuery(); }}>
                 <div className="relative flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={draftQuery} onChange={(event) => setDraftQuery(event.target.value)} placeholder="Describe a touch, tactic, or situation…" className="h-11 pl-10" /></div>
                 <Button type="submit" className="h-11 px-5" disabled={isPending} aria-label="Search touches"><Search className="h-4 w-4" /><span className="hidden sm:inline">Search</span></Button>
@@ -218,7 +248,9 @@ export function SearchPageShell({ initialParams, fencers }: SearchPageShellProps
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <MultiSelect label="Fencer" values={filters.fencers} options={fencers} onChange={(values) => applyFilters({ ...filters, fencers: values })} searchable />
                 <MultiSelect label="Action" values={filters.actions} options={[...ACTION_CODES]} onChange={(values) => applyFilters({ ...filters, actions: values as ActionCode[] })} searchable />
-                <MultiSelect label="Mistake" values={filters.mistakes} options={["tactical", "execution"]} onChange={(values) => applyFilters({ ...filters, mistakes: values as MistakeType[] })} />
+                <MultiSelect label="Failure mode" values={filters.failureModes} options={[...FAILURE_MODES]} onChange={(values) => applyFilters({ ...filters, failureModes: values as FailureMode[] })} formatOption={(value) => formatFailureMode(value as FailureMode)} />
+                <MultiSelect label="Cause" values={filters.failureCauses} options={[...FAILURE_CAUSES]} onChange={(values) => applyFilters({ ...filters, failureCauses: values as FailureCause[] })} formatOption={(value) => formatFailureCause(value as FailureCause)} />
+                <MultiSelect label="Legacy classification" values={filters.mistakes} options={["tactical", "execution"]} onChange={(values) => applyFilters({ ...filters, mistakes: values as MistakeType[] })} formatOption={(value) => LEGACY_MISTAKE_LABELS[value as MistakeType]} />
                 <DateFilter filters={filters} onChange={applyFilters} />
                 <MoreFilters filters={filters} onChange={applyFilters} />
                 <label className="ml-auto flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground">
@@ -249,10 +281,10 @@ function ResultsSkeleton() {
   return <div className="animate-in overflow-hidden rounded-lg border bg-card fade-in duration-200">{Array.from({ length: 4 }, (_, index) => <div key={index} className="border-b p-4 last:border-b-0"><div className="h-4 w-48 animate-pulse rounded bg-muted" /><div className="mt-3 h-3 w-3/4 animate-pulse rounded bg-muted/80" /><div className="mt-3 h-3 w-24 animate-pulse rounded bg-muted/70" /></div>)}</div>;
 }
 
-function MultiSelect({ label, values, options, onChange, searchable = false }: { label: string; values: string[]; options: string[]; onChange: (values: string[]) => void; searchable?: boolean }) {
+function MultiSelect({ label, values, options, onChange, searchable = false, formatOption = (value) => value }: { label: string; values: string[]; options: string[]; onChange: (values: string[]) => void; searchable?: boolean; formatOption?: (value: string) => string }) {
   const [search, setSearch] = useState("");
   const shown = searchable ? options.filter((option) => option.toLowerCase().includes(search.toLowerCase())) : options;
-  return <Popover><PopoverTrigger asChild><Button variant="outline" size="sm" className={cn(values.length > 0 && "border-primary/40 text-foreground")}>{label}{values.length > 0 && <Badge variant="secondary" className="ml-1 h-5 min-w-5 justify-center px-1.5">{values.length}</Badge>}<ChevronDown className="h-3 w-3 opacity-50" /></Button></PopoverTrigger><PopoverContent align="start" className="w-64 p-2">{searchable && <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={`Search ${label.toLowerCase()}…`} aria-label={`Search ${label.toLowerCase()}`} className="mb-2 h-8" />}<div className="max-h-64 overflow-y-auto">{shown.map((option) => { const checked = values.includes(option); return <button type="button" key={option} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-accent" onClick={() => onChange(checked ? values.filter((value) => value !== option) : [...values, option])}><span className={cn("flex h-4 w-4 items-center justify-center rounded border", checked && "border-primary bg-primary text-primary-foreground")}>{checked && <Check className="h-3 w-3" />}</span><span className="truncate">{option}</span></button>; })}</div>{shown.length === 0 && <p className="px-2 py-6 text-center text-muted-foreground">No {label.toLowerCase()}s found</p>}{values.length > 0 && <Button variant="ghost" size="sm" className="mt-2 w-full" onClick={() => onChange([])}><X className="h-3.5 w-3.5" />Clear</Button>}</PopoverContent></Popover>;
+  return <Popover><PopoverTrigger asChild><Button variant="outline" size="sm" className={cn(values.length > 0 && "border-primary/40 text-foreground")}>{label}{values.length > 0 && <Badge variant="secondary" className="ml-1 h-5 min-w-5 justify-center px-1.5">{values.length}</Badge>}<ChevronDown className="h-3 w-3 opacity-50" /></Button></PopoverTrigger><PopoverContent align="start" className="w-64 p-2">{searchable && <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={`Search ${label.toLowerCase()}…`} aria-label={`Search ${label.toLowerCase()}`} className="mb-2 h-8" />}<div className="max-h-64 overflow-y-auto">{shown.map((option) => { const checked = values.includes(option); return <button type="button" key={option} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-accent" onClick={() => onChange(checked ? values.filter((value) => value !== option) : [...values, option])}><span className={cn("flex h-4 w-4 items-center justify-center rounded border", checked && "border-primary bg-primary text-primary-foreground")}>{checked && <Check className="h-3 w-3" />}</span><span className="truncate">{formatOption(option)}</span></button>; })}</div>{shown.length === 0 && <p className="px-2 py-6 text-center text-muted-foreground">No {label.toLowerCase()}s found</p>}{values.length > 0 && <Button variant="ghost" size="sm" className="mt-2 w-full" onClick={() => onChange([])}><X className="h-3.5 w-3.5" />Clear</Button>}</PopoverContent></Popover>;
 }
 
 function DateFilter({ filters, onChange }: { filters: Filters; onChange: (filters: Filters) => void }) {
@@ -267,5 +299,5 @@ function MoreFilters({ filters, onChange }: { filters: Filters; onChange: (filte
 
 function ResultRow({ result, selected, onClick }: { result: CommentSearchResult; selected: boolean; onClick: () => void }) {
   const fencers = result.taggedFencer ? <><span className="font-medium">{result.taggedFencer}</span>{result.opponent && <span className="text-muted-foreground"> vs {result.opponent}</span>}</> : <span className="font-medium">{[result.leftFencer, result.rightFencer].filter(Boolean).join(" vs ") || "Unknown fencers"}</span>;
-  return <button type="button" disabled={!result.replayAvailable} onClick={onClick} className={cn("grid w-full grid-cols-[minmax(0,1fr)_auto] gap-3 border-b p-4 text-left last:border-b-0", result.replayAvailable ? "hover:bg-accent/45" : "cursor-default opacity-70", selected && "bg-accent/65")}><div className="min-w-0"><div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">{fencers}{result.action && <Badge variant="outline">{result.action}</Badge>}{result.mistake && <Badge variant="outline" className="capitalize">{result.mistake}</Badge>}</div><p className="mt-2 truncate text-sm text-muted-foreground">{result.comment || "No comment"}</p><p className="mt-2 text-xs text-muted-foreground">{result.boutDate || "Date unknown"}{result.period && ` · Period ${result.period}`}{result.matchClock && ` · ${result.matchClock}`}</p></div><div className="flex items-center gap-1.5 text-xs text-muted-foreground">{result.replayAvailable ? <><Play className="h-3.5 w-3.5" /> Replay</> : <><VideoOff className="h-3.5 w-3.5" /> No replay</>}</div></button>;
+  return <button type="button" disabled={!result.replayAvailable} onClick={onClick} className={cn("grid w-full grid-cols-[minmax(0,1fr)_auto] gap-3 border-b p-4 text-left last:border-b-0", result.replayAvailable ? "hover:bg-accent/45" : "cursor-default opacity-70", selected && "bg-accent/65")}><div className="min-w-0"><div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">{fencers}{result.action && <Badge variant="outline">{result.action}</Badge>}{result.mistake && <Badge variant="outline">{LEGACY_MISTAKE_LABELS[result.mistake]}</Badge>}{result.failureMode && <Badge variant="outline">{formatFailureMode(result.failureMode)}</Badge>}{result.failureCause && <Badge variant="secondary">{formatFailureCause(result.failureCause)}</Badge>}</div><p className="mt-2 truncate text-sm text-muted-foreground">{result.comment || "No comment"}</p><p className="mt-2 text-xs text-muted-foreground">{result.boutDate || "Date unknown"}{result.period && ` · Period ${result.period}`}{result.matchClock && ` · ${result.matchClock}`}</p></div><div className="flex items-center gap-1.5 text-xs text-muted-foreground">{result.replayAvailable ? <><Play className="h-3.5 w-3.5" /> Replay</> : <><VideoOff className="h-3.5 w-3.5" /> No replay</>}</div></button>;
 }

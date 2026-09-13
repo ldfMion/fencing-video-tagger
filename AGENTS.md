@@ -1,9 +1,17 @@
+# Fencing Video Tagger
+
+This project is a personal tool that is not currently not deployed for public access. I run it locally using videos in a folder in my laptop. Its purpose is for me to analyze my fencing videos to better understand my fencing or scount opponents. It also allows me to collect and calculate fencing statistics that I use in these analyses. 
+
+The app's design is focused in looking pleasing with controls that make taking actions very quickly, including keyboard shortcuts. The app design is also inspired by Linear in its UX but with more expressive colors.
+
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-This is a Next.js 16 App Router project for tagging and analyzing fencing bouts. Route entry points live in `app/`, including the main library page at `app/page.tsx`, bout detail pages in `app/bouts/[id]/page.tsx`, and fencer views in `app/fencers/[name]/page.tsx`.
+This is a Next.js 16 App Router project for tagging and analyzing fencing bouts. Route entry points live in `app/`, including the main library page at `app/page.tsx`, bout detail pages in `app/bouts/[id]/page.tsx`, and fencer views in `app/fencers/[name]/page.tsx`. 
 
 Reusable UI lives in `components/`, with base shadcn/Radix primitives under `components/ui/`. Shared state and behavior belong in `hooks/` and `contexts/`. Domain logic, schemas, scoring, and constants belong in `lib/`. Static assets live in `public/`, and one-off utilities such as CSV import scripts live in `scripts/`.
+
+Having a clean architecture and code structure is of utmost importance in this project.
 
 ## Build, Test, and Development Commands
 - `pnpm dev`: start the local dev server on `http://localhost:3000`.
@@ -15,12 +23,14 @@ Reusable UI lives in `components/`, with base shadcn/Radix primitives under `com
 Use `pnpm` consistently; the lockfile and workspace config are already committed.
 
 ## Coding Style & Naming Conventions
-Write TypeScript with 2-space indentation avoided here in favor of the repository’s existing formatter output: follow the current file style exactly. Use double quotes, trailing commas where the codebase already has them, and keep React components in PascalCase (`VideoPlayer.tsx`), hooks in `use-*` form (`use-video.ts`), and shared helpers in `lib/`.
-
-Do not duplicate scoring or styling rules in components. Reuse `lib/score.ts`, `lib/constants.ts`, and the UI primitives in `components/ui/`. Prefer small client components and colocate route-specific logic with the route.
+- Prefer a functional typescript coding style. 
+- Keep the code modularized.
+- Create temporary variables with descriptive names, keep functions short, and give functions descriptive names even if they get long.
+- Do not duplicate scoring or styling rules in components. Reuse `lib/score.ts`, `lib/constants.ts`, and the UI primitives in `components/ui/`. Prefer small client components and colocate route-specific logic with the route. 
+- Do not hadn roll components, always import them from ShadCn. If there is any UI you want to create, first check ShadCn for any components that would fit the use case.
 
 ## Testing Guidelines
-There is no dedicated test suite configured yet. For now, treat `pnpm lint` and `pnpm exec tsc --noEmit` as the required checks before opening a PR. Do not rely on `pnpm build` in sandboxed environments for routine validation in this repo, because it will fail on blocked Google Fonts fetches. When adding tests later, place them next to the feature or in a clear `__tests__` location and name them after the unit under test.
+There is no dedicated test suite configured yet. For now, treat `pnpm lint` and `pnpm exec tsc --noEmit` as the required checks before opening a PR. Do not rely on `pnpm build` in sandboxed environments for routine validation in this repo, because it will fail on blocked Google Fonts fetches. 
 
 ## Build Environment Notes
 `pnpm build` is expected to fail inside restricted sandboxes that cannot reach external Google Fonts URLs. In this repo, that shows up as `next/font` fetch failures for fonts such as `Geist`, `Geist Mono`, or `IBM Plex Sans`, and it should be treated as an environment/network limitation rather than an application build regression. Do not keep retrying `pnpm build` during normal validation unless the environment has external font access.
@@ -30,8 +40,7 @@ Recent commits use short, imperative summaries such as `added some charts` and `
 
 PRs should explain the user-visible behavior change, note any data-model or localStorage impact, and include screenshots or short recordings for UI updates. Link the related issue when applicable and list the commands you ran to validate the change.
 
-## Security & Data Notes
-Session data is stored in browser `localStorage`. Avoid introducing secrets into client code, and document any schema changes in `lib/types.ts` so stored sessions remain migratable.
+Before committing or when making a pull request, check if the changes require any modification to AGENTS.md and apply it.
 
 ## Local Video Library Notes
 `VIDEO_LIBRARY_ROOT` must point to a locally readable directory. Avoid protected macOS locations such as `~/Library/Mobile Documents/...` unless the running Node/Next.js process has permission to read them. If the route handlers cannot read the directory or file, persisted attached videos will fail after reload even if temporary blob playback worked earlier.

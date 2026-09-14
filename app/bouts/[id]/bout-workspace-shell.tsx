@@ -4,7 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   AlertCircle,
+  ChevronDown,
   Columns2,
+  HeartPulse,
   Library,
   Loader2,
   PanelRight,
@@ -22,6 +24,13 @@ import { VideoPlayer } from "@/components/video-player";
 import { Badge } from "@/components/ui/badge";
 import { AppearanceMenu } from "@/components/appearance-menu";
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Dialog,
   DialogContent,
@@ -64,6 +73,7 @@ type BoutWorkspaceTab = "tagging" | "analysis";
 type TaggingLayout = "rail" | "split";
 
 const TAGGING_LAYOUT_STORAGE_KEY = "fencing-video-tagger-layout";
+const HEART_RATE_VISIBILITY_STORAGE_KEY = "fencing-video-tagger-heart-rate-visible";
 
 export function BoutWorkspaceShell({
   boutId,
@@ -78,6 +88,7 @@ export function BoutWorkspaceShell({
   const hasAppliedInitialTagRef = useRef(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isLibraryPickerOpen, setIsLibraryPickerOpen] = useState(false);
+  const [isWorkspaceOptionsOpen, setIsWorkspaceOptionsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<BoutWorkspaceTab>("tagging");
   const [editingTagId, setEditingTagId] = useState<string | null>(null);
   const [copyFeedback, setCopyFeedback] = useState<"idle" | "copied" | "error">("idle");
@@ -86,6 +97,7 @@ export function BoutWorkspaceShell({
   const [heartRateError, setHeartRateError] = useState<string | null>(null);
   const [isMatchingHeartRate, setIsMatchingHeartRate] = useState(false);
   const [taggingLayout, setTaggingLayout] = useState<TaggingLayout>("rail");
+  const [isHeartRateVisible, setIsHeartRateVisible] = useState(true);
 
   const video = useVideo();
   const {
@@ -248,9 +260,15 @@ export function BoutWorkspaceShell({
 
   useEffect(() => {
     const storedLayout = window.localStorage.getItem(TAGGING_LAYOUT_STORAGE_KEY);
+    const storedHeartRateVisibility = window.localStorage.getItem(
+      HEART_RATE_VISIBILITY_STORAGE_KEY,
+    );
 
     if (storedLayout === "rail" || storedLayout === "split") {
       setTaggingLayout(storedLayout);
+    }
+    if (storedHeartRateVisibility === "false") {
+      setIsHeartRateVisible(false);
     }
   }, []);
 
@@ -261,6 +279,14 @@ export function BoutWorkspaceShell({
 
     setTaggingLayout(nextLayout);
     window.localStorage.setItem(TAGGING_LAYOUT_STORAGE_KEY, nextLayout);
+  }, []);
+
+  const handleHeartRateVisibilityChange = useCallback((visible: boolean) => {
+    setIsHeartRateVisible(visible);
+    window.localStorage.setItem(
+      HEART_RATE_VISIBILITY_STORAGE_KEY,
+      String(visible),
+    );
   }, []);
 
   useEffect(() => {
@@ -477,7 +503,7 @@ export function BoutWorkspaceShell({
     </div>
   );
 
-  const heartRatePanel = (
+  const heartRatePanel = isHeartRateVisible ? (
     <HeartRateCard
       canMatch={hasAttachedLibraryVideo}
       currentTime={video.currentTime}
@@ -487,7 +513,7 @@ export function BoutWorkspaceShell({
       onMatch={handleMatchHeartRate}
       onSeek={activeVideoUrl ? video.seek : undefined}
     />
-  );
+  ) : null;
 
   const tagFormPanel = (
     <div className="tagging-dock shrink-0 py-1">
@@ -556,30 +582,7 @@ export function BoutWorkspaceShell({
           </TabsList>
 
           <div className="flex items-center justify-end gap-1.5">
-            <ToggleGroup
-              type="single"
-              value={taggingLayout}
-              onValueChange={handleLayoutChange}
-              variant="outline"
-              size="sm"
-              aria-label="Tagging page layout"
-            >
-              <ToggleGroupItem value="rail" aria-label="Rail layout" title="Rail layout">
-                <PanelRight className="h-3.5 w-3.5" />
-                <span className="hidden xl:inline">Rail</span>
-              </ToggleGroupItem>
-              <ToggleGroupItem value="split" aria-label="Side-by-side layout" title="Side-by-side layout">
-                <Columns2 className="h-3.5 w-3.5" />
-                <span className="hidden xl:inline">Split</span>
-              </ToggleGroupItem>
-            </ToggleGroup>
             <AppearanceMenu compact />
-            <BoutExportButton
-              exportBoutToCsv={() => exportSessionCsv(session.id)}
-              fileName={`fencing-bout-${session.id}-${getTodayIsoDate()}.csv`}
-              disabled={!session}
-              size="sm"
-            />
             <input
               ref={fileInputRef}
               type="file"
@@ -587,23 +590,90 @@ export function BoutWorkspaceShell({
               onChange={handleFileSelect}
               className="hidden"
             />
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setIsLibraryPickerOpen(true)}
-              className="text-[11px]"
+            <Popover
+              open={isWorkspaceOptionsOpen}
+              onOpenChange={setIsWorkspaceOptionsOpen}
             >
-              <Video className="mr-1.5 h-4 w-4" />
-              {hasAttachedLibraryVideo ? "Change video" : "Attach video"}
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => fileInputRef.current?.click()}
-              className="text-[11px]"
-            >
-              <Upload className="mr-1.5 h-4 w-4" />
-              Open file
-            </Button>
+              <PopoverTrigger asChild>
+                <Button size="sm" variant="outline" className="text-[11px]">
+                  Options
+                  <ChevronDown data-icon="inline-end" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-64 p-2">
+                <PopoverHeader className="px-1 pb-2">
+                  <PopoverTitle>Workspace options</PopoverTitle>
+                </PopoverHeader>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between gap-3 px-1">
+                    <span className="flex items-center gap-2 text-xs font-medium">
+                      <HeartPulse />
+                      Heart rate
+                    </span>
+                    <ToggleGroup
+                      type="single"
+                      value={isHeartRateVisible ? "shown" : "hidden"}
+                      onValueChange={(value) => {
+                        if (value) handleHeartRateVisibilityChange(value === "shown");
+                      }}
+                      variant="outline"
+                      size="sm"
+                      aria-label="Heart rate visibility"
+                    >
+                      <ToggleGroupItem value="shown">Show</ToggleGroupItem>
+                      <ToggleGroupItem value="hidden">Hide</ToggleGroupItem>
+                    </ToggleGroup>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 px-1">
+                    <span className="text-xs font-medium">Layout</span>
+                    <ToggleGroup
+                      type="single"
+                      value={taggingLayout}
+                      onValueChange={handleLayoutChange}
+                      variant="outline"
+                      size="sm"
+                      aria-label="Tagging page layout"
+                    >
+                      <ToggleGroupItem value="rail" aria-label="Rail layout">
+                        <PanelRight />
+                        Rail
+                      </ToggleGroupItem>
+                      <ToggleGroupItem value="split" aria-label="Side-by-side layout">
+                        <Columns2 />
+                        Split
+                      </ToggleGroupItem>
+                    </ToggleGroup>
+                  </div>
+                  <BoutExportButton
+                    exportBoutToCsv={() => exportSessionCsv(session.id)}
+                    fileName={`fencing-bout-${session.id}-${getTodayIsoDate()}.csv`}
+                    disabled={!session}
+                    size="sm"
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setIsWorkspaceOptionsOpen(false);
+                      setIsLibraryPickerOpen(true);
+                    }}
+                  >
+                    <Video data-icon="inline-start" />
+                    {hasAttachedLibraryVideo ? "Change video" : "Attach video"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setIsWorkspaceOptionsOpen(false);
+                      fileInputRef.current?.click();
+                    }}
+                  >
+                    <Upload data-icon="inline-start" />
+                    Open file
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
 
           <NewBoutDialog

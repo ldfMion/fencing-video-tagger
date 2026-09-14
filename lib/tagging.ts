@@ -113,21 +113,24 @@ export function assertTagMetadataMatchesSession(
     Tag,
     | "failureCause"
     | "failureMode"
+    | "comment"
     | "matchClock"
     | "matchPeriod"
     | "mistake"
+    | "side"
     | "stripZone"
   >,
 ): void {
   const requiresMatchClock = isMatchClockEnabled(session);
   const requiresStripZone = isStripZoneEnabled(session);
+  const isCommentOnly = !tag.side && Boolean(tag.comment.trim());
 
-  if (requiresMatchClock) {
+  if (requiresMatchClock && !isCommentOnly) {
     MatchPeriodSchema.parse(tag.matchPeriod);
     MatchClockSchema.parse(tag.matchClock);
   }
 
-  if (requiresStripZone) {
+  if (requiresStripZone && !isCommentOnly) {
     StripZoneSchema.parse(tag.stripZone);
   }
 

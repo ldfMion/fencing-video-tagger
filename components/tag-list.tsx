@@ -223,6 +223,11 @@ export function TagList({
                 key={tag.id}
                 role={tag.timestamp != null && onSeek ? "button" : undefined}
                 tabIndex={tag.timestamp != null && onSeek ? 0 : undefined}
+                aria-label={
+                  tag.timestamp != null && onSeek
+                    ? `Seek to ${formatTime(tag.timestamp)}`
+                    : undefined
+                }
                 className={cn(
                   "tag-card group rounded-lg border border-border/70 bg-card px-3 py-3 transition-colors hover:border-foreground/20",
                   tag.timestamp != null && onSeek && "cursor-pointer",
@@ -237,6 +242,7 @@ export function TagList({
                 }}
                 onKeyDown={(event) => {
                   if (
+                    event.target === event.currentTarget &&
                     tag.timestamp != null &&
                     onSeek &&
                     (event.key === "Enter" || event.key === " ")

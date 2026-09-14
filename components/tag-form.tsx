@@ -159,6 +159,7 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
     () => normalizeMatchClockInput(matchClock),
     [matchClock],
   );
+  const isCommentOnly = !side && Boolean(comment.trim());
   const filteredActions = useMemo(() => {
     if (!actionSearch) {
       return ACTION_CODES;
@@ -169,8 +170,8 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
   }, [actionSearch]);
   const canSubmit = Boolean(
     (side || comment.trim()) &&
-      (!requiresMatchClock || normalizedMatchClock) &&
-      (!requiresStripZone || stripZone),
+      (isCommentOnly || !requiresMatchClock || normalizedMatchClock) &&
+      (isCommentOnly || !requiresStripZone || stripZone),
   );
 
   const commentRef = useRef<HTMLTextAreaElement>(null);
@@ -210,11 +211,14 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
       event?.preventDefault();
 
       if (!side && !comment.trim()) return false;
-      if (requiresMatchClock && !normalizedMatchClock) return false;
-      if (requiresStripZone && !stripZone) return false;
+      const isCommentOnlyTag = !side && Boolean(comment.trim());
+      if (!isCommentOnlyTag && requiresMatchClock && !normalizedMatchClock) return false;
+      if (!isCommentOnlyTag && requiresStripZone && !stripZone) return false;
 
       let timestamp: number | undefined;
-      if (isVideoMode) {
+      if (editingTag) {
+        timestamp = editingTag.timestamp;
+      } else if (isVideoMode) {
         timestamp = currentTime;
       } else if (manualTime.trim()) {
         timestamp = parseManualTime(manualTime);
@@ -228,9 +232,9 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
         mistake,
         failureMode,
         failureCause,
-        matchPeriod: requiresMatchClock ? matchPeriod : undefined,
-        matchClock: requiresMatchClock ? normalizedMatchClock : undefined,
-        stripZone: requiresStripZone ? stripZone : undefined,
+        matchPeriod: !isCommentOnlyTag && requiresMatchClock ? matchPeriod : undefined,
+        matchClock: !isCommentOnlyTag && requiresMatchClock ? normalizedMatchClock : undefined,
+        stripZone: !isCommentOnlyTag && requiresStripZone ? stripZone : undefined,
       };
 
       if (editingTag) {
@@ -299,7 +303,7 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
                 ) : null}
               </p>
               <span className="text-[10px] text-muted-foreground">
-                Save updates time
+                Timestamp preserved
               </span>
             </div>
           ) : null}
@@ -329,7 +333,14 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
           </Tooltip>
 
           <div className="tag-composer-meta">
-            {isVideoMode ? (
+            {isEditing ? (
+              <span className="inline-flex items-center gap-1.5">
+                <Clock className="size-3" />
+                {editingTag?.timestamp != null
+                  ? formatTime(editingTag.timestamp)
+                  : "No timestamp"}
+              </span>
+            ) : isVideoMode ? (
               <span className="inline-flex items-center gap-1.5">
                 <Clock className="size-3" />
                 {formatTime(currentTime)}

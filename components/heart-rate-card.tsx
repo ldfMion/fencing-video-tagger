@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { ChevronDown, ChevronUp, HeartPulse, Loader2, RefreshCw } from "lucide-react";
+import { useMemo } from "react";
+import { HeartPulse, Loader2, RefreshCw } from "lucide-react";
 import {
   HEART_RATE_ZONES,
   getHeartRateZoneColor,
@@ -36,7 +36,6 @@ export function HeartRateCard({
   onMatch,
   onSeek,
 }: HeartRateCardProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
   const currentSample = useMemo(
     () => data ? findClosestSample(data.samples, currentTime) : null,
     [currentTime, data],
@@ -82,23 +81,10 @@ export function HeartRateCard({
             )}
             {isMatching ? "Scanning export…" : data ? "Rematch" : "Match from Apple Health"}
           </Button>
-          <Button
-            size="icon-xs"
-            variant="ghost"
-            onClick={() => setIsExpanded((expanded) => !expanded)}
-            aria-label={isExpanded ? "Hide heart rate chart" : "Show heart rate chart"}
-            aria-expanded={isExpanded}
-          >
-            {isExpanded ? (
-              <ChevronUp className="h-3.5 w-3.5" />
-            ) : (
-              <ChevronDown className="h-3.5 w-3.5" />
-            )}
-          </Button>
         </div>
       </CardHeader>
 
-      {isExpanded ? <CardContent className="px-3">
+      <CardContent className="px-3">
         {data ? (
           <HeartRateChart
             currentTime={currentTime}
@@ -111,7 +97,7 @@ export function HeartRateCard({
           </p>
         )}
         {error ? <p className="mt-1 text-[11px] text-destructive">{error}</p> : null}
-      </CardContent> : null}
+      </CardContent>
     </Card>
   );
 }

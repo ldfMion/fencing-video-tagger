@@ -34,11 +34,12 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Check, ChevronsUpDown, Clock } from "lucide-react";
+import { Plus, ChevronDown, Clock } from "lucide-react";
 import {
   FAILURE_CAUSES,
   FAILURE_CAUSE_DESCRIPTIONS,
@@ -411,10 +412,13 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
                           )}
                         >
                           {action ?? "Select..."}
-                          <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
+                          <ChevronDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-[190px] p-0" align="start">
+                      <PopoverContent
+                        className="w-(--radix-popover-trigger-width) p-0"
+                        align="start"
+                      >
                         <Command className="tag-action-command">
                           <CommandInput
                             placeholder="Search action..."
@@ -428,6 +432,7 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
                                 <CommandItem
                                   key={code}
                                   value={code}
+                                  data-checked={action === code}
                                   onSelect={() => {
                                     setAction(
                                       action === code
@@ -438,14 +443,6 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
                                     setActionSearch("");
                                   }}
                                 >
-                                  <Check
-                                    className={cn(
-                                      "mr-2 h-4 w-4",
-                                      action === code
-                                        ? "opacity-100"
-                                        : "opacity-0",
-                                    )}
-                                  />
                                   {code}
                                 </CommandItem>
                               ))}
@@ -489,9 +486,10 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
                     <TooltipTrigger asChild>
                       <SelectTrigger
                         size="sm"
+                        variant="outline"
                         aria-label="Failure mode"
                         className={cn(
-                          "h-7 min-w-0 flex-1 text-[11px]",
+                          "min-w-0 flex-1 justify-between",
                           failureMode && "border-primary/40 bg-primary/5",
                         )}
                       >
@@ -506,17 +504,23 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
                       </p>
                     </TooltipContent>
                   </Tooltip>
-                  <SelectContent align="start">
-                    <SelectItem value="none">None</SelectItem>
-                    {FAILURE_MODES.map((mode) => (
-                      <SelectItem
-                        key={mode}
-                        value={mode}
-                        title={FAILURE_MODE_DESCRIPTIONS[mode]}
-                      >
-                        {FAILURE_MODE_LABELS[mode]}
-                      </SelectItem>
-                    ))}
+                  <SelectContent
+                    align="start"
+                    position="popper"
+                    sideOffset={4}
+                  >
+                    <SelectGroup>
+                      <SelectItem value="none">None</SelectItem>
+                      {FAILURE_MODES.map((mode) => (
+                        <SelectItem
+                          key={mode}
+                          value={mode}
+                          title={FAILURE_MODE_DESCRIPTIONS[mode]}
+                        >
+                          {FAILURE_MODE_LABELS[mode]}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
 
@@ -535,9 +539,10 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
                     <TooltipTrigger asChild>
                       <SelectTrigger
                         size="sm"
+                        variant="outline"
                         aria-label="Failure cause"
                         className={cn(
-                          "h-7 min-w-0 flex-1 text-[11px]",
+                          "min-w-0 flex-1 justify-between",
                           failureCause && "border-primary/40 bg-primary/5",
                         )}
                       >
@@ -554,17 +559,23 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
                       </p>
                     </TooltipContent>
                   </Tooltip>
-                  <SelectContent align="start">
-                    <SelectItem value="none">None</SelectItem>
-                    {FAILURE_CAUSES.map((cause) => (
-                      <SelectItem
-                        key={cause}
-                        value={cause}
-                        title={FAILURE_CAUSE_DESCRIPTIONS[cause]}
-                      >
-                        {FAILURE_CAUSE_LABELS[cause]}
-                      </SelectItem>
-                    ))}
+                  <SelectContent
+                    align="start"
+                    position="popper"
+                    sideOffset={4}
+                  >
+                    <SelectGroup>
+                      <SelectItem value="none">None</SelectItem>
+                      {FAILURE_CAUSES.map((cause) => (
+                        <SelectItem
+                          key={cause}
+                          value={cause}
+                          title={FAILURE_CAUSE_DESCRIPTIONS[cause]}
+                        >
+                          {FAILURE_CAUSE_LABELS[cause]}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
               </div>

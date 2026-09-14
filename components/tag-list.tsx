@@ -221,23 +221,33 @@ export function TagList({
             filteredTags.map((tag, index) => (
               <div
                 key={tag.id}
+                role={tag.timestamp != null && onSeek ? "button" : undefined}
+                tabIndex={tag.timestamp != null && onSeek ? 0 : undefined}
                 className={cn(
                   "tag-card group rounded-lg border border-border/70 bg-card px-3 py-3 transition-colors hover:border-foreground/20",
+                  tag.timestamp != null && onSeek && "cursor-pointer",
                   tag.side === "L" && "tag-card-left",
                   tag.side === "R" && "tag-card-right",
                   editingTagId === tag.id && "ring-2 ring-primary/30",
                 )}
+                onClick={() => {
+                  if (tag.timestamp != null && onSeek) {
+                    onSeek(tag.timestamp - SEEK_BUFFER);
+                  }
+                }}
+                onKeyDown={(event) => {
+                  if (
+                    tag.timestamp != null &&
+                    onSeek &&
+                    (event.key === "Enter" || event.key === " ")
+                  ) {
+                    event.preventDefault();
+                    onSeek(tag.timestamp - SEEK_BUFFER);
+                  }
+                }}
               >
                 <div className="flex items-start justify-between gap-2">
-                  <button
-                    onClick={() => {
-                      if (tag.timestamp != null && onSeek) {
-                        onSeek(tag.timestamp - SEEK_BUFFER);
-                      }
-                    }}
-                    className="text-left"
-                    disabled={tag.timestamp == null && !onSeek}
-                  >
+                  <div className="text-left">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-mono text-sm text-primary">
                         {tag.timestamp != null
@@ -286,21 +296,21 @@ export function TagList({
                       {tag.failureMode && (
                         <Badge
                           variant="outline"
-                          className="tag-failure-mode-badge px-1.5 py-0 text-xs"
+                          className="tag-mistake-badge tag-failure-mode-badge px-1.5 py-0 text-xs"
                         >
                           {formatFailureMode(tag.failureMode)}
                         </Badge>
                       )}
                       {tag.failureCause && (
                         <Badge
-                          variant="secondary"
-                          className="tag-failure-cause-badge px-1.5 py-0 text-xs"
+                          variant="outline"
+                          className="tag-mistake-badge tag-failure-cause-badge px-1.5 py-0 text-xs"
                         >
                           {formatFailureCause(tag.failureCause)}
                         </Badge>
                       )}
                     </div>
-                  </button>
+                  </div>
                   <div className="flex items-center gap-1">
                     <Button
                       variant="ghost"
@@ -348,18 +358,7 @@ export function TagList({
                   </div>
                 </div>
                 {tag.comment && (
-                  <p
-                    className="text-sm text-muted-foreground mt-1"
-                    style={{
-                      cursor:
-                        tag.timestamp != null && onSeek ? "pointer" : "default",
-                    }}
-                    onClick={() => {
-                      if (tag.timestamp != null && onSeek) {
-                        onSeek(tag.timestamp - SEEK_BUFFER);
-                      }
-                    }}
-                  >
+                  <p className="text-sm text-muted-foreground mt-1">
                     {tag.comment}
                   </p>
                 )}

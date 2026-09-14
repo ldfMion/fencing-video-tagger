@@ -62,11 +62,10 @@ function createVideoStream(
   options?: { start?: number; end?: number },
 ): ReadableStream<Uint8Array> {
   const stream = createReadStream(absolutePath, options);
+  let isClosed = false;
 
   return new ReadableStream<Uint8Array>({
     start(controller) {
-      let isClosed = false;
-
       const closeController = () => {
         if (!isClosed) {
           isClosed = true;
@@ -96,6 +95,7 @@ function createVideoStream(
       stream.once("error", errorController);
     },
     cancel() {
+      isClosed = true;
       stream.destroy();
     },
   });

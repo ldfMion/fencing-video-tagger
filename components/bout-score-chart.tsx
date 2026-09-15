@@ -8,13 +8,14 @@ import {
   ReferenceLine,
   XAxis,
   YAxis,
+  type TooltipContentProps,
 } from "recharts";
+import { TagSummary } from "@/components/tag-summary";
 import {
   ChartContainer,
   ChartLegend,
   ChartLegendContent,
   ChartTooltip,
-  ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
 import { formatMatchPeriodLabel } from "@/lib/tagging";
@@ -27,12 +28,14 @@ import { formatTime } from "@/lib/utils";
 
 interface BoutScoreChartProps {
   tags: Tag[];
+  matchClockEnabled?: boolean;
   leftFencer?: string;
   rightFencer?: string;
 }
 
 export function BoutScoreChart({
   tags,
+  matchClockEnabled = false,
   leftFencer = "Left",
   rightFencer = "Right",
 }: BoutScoreChartProps) {
@@ -103,7 +106,7 @@ export function BoutScoreChart({
             axisLine={false}
             tickMargin={8}
             tickFormatter={(value) =>
-              formatAxisTick(value, chartData.xMode)
+              formatAxisTick(value, chartData.xMode, chartData.domainMax)
             }
           />
           <YAxis
@@ -130,15 +133,11 @@ export function BoutScoreChart({
           ))}
           <ChartTooltip
             content={
-              <ChartTooltipContent
-                labelFormatter={(_, payload) =>
-                  formatTooltipLabel(
-                    payload[0]?.payload as ScoreProgressionPoint | undefined,
-                    chartData.xMode,
-                    leftFencer,
-                    rightFencer,
-                  )
-                }
+              <ScoreProgressionTooltip
+                xMode={chartData.xMode}
+                matchClockEnabled={matchClockEnabled}
+                leftFencer={leftFencer}
+                rightFencer={rightFencer}
               />
             }
           />
@@ -167,12 +166,74 @@ export function BoutScoreChart({
   );
 }
 
-function formatAxisTick(value: number, xMode: "event" | "time"): string {
+function formatAxisTick(
+  value: number,
+  xMode: "event" | "time",
+  domainMax: number,
+): string {
   if (xMode === "time") {
-    return formatTime(value);
+    const adjustedValue = value === domainMax && value > 0 ? value - 1 : value;
+    const periodIndex = Math.min(Math.floor(adjustedValue / 180), 3);
+    const periodStart = periodIndex * 180;
+    const periodDuration = periodIndex === 3 ? 60 : 180;
+    const elapsedInPeriod = value - periodStart;
+    const remainingSeconds = Math.max(0, periodDuration - elapsedInPeriod);
+    const period = periodIndex === 3 ? "Pri" : `P${periodIndex + 1}`;
+
+    return `${period} ${formatTime(remainingSeconds)}`;
   }
 
   return value === 0 ? "Start" : `${value}`;
+}
+
+interface ScoreProgressionTooltipProps
+  extends Partial<TooltipContentProps<number, string>> {
+  xMode: "event" | "time";
+  matchClockEnabled: boolean;
+  leftFencer: string;
+  rightFencer: string;
+}
+
+function ScoreProgressionTooltip({
+  active,
+  payload,
+  xMode,
+  matchClockEnabled,
+  leftFencer,
+  rightFencer,
+}: ScoreProgressionTooltipProps) {
+  const point = payload?.[0]?.payload as ScoreProgressionPoint | undefined;
+
+  if (!active || !point) {
+    return null;
+  }
+
+  const tag = point.tag;
+
+  return (
+    <div className="tag-card grid max-w-80 gap-2 rounded-lg border border-border/70 bg-card px-3 py-3 text-xs shadow-md">
+      {tag ? (
+        <TagSummary
+          tag={tag}
+          matchClockEnabled={matchClockEnabled}
+          fallbackIndex={point.eventIndex}
+        />
+      ) : (
+        <p className="font-medium">
+          {formatTooltipLabel(point, xMode, leftFencer, rightFencer)}
+        </p>
+      )}
+      <p className="border-t pt-2 text-muted-foreground">
+        <span className="font-medium text-foreground">
+          {formatTooltipLabel(point, xMode, leftFencer, rightFencer)}
+        </span>
+        <span className="mx-1.5">·</span>
+        <span className="font-mono tabular-nums">
+          {leftFencer} {point.leftScore}–{point.rightScore} {rightFencer}
+        </span>
+      </p>
+    </div>
+  );
 }
 
 function formatTooltipLabel(

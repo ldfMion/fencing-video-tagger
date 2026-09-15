@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Toggle } from "@/components/ui/toggle";
 import {
@@ -18,16 +17,8 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Check, Copy, ChevronDown, Pencil, Trash2, X } from "lucide-react";
+import { TagSummary } from "@/components/tag-summary";
 import { SIDE_COLORS } from "@/lib/constants";
-import {
-  formatFailureCause,
-  formatFailureMode,
-  LEGACY_MISTAKE_LABELS,
-} from "@/lib/failure-classification";
-import {
-  formatMatchPeriodLabel,
-  formatStripZoneLabel,
-} from "@/lib/tagging";
 import type { ActionCode, Side, Tag } from "@/lib/types";
 import { cn, formatTime, sortTags } from "@/lib/utils";
 
@@ -35,6 +26,7 @@ const SEEK_BUFFER = 3;
 
 interface TagListProps {
   tags: Tag[];
+  matchClockEnabled?: boolean;
   onSeek?: (time: number) => void;
   onEdit: (tagId: string) => void;
   onDelete: (tagId: string) => void;
@@ -45,6 +37,7 @@ interface TagListProps {
 
 export function TagList({
   tags,
+  matchClockEnabled = false,
   onSeek,
   onEdit,
   onDelete,
@@ -253,70 +246,12 @@ export function TagList({
                 }}
               >
                 <div className="flex items-start justify-between gap-2">
-                  <div className="text-left">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-mono text-sm text-primary">
-                        {tag.timestamp != null
-                          ? formatTime(tag.timestamp)
-                          : `#${index + 1}`}
-                      </span>
-                      {tag.side && (
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "px-1.5 py-0 text-xs",
-                            tag.side === "L"
-                              ? cn(SIDE_COLORS.left.badge, "tag-side-badge-left")
-                              : cn(SIDE_COLORS.right.badge, "tag-side-badge-right"),
-                          )}
-                        >
-                          {tag.side}
-                        </Badge>
-                      )}
-                      {tag.action && (
-                        <Badge
-                          variant="outline"
-                          className="tag-action-badge px-1.5 py-0 text-xs"
-                        >
-                          {tag.action}
-                        </Badge>
-                      )}
-                      {formatMatchPeriodLabel(tag.matchPeriod) && tag.matchClock ? (
-                        <Badge variant="outline" className="text-xs px-1.5 py-0">
-                          {formatMatchPeriodLabel(tag.matchPeriod)} {tag.matchClock}
-                        </Badge>
-                      ) : null}
-                      {formatStripZoneLabel(tag.stripZone) ? (
-                        <Badge variant="outline" className="text-xs px-1.5 py-0">
-                          {formatStripZoneLabel(tag.stripZone)}
-                        </Badge>
-                      ) : null}
-                      {tag.mistake && (
-                        <Badge
-                          variant="outline"
-                          className="tag-mistake-badge px-1.5 py-0 text-xs"
-                        >
-                          {LEGACY_MISTAKE_LABELS[tag.mistake]}
-                        </Badge>
-                      )}
-                      {tag.failureMode && (
-                        <Badge
-                          variant="outline"
-                          className="tag-mistake-badge tag-failure-mode-badge px-1.5 py-0 text-xs"
-                        >
-                          {formatFailureMode(tag.failureMode)}
-                        </Badge>
-                      )}
-                      {tag.failureCause && (
-                        <Badge
-                          variant="outline"
-                          className="tag-mistake-badge tag-failure-cause-badge px-1.5 py-0 text-xs"
-                        >
-                          {formatFailureCause(tag.failureCause)}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
+                  <TagSummary
+                    tag={tag}
+                    matchClockEnabled={matchClockEnabled}
+                    fallbackIndex={index + 1}
+                    className="flex-1 text-left"
+                  />
                   <div className="flex items-center gap-1">
                     <Button
                       variant="ghost"
@@ -363,11 +298,6 @@ export function TagList({
                     </Button>
                   </div>
                 </div>
-                {tag.comment && (
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {tag.comment}
-                  </p>
-                )}
               </div>
             ))
           )}

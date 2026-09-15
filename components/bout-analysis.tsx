@@ -14,12 +14,14 @@ import type { Side, Tag } from "@/lib/types";
 
 interface BoutAnalysisProps {
   tags: Tag[];
+  matchClockEnabled?: boolean;
   leftFencer?: string;
   rightFencer?: string;
 }
 
 export function BoutAnalysis({
   tags,
+  matchClockEnabled = false,
   leftFencer = "Left",
   rightFencer = "Right",
 }: BoutAnalysisProps) {
@@ -67,6 +69,7 @@ export function BoutAnalysis({
 
       <BoutScoreChart
         tags={tags}
+        matchClockEnabled={matchClockEnabled}
         leftFencer={leftFencer}
         rightFencer={rightFencer}
       />

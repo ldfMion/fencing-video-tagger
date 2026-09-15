@@ -28,6 +28,7 @@ Use `pnpm` consistently; the lockfile and workspace config are already committed
 - Create temporary variables with descriptive names, keep functions short, and give functions descriptive names even if they get long.
 - Do not duplicate scoring or styling rules in components. Reuse `lib/score.ts`, `lib/constants.ts`, and the UI primitives in `components/ui/`. Prefer small client components and colocate route-specific logic with the route. 
 - Do not hadn roll components, always import them from ShadCn. If there is any UI you want to create, first check ShadCn for any components that would fit the use case.
+- Reduce duplicated code as much as possible. Similar UIs should be using shared components.
 
 ## Testing Guidelines
 There is no dedicated test suite configured yet. For now, treat `pnpm lint` and `pnpm exec tsc --noEmit` as the required checks before opening a PR. Do not rely on `pnpm build` in sandboxed environments for routine validation in this repo, because it will fail on blocked Google Fonts fetches. 

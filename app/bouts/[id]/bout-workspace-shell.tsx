@@ -534,6 +534,7 @@ export function BoutWorkspaceShell({
     <aside className="tag-rail min-h-0 flex-1 pl-1">
       <TagList
         tags={tags}
+        matchClockEnabled={session.taggingOptions?.matchClockEnabled === true}
         onEdit={handleEditTag}
         onDelete={handleDeleteTag}
         onSeek={activeVideoUrl ? video.seek : undefined}
@@ -727,6 +728,7 @@ export function BoutWorkspaceShell({
         <TabsContent value="analysis" className="mt-0 flex-1 overflow-auto p-4">
           <BoutAnalysis
             tags={tags}
+            matchClockEnabled={session.taggingOptions?.matchClockEnabled === true}
             leftFencer={session.leftFencer}
             rightFencer={session.rightFencer}
           />

@@ -23,6 +23,7 @@ export interface ScoreProgressionPoint {
   side?: Side;
   matchPeriod?: MatchPeriod;
   matchClock?: MatchClock;
+  tag?: Tag;
 }
 
 export interface ScoreProgressionBreak {
@@ -146,6 +147,7 @@ export function buildScoreProgressionChartData(
           side: event.tag.side,
           matchPeriod: event.tag.matchPeriod,
           matchClock: event.tag.matchClock,
+          tag: event.tag,
         })),
       ],
       breaks: [],
@@ -171,6 +173,7 @@ export function buildScoreProgressionChartData(
       side: event.tag.side,
       matchPeriod: event.tag.matchPeriod,
       matchClock: event.tag.matchClock,
+      tag: event.tag,
     })),
   ];
 

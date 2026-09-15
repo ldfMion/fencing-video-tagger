@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { deriveBoutDateFromFileMetadata } from "@/lib/date-utils";
 import { normalizeTaggingOptions } from "@/lib/tagging";
 import { cn } from "@/lib/utils";
 import type {
@@ -434,6 +435,11 @@ function DialogFormContents({
                 onCancel={() => setIsLibraryPickerOpen(false)}
                 onConfirm={(item) => {
                   setSelectedLibraryVideo(item);
+                  if (!isEditMode) {
+                    setBoutDate(
+                      deriveBoutDateFromFileMetadata(item.modifiedAt) ?? "",
+                    );
+                  }
                   setIsLibraryPickerOpen(false);
                 }}
               />

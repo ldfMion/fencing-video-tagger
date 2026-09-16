@@ -150,7 +150,7 @@ export function buildScoreProgressionChartData(
           tag: event.tag,
         })),
       ],
-      breaks: [],
+      breaks: getEventAxisBreaks(events),
       xMode: "event",
       domainMax: Math.max(1, events.length),
     };
@@ -194,6 +194,25 @@ export function buildScoreProgressionChartData(
     xMode: "time",
     domainMax: timedAxis.domainMax,
   };
+}
+
+function getEventAxisBreaks(
+  events: ScoringEvent[],
+): ScoreProgressionBreak[] {
+  return events.flatMap((event, index) => {
+    if (index === 0) {
+      return [];
+    }
+
+    const previousPeriod = events[index - 1].tag.matchPeriod;
+    const currentPeriod = event.tag.matchPeriod;
+
+    if (!previousPeriod || !currentPeriod || previousPeriod === currentPeriod) {
+      return [];
+    }
+
+    return [{ x: index + 0.5, label: "Break" }];
+  });
 }
 
 function getTimedAxis(

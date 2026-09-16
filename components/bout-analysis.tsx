@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { filterTagsByAnalysisRange, type AnalysisRange } from "@/lib/analysis-range";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { BoutScoreChart } from "@/components/bout-score-chart";
@@ -26,9 +27,19 @@ export function BoutAnalysis({
   rightFencer = "Right",
 }: BoutAnalysisProps) {
   const [fencerPerspective, setFencerPerspective] = useState<Side>("L");
-  const scoringEvents = useMemo(() => computeRunningScore(tags), [tags]);
+  const [selectedRange, setSelectedRange] = useState<AnalysisRange | null>(null);
+  const allScoringEvents = useMemo(() => computeRunningScore(tags), [tags]);
+  const range = selectedRange &&
+    allScoringEvents.some((event) => event.tag.id === selectedRange.startId) &&
+    allScoringEvents.some((event) => event.tag.id === selectedRange.endId)
+    ? selectedRange : null;
+  const filteredTags = useMemo(() => filterTagsByAnalysisRange(tags, range), [tags, range]);
+  const scoringEvents = useMemo(() => {
+    const includedIds = new Set(filteredTags.map((tag) => tag.id));
+    return allScoringEvents.filter((event) => includedIds.has(event.tag.id));
+  }, [allScoringEvents, filteredTags]);
 
-  const { left: finalLeft, right: finalRight } = computeScore(tags);
+  const { left: finalLeft, right: finalRight } = computeScore(filteredTags);
 
   const leftWins = finalLeft > finalRight;
   const rightWins = finalRight > finalLeft;
@@ -42,6 +53,9 @@ export function BoutAnalysis({
     <div className="space-y-6 p-4 max-w-6xl mx-auto">
       {/* Score Card */}
       <div className="rounded-lg border bg-card p-6">
+        <p className="mb-3 text-center text-xs text-muted-foreground">
+          {range ? "Points in selected range" : "Full bout score"}
+        </p>
         <div className="flex items-center justify-center gap-6">
           <div className="text-right flex-1">
             <p
@@ -68,6 +82,8 @@ export function BoutAnalysis({
       </div>
 
       <BoutScoreChart
+        range={range}
+        onRangeChange={setSelectedRange}
         tags={tags}
         matchClockEnabled={matchClockEnabled}
         leftFencer={leftFencer}
@@ -75,13 +91,13 @@ export function BoutAnalysis({
       />
 
       <BoutStripHeatmap
-        tags={tags}
+        tags={filteredTags}
         leftFencer={leftFencer}
         rightFencer={rightFencer}
       />
 
       <BoutFencerCharts
-        tags={tags}
+        tags={filteredTags}
         perspective={fencerPerspective}
         onPerspectiveChange={setFencerPerspective}
         leftFencer={leftFencer}
@@ -92,13 +108,13 @@ export function BoutAnalysis({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Stats Table */}
         <BoutStats
-          tags={tags}
+          tags={filteredTags}
           perspective={fencerPerspective}
         />
 
         {/* Events Timeline */}
         <div>
-          <h3 className="text-sm font-medium mb-3">Events</h3>
+          <h3 className="text-sm font-medium mb-3">{range ? "Events in selection · bout score" : "Events"}</h3>
           {scoringEvents.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-4">
               No scoring events yet.

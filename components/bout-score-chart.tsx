@@ -1,15 +1,18 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import {
   CartesianGrid,
   Line,
   LineChart,
   ReferenceLine,
+  ReferenceArea,
   XAxis,
   YAxis,
   type TooltipContentProps,
 } from "recharts";
+import { AnalysisRangeControls } from "@/components/analysis-range-controls";
+import type { AnalysisRange } from "@/lib/analysis-range";
 import { TagSummary } from "@/components/tag-summary";
 import {
   ChartContainer,
@@ -21,6 +24,7 @@ import {
 import { formatMatchPeriodLabel } from "@/lib/tagging";
 import {
   buildScoreProgressionChartData,
+  computeRunningScore,
   type ScoreProgressionPoint,
 } from "@/lib/score";
 import type { Tag } from "@/lib/types";
@@ -28,6 +32,8 @@ import { formatTime } from "@/lib/utils";
 
 interface BoutScoreChartProps {
   tags: Tag[];
+  range?: AnalysisRange | null;
+  onRangeChange?: (range: AnalysisRange | null) => void;
   matchClockEnabled?: boolean;
   leftFencer?: string;
   rightFencer?: string;
@@ -35,11 +41,34 @@ interface BoutScoreChartProps {
 
 export function BoutScoreChart({
   tags,
+  range = null,
+  onRangeChange,
   matchClockEnabled = false,
   leftFencer = "Left",
   rightFencer = "Right",
 }: BoutScoreChartProps) {
   const chartData = useMemo(() => buildScoreProgressionChartData(tags), [tags]);
+
+  const events = useMemo(() => computeRunningScore(tags), [tags]);
+  const dragStart = useRef<number | null>(null);
+  const selectedStart = range ? chartData.points.find((point) => point.tag?.id === range.startId) : undefined;
+  const selectedEnd = range ? chartData.points.find((point) => point.tag?.id === range.endId) : undefined;
+
+  function selectThroughPoint(index: number) {
+    if (dragStart.current === null || !onRangeChange) return;
+    const startIndex = Math.min(dragStart.current, index);
+    const endIndex = Math.max(dragStart.current, index);
+    onRangeChange({ startId: events[startIndex].tag.id, endId: events[endIndex].tag.id });
+  }
+
+  function eventIndexFromTooltip(index: string | number | null | undefined): number | null {
+    if (index == null || !events.length) return null;
+    const point = chartData.points[Number(index)];
+    if (!point) return null;
+    if (point.pointType === "start") return 0;
+    if (point.pointType === "tail") return events.length - 1;
+    return (point.eventIndex ?? 1) - 1;
+  }
 
   const chartConfig = useMemo(
     () =>
@@ -91,9 +120,24 @@ export function BoutScoreChart({
         </p>
       </div>
 
-      <ChartContainer config={chartConfig} className="h-[280px] w-full">
+      <ChartContainer config={chartConfig} className="h-[280px] w-full select-none">
         <LineChart
           data={chartData.points}
+          onMouseDown={(state, event) => {
+            if (!onRangeChange || event.button !== 0) return;
+            const index = eventIndexFromTooltip(state.activeTooltipIndex);
+            if (index === null) return;
+            event.preventDefault();
+            dragStart.current = index;
+            selectThroughPoint(index);
+          }}
+          onMouseMove={(state, event) => {
+            if (event.buttons !== 1) { dragStart.current = null; return; }
+            const index = eventIndexFromTooltip(state.activeTooltipIndex);
+            if (index !== null) selectThroughPoint(index);
+          }}
+          onMouseUp={() => { dragStart.current = null; }}
+          onMouseLeave={() => { dragStart.current = null; }}
           margin={{ top: 12, right: 12, left: 4, bottom: 4 }}
         >
           <CartesianGrid vertical={false} />
@@ -131,6 +175,20 @@ export function BoutScoreChart({
               }}
             />
           ))}
+          {selectedStart && selectedEnd ? (
+            selectedStart.x === selectedEnd.x ? (
+              <ReferenceLine x={selectedStart.x} stroke="var(--primary)" strokeWidth={4} />
+            ) : (
+              <ReferenceArea
+                x1={selectedStart.x}
+                x2={selectedEnd.x}
+                fill="var(--primary)"
+                fillOpacity={0.12}
+                stroke="var(--primary)"
+                strokeOpacity={0.5}
+              />
+            )
+          ) : null}
           <ChartTooltip
             content={
               <ScoreProgressionTooltip
@@ -162,6 +220,9 @@ export function BoutScoreChart({
           />
         </LineChart>
       </ChartContainer>
+      {onRangeChange ? (
+        <AnalysisRangeControls events={events} range={range} onRangeChange={onRangeChange} />
+      ) : null}
     </div>
   );
 }

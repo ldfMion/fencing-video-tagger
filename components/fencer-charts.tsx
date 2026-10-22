@@ -1,6 +1,5 @@
 "use client";
 
-import type { ReactNode } from "react";
 import {
   RadarChart,
   Radar,
@@ -18,6 +17,7 @@ import {
   ChartLegendContent,
   type ChartConfig,
 } from "@/components/ui/chart";
+import { TacticalOutcomesChart } from "@/components/tactical-outcomes-chart";
 import type { StatRow } from "@/lib/stats";
 import type { TacticalIntent } from "@/lib/action-classifications";
 
@@ -33,9 +33,6 @@ interface FencerChartsProps {
   tacticalStats: StatRow<TacticalIntent>[];
   defMatchupStats: StatRow<DefMatchup>[];
 }
-
-type TooltipValue = string | number | ReadonlyArray<string | number>;
-type TooltipFormatterResult = [ReactNode, ReactNode];
 
 // Short labels for radar spokes
 const SPOKE_LABELS: Record<string, string> = {
@@ -62,65 +59,6 @@ const exchangeTypeConfig: ChartConfig = {
   aop: { label: "Attack on Prep", color: "var(--chart-3)" },
   offense: { label: "Offense", color: "var(--chart-4)" },
 };
-
-const offenseDefenseConfig: ChartConfig = {
-  offensive: { label: "Offensive", color: "var(--chart-1)" },
-  defensive: { label: "Defensive", color: "var(--chart-5)" },
-};
-
-function DonutChart({
-  data,
-  config,
-  centerPct,
-  centerLabel,
-  tooltipFormatter,
-}: {
-  data: { name: string; value: number }[];
-  config: ChartConfig;
-  centerPct: number;
-  centerLabel: string;
-  tooltipFormatter: (value: TooltipValue, name: string) => TooltipFormatterResult;
-}) {
-  return (
-    <div className="relative">
-      <ChartContainer config={config} className="h-[250px] w-full">
-        <PieChart>
-          <Pie
-            data={data}
-            dataKey="value"
-            nameKey="name"
-            cx="50%"
-            cy="50%"
-            innerRadius={65}
-            outerRadius={90}
-          >
-            {data.map((entry) => (
-              <Cell
-                key={entry.name}
-                fill={`var(--color-${entry.name})`}
-                opacity={0.85}
-              />
-            ))}
-          </Pie>
-          <ChartTooltip
-            content={
-              <ChartTooltipContent
-                formatter={(value, name) =>
-                  tooltipFormatter(value ?? "", name as string)
-                }
-              />
-            }
-          />
-          <ChartLegend content={<ChartLegendContent nameKey="name" />} />
-        </PieChart>
-      </ChartContainer>
-      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-bold">{centerPct}%</span>
-        <span className="text-xs text-muted-foreground">{centerLabel}</span>
-      </div>
-    </div>
-  );
-}
 
 export function FencerCharts({ tacticalStats, defMatchupStats }: FencerChartsProps) {
   // --- Radar: Win % per matchup ---
@@ -164,52 +102,8 @@ export function FencerCharts({ tacticalStats, defMatchupStats }: FencerChartsPro
     { name: "offense", value: offenseExecs },
   ].filter((d) => d.value > 0);
 
-  // --- Donut: Total Offense vs Defense volume ---
-  const offVol = (offRow?.hitsFor ?? 0) + (offRow?.hitsAgainst ?? 0);
-  const defVol = (defRow?.hitsFor ?? 0) + (defRow?.hitsAgainst ?? 0);
-  const totalVol = offVol + defVol;
-  const offPct = totalVol > 0 ? Math.round((offVol / totalVol) * 100) : 0;
-
-  const offenseDefenseData = [
-    { name: "offensive", value: offVol },
-    { name: "defensive", value: defVol },
-  ].filter((d) => d.value > 0);
-
-  // --- Donut: Scored touches by offense/defense ---
-  const offScoredVol = offRow?.hitsFor ?? 0;
-  const defScoredVol = defRow?.hitsFor ?? 0;
-  const totalScored = offScoredVol + defScoredVol;
-  const offScoredPct = totalScored > 0 ? Math.round((offScoredVol / totalScored) * 100) : 0;
-
-  const scoredSplitData = [
-    { name: "offensive", value: offScoredVol },
-    { name: "defensive", value: defScoredVol },
-  ].filter((d) => d.value > 0);
-
-  // --- Donut: Received touches by offense/defense ---
-  // offRow.hitsAgainst = received while attacking (opponent countered/parried)
-  // defRow.hitsAgainst = received while defending (opponent attacked through)
-  const offReceivedVol = offRow?.hitsAgainst ?? 0;
-  const defReceivedVol = defRow?.hitsAgainst ?? 0;
-  const totalReceived = offReceivedVol + defReceivedVol;
-  const offReceivedPct =
-    totalReceived > 0 ? Math.round((offReceivedVol / totalReceived) * 100) : 0;
-
-  const receivedSplitData = [
-    { name: "offensive", value: offReceivedVol },
-    { name: "defensive", value: defReceivedVol },
-  ].filter((d) => d.value > 0);
-
   const hasRadarData = defMatchupStats.some((r) => r.total > 0);
-  const hasPieData = totalVol > 0;
-
-  const offDefTooltipFormatter = (
-    value: TooltipValue,
-    name: string,
-  ): TooltipFormatterResult => [
-    `${Array.isArray(value) ? value.join(", ") : value} touches`,
-    offenseDefenseConfig[name]?.label ?? name,
-  ];
+  const hasPieData = grandTotal > 0;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -333,70 +227,7 @@ export function FencerCharts({ tacticalStats, defMatchupStats }: FencerChartsPro
         )}
       </div>
 
-      {/* Chart 4 — Donut: Total Offense vs Defense volume */}
-      <div className="rounded-lg border p-4">
-        <p className="text-sm font-medium mb-1">Offense vs Defense Volume</p>
-        <p className="text-xs text-muted-foreground mb-3">
-          Share of all touches in offensive vs defensive exchanges
-        </p>
-        {!hasPieData ? (
-          <p className="text-xs text-muted-foreground text-center py-8">No data</p>
-        ) : (
-          <DonutChart
-            data={offenseDefenseData}
-            config={offenseDefenseConfig}
-            centerPct={offPct}
-            centerLabel={offPct >= 60 ? "Attacker" : offPct >= 40 ? "Balanced" : "Defender"}
-            tooltipFormatter={offDefTooltipFormatter}
-          />
-        )}
-      </div>
-
-      {/* Chart 5 — Donut: Scored touches offense/defense split */}
-      <div className="rounded-lg border p-4">
-        <p className="text-sm font-medium mb-1">Scored: Offense vs Defense</p>
-        <p className="text-xs text-muted-foreground mb-3">
-          Your scored touches by your tactical role
-        </p>
-        {!hasPieData ? (
-          <p className="text-xs text-muted-foreground text-center py-8">No data</p>
-        ) : (
-          <DonutChart
-            data={scoredSplitData}
-            config={offenseDefenseConfig}
-            centerPct={offScoredPct}
-            centerLabel={
-              offScoredPct >= 60 ? "Attacker" : offScoredPct >= 40 ? "Balanced" : "Defender"
-            }
-            tooltipFormatter={offDefTooltipFormatter}
-          />
-        )}
-      </div>
-
-      {/* Chart 6 — Donut: Received touches offense/defense split */}
-      <div className="rounded-lg border p-4">
-        <p className="text-sm font-medium mb-1">Received: Offense vs Defense</p>
-        <p className="text-xs text-muted-foreground mb-3">
-          Touches received while in offensive vs defensive role
-        </p>
-        {!hasPieData ? (
-          <p className="text-xs text-muted-foreground text-center py-8">No data</p>
-        ) : (
-          <DonutChart
-            data={receivedSplitData}
-            config={offenseDefenseConfig}
-            centerPct={offReceivedPct}
-            centerLabel={
-              offReceivedPct >= 60
-                ? "While Attacking"
-                : offReceivedPct >= 40
-                  ? "Mixed"
-                  : "While Defending"
-            }
-            tooltipFormatter={offDefTooltipFormatter}
-          />
-        )}
-      </div>
+      <TacticalOutcomesChart tacticalStats={tacticalStats} />
     </div>
   );
 }

@@ -1,0 +1,25 @@
+.cell {
+  container-type: size;
+  overflow: hidden;
+}
+
+.count,
+.details {
+  display: none;
+}
+
+@container (min-width: 32px) and (min-height: 28px) {
+  .count {
+    display: flex;
+  }
+}
+
+@container (min-width: 125px) and (min-height: 112px) {
+  .count {
+    display: none;
+  }
+
+  .details {
+    display: flex;
+  }
+}

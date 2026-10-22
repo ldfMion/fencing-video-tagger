@@ -5,6 +5,7 @@ import type {
   Side,
   Tag,
 } from "@/lib/types";
+import { MATCH_PERIOD_SEGMENTS, parseMatchClockSeconds, REGULATION_PERIOD_DURATION_SECONDS } from "@/lib/match-clock";
 import { sortTags } from "@/lib/utils";
 
 export interface ScoringEvent {
@@ -17,7 +18,7 @@ export interface ScoreProgressionPoint {
   x: number;
   leftScore: number;
   rightScore: number;
-  pointType: "start" | "event" | "tail";
+  pointType: "start" | "event";
   eventIndex?: number;
   action?: ActionCode;
   side?: Side;
@@ -37,39 +38,6 @@ export interface ScoreProgressionChartData {
   xMode: "event" | "time";
   domainMax: number;
 }
-
-const REGULATION_PERIOD_DURATION_SECONDS = 3 * 60;
-const PRIORITY_PERIOD_DURATION_SECONDS = 60;
-
-const MATCH_PERIOD_SEGMENTS: Record<
-  MatchPeriod,
-  { start: number; duration: number; order: number; label: string }
-> = {
-  "1": {
-    start: 0,
-    duration: REGULATION_PERIOD_DURATION_SECONDS,
-    order: 0,
-    label: "P1",
-  },
-  "2": {
-    start: REGULATION_PERIOD_DURATION_SECONDS,
-    duration: REGULATION_PERIOD_DURATION_SECONDS,
-    order: 1,
-    label: "P2",
-  },
-  "3": {
-    start: REGULATION_PERIOD_DURATION_SECONDS * 2,
-    duration: REGULATION_PERIOD_DURATION_SECONDS,
-    order: 2,
-    label: "P3",
-  },
-  priority: {
-    start: REGULATION_PERIOD_DURATION_SECONDS * 3,
-    duration: PRIORITY_PERIOD_DURATION_SECONDS,
-    order: 3,
-    label: "Pri",
-  },
-};
 
 const PERIOD_BREAKS = [
   { x: REGULATION_PERIOD_DURATION_SECONDS, order: 1 },
@@ -96,6 +64,21 @@ export function computeRunningScore(tags: Tag[]): ScoringEvent[] {
     }
     return { tag, leftScore: left, rightScore: right };
   });
+}
+
+/** Signed left-minus-right average after each point, excluding non-scoring cards. */
+export function computeAverageScoreDifference(tags: Tag[]): number | null {
+  const scoringEvents = computeRunningScore(tags).filter(
+    ({ tag }) => tag.action !== "yc",
+  );
+
+  if (scoringEvents.length === 0) return null;
+
+  const totalDifference = scoringEvents.reduce(
+    (total, event) => total + event.leftScore - event.rightScore,
+    0,
+  );
+  return totalDifference / scoringEvents.length;
 }
 
 export function computeScore(tags: Tag[]): { left: number; right: number } {
@@ -177,17 +160,6 @@ export function buildScoreProgressionChartData(
     })),
   ];
 
-  const lastPoint = points[points.length - 1];
-
-  if (lastPoint.x < timedAxis.domainMax) {
-    points.push({
-      x: timedAxis.domainMax,
-      leftScore: lastPoint.leftScore,
-      rightScore: lastPoint.rightScore,
-      pointType: "tail",
-    });
-  }
-
   return {
     points,
     breaks: timedAxis.breaks,
@@ -245,14 +217,6 @@ function getTimedAxis(
     coordinates.push(x);
   }
 
-  const highestPeriod = Object.values(MATCH_PERIOD_SEGMENTS).find(
-    (segment) => segment.order === highestPeriodOrder,
-  );
-
-  if (!highestPeriod) {
-    return null;
-  }
-
   return {
     coordinates,
     breaks: PERIOD_BREAKS
@@ -261,23 +225,6 @@ function getTimedAxis(
         x: periodBreak.x,
         label: "Break",
       })),
-    domainMax: highestPeriod.start + highestPeriod.duration,
+    domainMax: Math.max(1, coordinates[coordinates.length - 1]),
   };
-}
-
-function parseMatchClockSeconds(matchClock: MatchClock): number | null {
-  const [minutesValue, secondsValue] = matchClock.split(":");
-  const minutes = Number.parseInt(minutesValue, 10);
-  const seconds = Number.parseInt(secondsValue, 10);
-
-  if (
-    Number.isNaN(minutes) ||
-    Number.isNaN(seconds) ||
-    seconds < 0 ||
-    seconds >= 60
-  ) {
-    return null;
-  }
-
-  return (minutes * 60) + seconds;
 }

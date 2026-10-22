@@ -8,6 +8,7 @@ import {
   forwardRef,
   useImperativeHandle,
 } from "react";
+import { getMatchTimeValidationError } from "@/lib/match-clock";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -85,6 +86,7 @@ export interface TagFormHandle {
 }
 
 interface TagFormProps {
+  tags: Tag[];
   currentTime: number | undefined;
   onAddTag: (params: AddTagParams) => void;
   onUpdateTag: (
@@ -98,23 +100,33 @@ interface TagFormProps {
   disabled?: boolean;
 }
 
-interface TagFormFieldsProps {
-  currentTime: number | undefined;
-  onAddTag: (params: AddTagParams) => void;
-  onUpdateTag: (
-    tagId: string,
-    updates: CompleteTagContent,
-  ) => void | Promise<void>;
-  onCancelEdit: () => void;
-  editingTag?: Tag | null;
-  failureClassificationVersion: FailureClassificationVersion;
-  taggingOptions?: TaggingOptions;
-  disabled?: boolean;
+interface TagFormFieldsProps extends TagFormProps {
   formIdPrefix: string;
+}
+
+function parseManualTime(timeStr: string): number | undefined {
+  if (!timeStr.trim()) return undefined;
+
+  const parts = timeStr.split(":");
+  if (parts.length === 2) {
+    const mins = parseInt(parts[0], 10);
+    const secs = parseInt(parts[1], 10);
+    if (!isNaN(mins) && !isNaN(secs)) {
+      return mins * 60 + secs;
+    }
+  }
+
+  const seconds = parseInt(timeStr, 10);
+  if (!isNaN(seconds)) {
+    return seconds;
+  }
+
+  return undefined;
 }
 
 const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function TagFormFields(
   {
+    tags,
     currentTime,
     onAddTag,
     onUpdateTag,
@@ -168,8 +180,21 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
     const lower = actionSearch.toLowerCase();
     return ACTION_CODES.filter((code) => code.toLowerCase().includes(lower));
   }, [actionSearch]);
+  const matchTimeError = useMemo(() => {
+    if (!requiresMatchClock || isCommentOnly || !matchClock.trim()) return null;
+    if (!normalizedMatchClock) return "Enter a valid match clock, such as 2:17.";
+    return getMatchTimeValidationError(tags, {
+      id: editingTag?.id ?? "tag-form-draft",
+      timestamp: editingTag ? editingTag.timestamp : currentTime ?? parseManualTime(manualTime),
+      seq: editingTag ? editingTag.seq : Math.max(0, ...tags.map((tag) => tag.seq ?? 0)) + 1,
+      createdAt: editingTag?.createdAt ?? 0,
+      comment: "",
+      matchPeriod,
+      matchClock: normalizedMatchClock,
+    });
+  }, [tags, editingTag, currentTime, manualTime, requiresMatchClock, isCommentOnly, matchClock, matchPeriod, normalizedMatchClock]);
   const canSubmit = Boolean(
-    (side || comment.trim()) &&
+    !matchTimeError && (side || comment.trim()) &&
       (isCommentOnly || !requiresMatchClock || normalizedMatchClock) &&
       (isCommentOnly || !requiresStripZone || stripZone),
   );
@@ -186,31 +211,11 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
     setManualTime("");
   }, []);
 
-  const parseManualTime = (timeStr: string): number | undefined => {
-    if (!timeStr.trim()) return undefined;
-
-    const parts = timeStr.split(":");
-    if (parts.length === 2) {
-      const mins = parseInt(parts[0], 10);
-      const secs = parseInt(parts[1], 10);
-      if (!isNaN(mins) && !isNaN(secs)) {
-        return mins * 60 + secs;
-      }
-    }
-
-    const seconds = parseInt(timeStr, 10);
-    if (!isNaN(seconds)) {
-      return seconds;
-    }
-
-    return undefined;
-  };
-
   const handleSubmit = useCallback(
     (event?: React.FormEvent) => {
       event?.preventDefault();
 
-      if (!side && !comment.trim()) return false;
+      if (disabled || !canSubmit) return false;
       const isCommentOnlyTag = !side && Boolean(comment.trim());
       if (!isCommentOnlyTag && requiresMatchClock && !normalizedMatchClock) return false;
       if (!isCommentOnlyTag && requiresStripZone && !stripZone) return false;
@@ -248,6 +253,8 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
     },
     [
       action,
+      canSubmit,
+      disabled,
       comment,
       currentTime,
       editingTag,
@@ -722,9 +729,15 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
                       }
                     }}
                     placeholder="2:17 or 217"
-                    aria-invalid={matchClock.length > 0 && !normalizedMatchClock}
+                    aria-invalid={Boolean(matchTimeError)}
+                    aria-describedby={matchTimeError ? `match-clock-error-${formIdPrefix}` : undefined}
                     className="h-6 text-xs font-mono"
                   />
+                  {matchTimeError ? (
+                    <p id={`match-clock-error-${formIdPrefix}`} role="status" className="text-xs text-destructive">
+                      {matchTimeError}
+                    </p>
+                  ) : null}
                 </div>
               </div>
             ) : null}

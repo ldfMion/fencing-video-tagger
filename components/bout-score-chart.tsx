@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import {
   Line,
   LineChart,
@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import { AnalysisRangeControls } from "@/components/analysis-range-controls";
 import type { AnalysisRange } from "@/lib/analysis-range";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { TagSummary } from "@/components/tag-summary";
 import {
   ChartContainer,
@@ -20,10 +21,12 @@ import {
   ChartTooltip,
   type ChartConfig,
 } from "@/components/ui/chart";
+import { MATCH_PERIOD_SEGMENTS } from "@/lib/match-clock";
 import { formatMatchPeriodLabel } from "@/lib/tagging";
 import {
   buildScoreProgressionChartData,
   computeRunningScore,
+  computeAverageScoreDifference,
   type ScoreProgressionPoint,
 } from "@/lib/score";
 import type { Tag } from "@/lib/types";
@@ -46,7 +49,28 @@ export function BoutScoreChart({
   leftFencer = "Left",
   rightFencer = "Right",
 }: BoutScoreChartProps) {
-  const chartData = useMemo(() => buildScoreProgressionChartData(tags), [tags]);
+  const differenceGradientId = useId();
+  const [chartView, setChartView] = useState<"scores" | "difference">("scores");
+  const showDifference = chartView === "difference";
+  const chartData = useMemo(() => {
+    const progression = buildScoreProgressionChartData(tags);
+    return {
+      ...progression,
+      points: progression.points.map((point, index) => {
+        const previousPoint = progression.points[index - 1];
+        const scoringSide = previousPoint && point.pointType === "event"
+          ? point.leftScore > previousPoint.leftScore ? "L" as const
+            : point.rightScore > previousPoint.rightScore ? "R" as const : null
+          : null;
+        return {
+          ...point,
+          scoreDifference: point.leftScore - point.rightScore,
+          scoringSide,
+        };
+      }),
+    };
+  }, [tags]);
+  const averageDifference = useMemo(() => computeAverageScoreDifference(tags), [tags]);
 
   const events = useMemo(() => computeRunningScore(tags), [tags]);
   const dragStart = useRef<number | null>(null);
@@ -65,37 +89,23 @@ export function BoutScoreChart({
     const point = chartData.points[Number(index)];
     if (!point) return null;
     if (point.pointType === "start") return 0;
-    if (point.pointType === "tail") return events.length - 1;
     return (point.eventIndex ?? 1) - 1;
   }
 
-  const chartConfig = useMemo(
-    () =>
-      ({
-        leftScore: {
-          label: leftFencer,
-          theme: {
-            light: "#b91c1c",
-            dark: "#f87171",
-          },
-        },
-        rightScore: {
-          label: rightFencer,
-          theme: {
-            light: "#15803d",
-            dark: "#4ade80",
-          },
-        },
-      }) satisfies ChartConfig,
-    [leftFencer, rightFencer],
-  );
-
-  const maxScore = Math.max(
-    1,
-    ...chartData.points.map((point) =>
-      Math.max(point.leftScore, point.rightScore),
-    ),
-  );
+  const chartConfig = {
+    leftScore: {
+      label: leftFencer,
+      color: "var(--side-left)",
+    },
+    rightScore: {
+      label: rightFencer,
+      color: "var(--side-right)",
+    },
+    scoreDifference: {
+      label: "Net touch difference",
+      color: "var(--chart-5)",
+    },
+  } satisfies ChartConfig;
 
   if (chartData.points.length <= 1) {
     return (
@@ -108,20 +118,84 @@ export function BoutScoreChart({
     );
   }
 
+  const lastPoint = chartData.points[chartData.points.length - 1];
+  const timeTickStep = chartData.domainMax > 360 ? 120 : chartData.domainMax > 180 ? 60 : 30;
+  const timeTicks = [
+    ...Array.from({ length: Math.ceil(chartData.domainMax / timeTickStep) }, (_, index) => index * timeTickStep)
+      .filter((value) => value === 0 || chartData.breaks.some((periodBreak) => periodBreak.x === value) || chartData.domainMax - value >= timeTickStep / 3),
+    chartData.domainMax,
+  ];
+
+  const maxDifference = Math.max(1, ...chartData.points.map((point) => Math.abs(point.scoreDifference)));
+
+  const maxScore = Math.max(1, ...chartData.points.map((point) => Math.max(point.leftScore, point.rightScore)));
+  const differences = chartData.points.map((point) => point.scoreDifference);
+  const highestDifference = Math.max(...differences);
+  const lowestDifference = Math.min(...differences);
+  const differenceSpan = highestDifference - lowestDifference;
+  const zeroGradientOffset = differenceSpan === 0 ? 0.5 : highestDifference / differenceSpan;
+  const gridValues = showDifference
+    ? Array.from({ length: maxDifference * 2 + 1 }, (_, index) => index - maxDifference)
+    : Array.from({ length: maxScore + 1 }, (_, index) => index);
+
+  const differenceTicks = Array.from(
+    new Set([
+      -maxDifference,
+      ...Array.from({ length: maxDifference * 2 + 1 }, (_, index) => index - maxDifference)
+        .filter((difference) => difference === 0 || (difference % 5 === 0 && Math.abs(difference) <= maxDifference - 2)),
+      maxDifference,
+    ]),
+  ).sort((left, right) => left - right);
+
   return (
     <div className="rounded-lg border p-4">
-      <div className="mb-3 space-y-1">
-        <p className="text-sm font-medium">Score Progression</p>
-        <p className="text-xs text-muted-foreground">
-          {chartData.xMode === "time"
-            ? "X-axis uses match period and clock. Dashed markers show breaks between periods."
-            : "Timed metadata is incomplete, so the x-axis falls back to scoring order."}
-        </p>
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <p className="text-sm font-medium">Score Progression</p>
+          <p className="text-xs text-muted-foreground">
+            {chartData.xMode === "time"
+              ? "X-axis uses match period and clock. Dashed markers show breaks between periods."
+              : "Match timing is missing or inconsistent, so both views use scoring order."}
+          </p>
+        </div>
+        <div className="flex flex-col gap-1">
+          <p className="text-xs text-muted-foreground">Average score difference</p>
+          <p className="text-xl font-medium tabular-nums">
+            {averageDifference === null ? "—" : formatSignedDifference(averageDifference, 1)}
+            <span className="ml-1 text-xs font-normal text-muted-foreground">touches</span>
+          </p>
+          <p className="text-xs text-muted-foreground">Left − Right · after each scoring event</p>
+        </div>
       </div>
-
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <ToggleGroup
+          type="single"
+          value={chartView}
+          onValueChange={(value) => {
+            if (value === "scores" || value === "difference") setChartView(value);
+          }}
+          variant="outline"
+          size="sm"
+          aria-label="Score chart view"
+        >
+          <ToggleGroupItem value="scores">Scores</ToggleGroupItem>
+          <ToggleGroupItem value="difference">Difference</ToggleGroupItem>
+        </ToggleGroup>
+        {showDifference ? (
+          <p className="text-xs text-muted-foreground">
+            <span className="text-side-left">+ {leftFencer} (left)</span>
+            <span className="mx-2">· 0 tied ·</span>
+            <span className="text-side-right">− {rightFencer} (right)</span>
+          </p>
+        ) : null}
+      </div>
+      {showDifference ? (
+        <p className="mb-2 text-xs text-muted-foreground">Line color shows who leads. Dots show who scored: red for {leftFencer} (left), green for {rightFencer} (right).</p>
+      ) : null}
       <ChartContainer config={chartConfig} className="h-[280px] w-full select-none">
         <LineChart
           data={chartData.points}
+          accessibilityLayer
           onMouseDown={(state, event) => {
             if (!onRangeChange || event.button !== 0) return;
             const index = eventIndexFromTooltip(state.activeTooltipIndex);
@@ -139,30 +213,42 @@ export function BoutScoreChart({
           onMouseLeave={() => { dragStart.current = null; }}
           margin={{ top: 12, right: 12, left: 4, bottom: 4 }}
         >
-          {Array.from({ length: maxScore + 1 }, (_, score) => (
+          <defs>
+            <linearGradient id={differenceGradientId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset={zeroGradientOffset} stopColor="var(--color-leftScore)" />
+              <stop offset={zeroGradientOffset} stopColor="var(--color-rightScore)" />
+            </linearGradient>
+          </defs>
+          {gridValues.map((difference) => (
             <ReferenceLine
-              key={score}
-              y={score}
-              stroke="var(--border)"
-              strokeOpacity={score % 5 === 0 ? 1 : 0.4}
+              key={`difference-${difference}`}
+              y={difference}
+              stroke={showDifference && difference === 0 ? "var(--muted-foreground)" : "var(--border)"}
+              strokeOpacity={difference % 5 === 0 ? 1 : 0.4}
+              strokeDasharray={showDifference && difference === 0 ? "4 4" : undefined}
             />
           ))}
           <XAxis
             dataKey="x"
             type="number"
             domain={[0, chartData.domainMax]}
+            allowDataOverflow
+            padding={{ left: 5, right: 5 }}
+            ticks={chartData.xMode === "time" ? timeTicks : undefined}
+            interval="preserveStartEnd"
             allowDecimals={false}
             tickLine={false}
             axisLine={false}
             tickMargin={8}
             tickFormatter={(value) =>
-              formatAxisTick(value, chartData.xMode, chartData.domainMax)
+              formatAxisTick(value, chartData.xMode, chartData.domainMax, lastPoint.matchPeriod)
             }
           />
           <YAxis
             allowDecimals={false}
-            domain={[0, maxScore]}
-            ticks={Array.from({ length: Math.floor(maxScore / 5) + 1 }, (_, index) => index * 5)}
+            domain={showDifference ? [-maxDifference, maxDifference] : [0, maxScore]}
+            ticks={showDifference ? differenceTicks : Array.from({ length: Math.floor(maxScore / 5) + 1 }, (_, index) => index * 5)}
+            tickFormatter={showDifference ? (value) => formatSignedDifference(value) : undefined}
             interval={0}
             tickLine={false}
             axisLine={false}
@@ -207,25 +293,21 @@ export function BoutScoreChart({
               />
             }
           />
-          <ChartLegend content={<ChartLegendContent />} />
-          <Line
-            type="stepAfter"
-            dataKey="leftScore"
-            stroke="var(--color-leftScore)"
-            strokeWidth={2.5}
-            dot={false}
-            activeDot={{ r: 4 }}
-            isAnimationActive={false}
-          />
-          <Line
-            type="stepAfter"
-            dataKey="rightScore"
-            stroke="var(--color-rightScore)"
-            strokeWidth={2.5}
-            dot={false}
-            activeDot={{ r: 4 }}
-            isAnimationActive={false}
-          />
+          {!showDifference ? <ChartLegend content={<ChartLegendContent />} /> : null}
+          {(showDifference ? ["scoreDifference"] : ["leftScore", "rightScore"]).map((dataKey) => (
+            <Line
+              key={dataKey}
+              type="stepAfter"
+              dataKey={dataKey}
+              stroke={dataKey === "scoreDifference"
+                ? differenceSpan === 0 ? "var(--muted-foreground)" : `url(#${differenceGradientId})`
+                : `var(--color-${dataKey})`}
+              strokeWidth={2.5}
+              dot={showDifference ? <ScoringEventDot /> : false}
+              activeDot={showDifference ? <ScoringEventDot radius={5} /> : { r: 4 }}
+              isAnimationActive={false}
+            />
+          ))}
         </LineChart>
       </ChartContainer>
       {onRangeChange ? (
@@ -235,21 +317,42 @@ export function BoutScoreChart({
   );
 }
 
+interface ScoringEventDotProps {
+  cx?: number;
+  cy?: number;
+  radius?: number;
+  payload?: ScoreProgressionPoint & { scoringSide: "L" | "R" | null };
+}
+
+function ScoringEventDot({ cx, cy, radius = 3.5, payload }: ScoringEventDotProps) {
+  if (cx == null || cy == null || !payload?.scoringSide) return null;
+
+  return (
+    <circle
+      cx={cx}
+      cy={cy}
+      r={radius}
+      fill={payload.scoringSide === "L" ? "var(--color-leftScore)" : "var(--color-rightScore)"}
+      stroke="var(--background)"
+      strokeWidth={1.5}
+      data-scoring-side={payload.scoringSide}
+    />
+  );
+}
+
 function formatAxisTick(
   value: number,
   xMode: "event" | "time",
   domainMax: number,
+  lastPeriod?: Tag["matchPeriod"],
 ): string {
   if (xMode === "time") {
-    const adjustedValue = value === domainMax && value > 0 ? value - 1 : value;
-    const periodIndex = Math.min(Math.floor(adjustedValue / 180), 3);
-    const periodStart = periodIndex * 180;
-    const periodDuration = periodIndex === 3 ? 60 : 180;
-    const elapsedInPeriod = value - periodStart;
-    const remainingSeconds = Math.max(0, periodDuration - elapsedInPeriod);
-    const period = periodIndex === 3 ? "Pri" : `P${periodIndex + 1}`;
-
-    return `${period} ${formatTime(remainingSeconds)}`;
+    const segment = value === domainMax && lastPeriod
+      ? MATCH_PERIOD_SEGMENTS[lastPeriod]
+      : Object.values(MATCH_PERIOD_SEGMENTS).findLast((period) => period.start <= value)
+        ?? MATCH_PERIOD_SEGMENTS["1"];
+    const remainingSeconds = Math.max(0, segment.duration - (value - segment.start));
+    return `${segment.label} ${formatTime(remainingSeconds)}`;
   }
 
   return value === 0 ? "Start" : `${value}`;
@@ -301,8 +404,16 @@ function ScoreProgressionTooltip({
           {leftFencer} {point.leftScore}–{point.rightScore} {rightFencer}
         </span>
       </p>
+      <p className="text-muted-foreground">
+        Difference (Left − Right): <span className="font-mono tabular-nums text-foreground">{formatSignedDifference(point.leftScore - point.rightScore)}</span>
+      </p>
     </div>
   );
+}
+
+function formatSignedDifference(value: number, decimals = 0): string {
+  const roundedValue = Number(value.toFixed(decimals));
+  return `${roundedValue > 0 ? "+" : ""}${roundedValue.toFixed(decimals)}`;
 }
 
 function formatTooltipLabel(
@@ -317,10 +428,6 @@ function formatTooltipLabel(
 
   if (point.pointType === "start") {
     return xMode === "time" ? "Bout start" : "Before first score";
-  }
-
-  if (point.pointType === "tail") {
-    return xMode === "time" ? "End of current segment" : "Current final score";
   }
 
   const eventSummary = getEventSummary(point, leftFencer, rightFencer);

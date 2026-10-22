@@ -523,6 +523,7 @@ export function BoutWorkspaceShell({
         onUpdateTag={handleUpdateTag}
         onCancelEdit={handleCancelEdit}
         editingTag={editingTag}
+        tags={session.tags}
         currentTime={activeVideoUrl ? video.currentTime : undefined}
         failureClassificationVersion={session.failureClassificationVersion}
         taggingOptions={session.taggingOptions}

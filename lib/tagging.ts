@@ -1,3 +1,4 @@
+import { getMatchTimeValidationError } from "@/lib/match-clock";
 import {
   MatchClockSchema,
   MatchPeriodSchema,
@@ -71,7 +72,7 @@ export function normalizeMatchClockInput(value: string): string | undefined {
   }
 
   if (digitsOnly.length <= 2) {
-    return `0:${digitsOnly.padStart(2, "0")}`;
+    return Number(digitsOnly) < 60 ? `0:${digitsOnly.padStart(2, "0")}` : undefined;
   }
 
   const minutes = digitsOnly.slice(0, -2);
@@ -108,18 +109,8 @@ export function getDefaultMatchPeriod(): NonNullable<Tag["matchPeriod"]> {
 }
 
 export function assertTagMetadataMatchesSession(
-  session: Pick<VideoSession, "failureClassificationVersion" | "taggingOptions">,
-  tag: Pick<
-    Tag,
-    | "failureCause"
-    | "failureMode"
-    | "comment"
-    | "matchClock"
-    | "matchPeriod"
-    | "mistake"
-    | "side"
-    | "stripZone"
-  >,
+  session: Pick<VideoSession, "failureClassificationVersion" | "taggingOptions"> & { tags?: Tag[] },
+  tag: Tag,
 ): void {
   const requiresMatchClock = isMatchClockEnabled(session);
   const requiresStripZone = isStripZoneEnabled(session);
@@ -128,6 +119,8 @@ export function assertTagMetadataMatchesSession(
   if (requiresMatchClock && !isCommentOnly) {
     MatchPeriodSchema.parse(tag.matchPeriod);
     MatchClockSchema.parse(tag.matchClock);
+    const matchTimeError = getMatchTimeValidationError(session.tags ?? [], tag);
+    if (matchTimeError) throw new Error(matchTimeError);
   }
 
   if (requiresStripZone && !isCommentOnly) {

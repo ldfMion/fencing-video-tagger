@@ -223,7 +223,7 @@ export function createTagRecord(
   session?: Pick<
     VideoSession,
     "failureClassificationVersion" | "taggingOptions"
-  >,
+  > & { tags?: Tag[] },
   options?: CreateTagRecordOptions,
 ): Tag {
   const nextTag: Tag = {

@@ -54,7 +54,7 @@ export function AnalysisRangeControls({ events, range, onRangeChange }: Analysis
       </div>
       <p className="text-xs text-muted-foreground">
         Drag across the chart to select events. Adjust the handles here, or focus a handle and use arrow keys.
-        Both boundary events and all tags between them are included. The chart keeps the full bout score.
+        Both boundary events and all tags between them are included. The chart keeps the full bout progression.
       </p>
     </div>
   );

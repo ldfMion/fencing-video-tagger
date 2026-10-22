@@ -2,7 +2,6 @@
 
 import { useMemo, useRef } from "react";
 import {
-  CartesianGrid,
   Line,
   LineChart,
   ReferenceLine,
@@ -140,7 +139,14 @@ export function BoutScoreChart({
           onMouseLeave={() => { dragStart.current = null; }}
           margin={{ top: 12, right: 12, left: 4, bottom: 4 }}
         >
-          <CartesianGrid vertical={false} />
+          {Array.from({ length: maxScore + 1 }, (_, score) => (
+            <ReferenceLine
+              key={score}
+              y={score}
+              stroke="var(--border)"
+              strokeOpacity={score % 5 === 0 ? 1 : 0.4}
+            />
+          ))}
           <XAxis
             dataKey="x"
             type="number"
@@ -156,6 +162,8 @@ export function BoutScoreChart({
           <YAxis
             allowDecimals={false}
             domain={[0, maxScore]}
+            ticks={Array.from({ length: Math.floor(maxScore / 5) + 1 }, (_, index) => index * 5)}
+            interval={0}
             tickLine={false}
             axisLine={false}
             tickMargin={8}

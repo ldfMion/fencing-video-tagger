@@ -345,6 +345,8 @@ function parseTagRow(row: TagRow): Tag {
     ...(row.tag.matchPeriod != null && { matchPeriod: row.tag.matchPeriod }),
     ...(row.tag.matchClock != null && { matchClock: row.tag.matchClock }),
     ...(row.tag.stripZone != null && { stripZone: row.tag.stripZone }),
+    ...(row.tag.origin != null && { origin: row.tag.origin }),
+    ...(row.tag.autoTagJobId != null && { autoTagJobId: row.tag.autoTagJobId }),
   });
 }
 
@@ -391,6 +393,8 @@ function toTagValues(tag: Tag) {
     matchPeriod: tag.matchPeriod ?? null,
     matchClock: tag.matchClock ?? null,
     stripZone: tag.stripZone ?? null,
+    origin: tag.origin ?? null,
+    autoTagJobId: tag.autoTagJobId ?? null,
   };
 }
 

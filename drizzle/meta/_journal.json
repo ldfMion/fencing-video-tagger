@@ -36,6 +36,13 @@
       "when": 1789320513986,
       "tag": "0004_fantastic_captain_stacy",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1793041236319,
+      "tag": "0005_auto_tag_jobs",
+      "breakpoints": true
     }
   ]
 }

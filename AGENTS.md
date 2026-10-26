@@ -58,6 +58,15 @@ If a video works before reload but fails after reload, debug the persisted route
 
 Treat browser "video format not supported" as possibly meaning a bad server response or unreadable file, not only an actual codec problem.
 
+## Auto-tagging (Codex agent)
+The bout page's Options menu opens an Auto-tag dialog that runs the Codex CLI as a scoring-only tagger. It only starts on bouts with a library video and no scoring tags. "Run benchmark on a copy" copies a hand-tagged bout without its tags, and the report compares the agent's result with the original.
+- Agent tools are an MCP server at `app/api/auto-tag/mcp/route.ts` (`mcp-handler` v2, stateless MCP spec). Each job gets a random bearer token; only its sha256 hash is stored.
+- Job lifecycle, overview frame sheets, and cleanup live in `lib/server/auto-tag/`. Pure rules (agent fields, prompt, evaluation) live in `lib/auto-tag/`.
+- Jobs and their event log are stored in the `auto_tag_jobs` and `auto_tag_job_events` tables. Agent tags have `origin: "agent"` plus `autoTagJobId`. The agent can only edit its own tags while their time, side, action, clock, and zone still match what it last wrote.
+- Job images and the launch script live in `.data/auto-tag-jobs/<jobId>/` and are deleted when the job ends (finished, cancelled, failed, or abandoned after 20 idle minutes). The event log is kept.
+- "Open in Terminal" uses `osascript`; it needs macOS Automation permission for Terminal. "Copy command" is the fallback.
+- Frame extraction needs `ffmpeg` and `ffprobe` on `PATH`.
+
 ## UI Verification Notes
 For tagging-page UI changes, verify on a laptop-height viewport with a real bout that has a video loaded. Short viewports are the main failure case for overflow, clipped controls, and form/player overlap.
 

@@ -56,13 +56,15 @@ app/layout.tsx (root layout)
 - **`lib/server/db/`** — Drizzle SQLite client, schema, and migrations.
 - **`lib/server/repositories/session-repository.ts`** — Server-only repository that assembles separately stored, Zod-validated session and tag JSON entities.
 - **`lib/server/session-service.ts`** — Server-side session/tag domain logic and request validation used by server actions and SSR loaders.
+- **`lib/auto-tag/`** — Pure auto-tag rules: agent-editable tag fields, job statuses and limits, the agent prompt and job brief, and `evaluateAutoTagJob` for review and benchmark reports.
+- **`lib/server/auto-tag/`** — Auto-tag job service, server actions, ffmpeg frame sheets, MCP tool implementations, and the per-job workspace in `.data/auto-tag-jobs/`. The MCP route is `app/api/auto-tag/mcp/route.ts`.
 - **`lib/utils.ts`** — `cn()` (Tailwind class merging) and `formatTime()` (seconds → `m:ss` string).
 - **`lib/score.ts`** — `computeScore(tags)` returns final left/right score; `computeRunningScore(tags)` returns event-by-event `ScoringEvent[]` timeline. `computeScore` delegates to `computeRunningScore`.
 - **`lib/constants.ts`** — `SIDE_COLORS` with `left`/`right` keys containing `text` and `badge` Tailwind class strings for fencer side coloring (red for left, green for right).
 
 ### Types (`lib/types.ts`)
 
-- `Tag`: { id, timestamp, comment, createdAt, side?, action?, mistake?, failureMode?, failureCause? }
+- `Tag`: { id, timestamp, comment, createdAt, side?, action?, mistake?, failureMode?, failureCause?, origin? ("agent"), autoTagJobId? }
 - `VideoSession`: { id, failureClassificationVersion, fileName, tags[], lastModified, leftFencer?, rightFencer?, boutDate? }
 - `ActionCode`: Union of fencing action notation strings (e.g., "A-P", "R-R", "yc", "rc")
 - `Side`: "L" | "R"

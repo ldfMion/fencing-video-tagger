@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   AlertCircle,
+  Bot,
   ChevronDown,
   Columns2,
   HeartPulse,
@@ -13,6 +14,7 @@ import {
   Upload,
   Video,
 } from "lucide-react";
+import { AutoTagDialog } from "@/components/auto-tag-dialog";
 import { BoutAnalysis } from "@/components/bout-analysis";
 import { BoutExportButton } from "@/components/export-button";
 import { HeartRateCard } from "@/components/heart-rate-card";
@@ -89,6 +91,7 @@ export function BoutWorkspaceShell({
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isLibraryPickerOpen, setIsLibraryPickerOpen] = useState(false);
   const [isWorkspaceOptionsOpen, setIsWorkspaceOptionsOpen] = useState(false);
+  const [isAutoTagOpen, setIsAutoTagOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<BoutWorkspaceTab>("tagging");
   const [editingTagId, setEditingTagId] = useState<string | null>(null);
   const [copyFeedback, setCopyFeedback] = useState<"idle" | "copied" | "error">("idle");
@@ -665,6 +668,17 @@ export function BoutWorkspaceShell({
                   </Button>
                   <Button
                     size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setIsWorkspaceOptionsOpen(false);
+                      setIsAutoTagOpen(true);
+                    }}
+                  >
+                    <Bot data-icon="inline-start" />
+                    Auto-tag
+                  </Button>
+                  <Button
+                    size="sm"
                     onClick={() => {
                       setIsWorkspaceOptionsOpen(false);
                       fileInputRef.current?.click();
@@ -735,6 +749,12 @@ export function BoutWorkspaceShell({
           />
         </TabsContent>
       </Tabs>
+
+      <AutoTagDialog
+        session={session}
+        open={isAutoTagOpen}
+        onOpenChange={setIsAutoTagOpen}
+      />
 
       <Dialog open={isLibraryPickerOpen} onOpenChange={setIsLibraryPickerOpen}>
         <DialogContent className="sm:max-w-[680px]">

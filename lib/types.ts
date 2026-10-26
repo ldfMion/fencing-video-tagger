@@ -71,6 +71,7 @@ export const FailureCauseSchema = z.enum([
   "skill-gap",
 ]);
 export const VideoSourceTypeSchema = z.enum(["library", "temporary"]);
+export const TagOriginSchema = z.enum(["agent"]);
 export const MATCH_PERIODS = ["1", "2", "3", "priority"] as const;
 export const STRIP_ZONES = ["1", "2", "3", "4", "5"] as const;
 export const MATCH_CLOCK_PATTERN = /^(\d{1,2}):([0-5]\d)$/;
@@ -95,6 +96,7 @@ export type MatchPeriod = z.infer<typeof MatchPeriodSchema>;
 export type MatchClock = z.infer<typeof MatchClockSchema>;
 export type StripZone = z.infer<typeof StripZoneSchema>;
 export type TaggingOptions = z.infer<typeof TaggingOptionsSchema>;
+export type TagOrigin = z.infer<typeof TagOriginSchema>;
 
 const TagFieldsSchema = z.object({
   id: z.string(),
@@ -111,6 +113,8 @@ const TagFieldsSchema = z.object({
   matchPeriod: MatchPeriodSchema.optional(),
   matchClock: MatchClockSchema.optional(),
   stripZone: StripZoneSchema.optional(),
+  origin: TagOriginSchema.optional(), // absent for tags you created yourself
+  autoTagJobId: z.string().optional(),
 });
 
 export const TagSchema = TagFieldsSchema.refine(
@@ -126,6 +130,8 @@ export const TagContentFieldsSchema = TagFieldsSchema.omit({
   id: true,
   seq: true,
   createdAt: true,
+  origin: true,
+  autoTagJobId: true,
 });
 export const TagContentSchema = TagContentFieldsSchema.refine(
   (tag) => !tag.failureCause || tag.failureMode,

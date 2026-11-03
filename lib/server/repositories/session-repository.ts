@@ -521,10 +521,16 @@ function sessionVersionMatches(session: VideoSession) {
   );
 }
 
+/** Thrown when another write changed the session after the caller loaded it. */
+export class SessionConflictError extends Error {
+  constructor(sessionId: string) {
+    super(`Session ${sessionId} changed while this request was being processed. Please retry.`);
+    this.name = "SessionConflictError";
+  }
+}
+
 function throwSessionConflict(sessionId: string): never {
-  throw new Error(
-    `Session ${sessionId} changed while this request was being processed. Please retry.`,
-  );
+  throw new SessionConflictError(sessionId);
 }
 
 function isDuplicateSessionError(error: unknown): boolean {

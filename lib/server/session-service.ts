@@ -172,7 +172,7 @@ export async function deleteSession(
 
 export async function addTag(input: AddTagInput): Promise<VideoSession> {
   const parsedInput = AddTagInputSchema.parse(input);
-  const { session } = await addTagToSession(parsedInput.sessionId, parsedInput.params, {
+  const { session } = await addTagToSession(await requireSession(parsedInput.sessionId), parsedInput.params, {
     tagId: parsedInput.tagId,
     createdAt: parsedInput.createdAt,
   });
@@ -182,7 +182,7 @@ export async function addTag(input: AddTagInput): Promise<VideoSession> {
 export async function updateTag(input: UpdateTagInput): Promise<VideoSession> {
   const parsedInput = UpdateTagInputSchema.parse(input);
   const { session } = await updateTagInSession(
-    parsedInput.sessionId,
+    await requireSession(parsedInput.sessionId),
     parsedInput.tagId,
     parsedInput.updates,
   );
@@ -191,7 +191,7 @@ export async function updateTag(input: UpdateTagInput): Promise<VideoSession> {
 
 export async function deleteTag(input: DeleteTagInput): Promise<VideoSession> {
   const parsedInput = DeleteTagInputSchema.parse(input);
-  return deleteTagFromSession(parsedInput.sessionId, parsedInput.tagId);
+  return deleteTagFromSession(await requireSession(parsedInput.sessionId), parsedInput.tagId);
 }
 
 export async function importSessions(

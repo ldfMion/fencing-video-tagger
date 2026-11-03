@@ -24,12 +24,15 @@ export function getNextLastModified(session: VideoSession): number {
   return Math.max(Date.now(), session.lastModified + 1);
 }
 
+/**
+ * Tag writes take the session the caller already loaded, so checks the caller ran on that
+ * snapshot are protected by the repository's lastModified compare-and-swap.
+ */
 export async function addTagToSession(
-  sessionId: string,
+  session: VideoSession,
   params: TagContent,
   provenance: TagProvenance = {},
 ): Promise<{ session: VideoSession; tag: Tag }> {
-  const session = await requireSession(sessionId);
   const nextTag: Tag = {
     ...createTagRecord(params, session, {
       tagId: provenance.tagId,
@@ -51,11 +54,10 @@ export async function addTagToSession(
 }
 
 export async function updateTagInSession(
-  sessionId: string,
+  session: VideoSession,
   tagId: string,
   updates: Partial<TagContent>,
 ): Promise<{ session: VideoSession; tag: Tag }> {
-  const session = await requireSession(sessionId);
   const previousTag = findTagOrThrow(session, tagId);
   const nextTag = { ...previousTag, ...updates };
   assertTagMetadataMatchesSession(session, nextTag);
@@ -71,10 +73,9 @@ export async function updateTagInSession(
 }
 
 export async function deleteTagFromSession(
-  sessionId: string,
+  session: VideoSession,
   tagId: string,
 ): Promise<VideoSession> {
-  const session = await requireSession(sessionId);
   findTagOrThrow(session, tagId);
   const nextSession = {
     ...session,

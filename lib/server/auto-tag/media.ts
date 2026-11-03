@@ -63,6 +63,10 @@ export interface GenerateOverviewSheetsOptions {
   fps: number;
   secondsPerSheet: number;
   maxSheetWidth?: number;
+  /** Skips the ffprobe call when the caller already probed the video. */
+  streamInfo?: VideoStreamInfo;
+  /** Called after each sheet is written. */
+  onSheetDone?: () => Promise<void>;
 }
 
 function describeError(error: unknown): string {
@@ -209,22 +213,26 @@ export async function generateOverviewSheets(options: GenerateOverviewSheetsOpti
   assertPositiveFiniteNumber(options.duration, "duration");
   assertPositiveFiniteNumber(options.secondsPerSheet, "secondsPerSheet");
   assertPositiveFiniteNumber(options.fps, "fps");
-  const streamInfo = await probeVideoStream(options.videoPath);
+  const streamInfo = options.streamInfo ?? await probeVideoStream(options.videoPath);
   const duration = Math.min(options.duration, streamInfo.duration);
   await mkdir(options.outputDir, { recursive: true });
 
   const sheets = await mapWithConcurrency(
     computeOverviewWindows(duration, options.secondsPerSheet, options.fps),
     OVERVIEW_CONCURRENCY,
-    (window, sheetIndex) => extractFrameSheet({
-      videoPath: options.videoPath,
-      start: window.start,
-      end: window.end,
-      fps: options.fps,
-      outputPath: path.join(options.outputDir, formatOverviewSheetFileName(sheetIndex)),
-      maxSheetWidth: options.maxSheetWidth,
-      streamInfo,
-    }),
+    async (window, sheetIndex) => {
+      const sheet = await extractFrameSheet({
+        videoPath: options.videoPath,
+        start: window.start,
+        end: window.end,
+        fps: options.fps,
+        outputPath: path.join(options.outputDir, formatOverviewSheetFileName(sheetIndex)),
+        maxSheetWidth: options.maxSheetWidth,
+        streamInfo,
+      });
+      await options.onSheetDone?.();
+      return sheet;
+    },
   );
 
   await writeFile(overviewManifestPath(options.outputDir), JSON.stringify(sheets, null, 2));

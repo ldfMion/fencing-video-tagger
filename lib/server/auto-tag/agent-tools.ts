@@ -41,6 +41,7 @@ import {
   requireSession,
   updateTagInSession,
 } from "@/lib/server/tag-mutations";
+import { SessionConflictError } from "@/lib/server/repositories/session-repository";
 import { resolveVideoLibraryFile } from "@/lib/server/video-library";
 import { isMatchClockEnabled, isStripZoneEnabled } from "@/lib/tagging";
 import type { Tag, VideoSession } from "@/lib/types";
@@ -55,8 +56,6 @@ export interface FrameRequest {
   fps: number;
   crop?: CropRect;
 }
-
-const SESSION_CONFLICT_PATTERN = /changed while this request was being processed/;
 
 export async function getJobBrief(job: AutoTagJobRecord): Promise<AgentToolContent[]> {
   const session = await requireSession(job.boutId);
@@ -156,7 +155,7 @@ export async function addAgentTag(
   const { tag } = await retryOnSessionConflict(async () => {
     const session = await requireSession(job.boutId);
     assertNoDuplicateTouch(session, fields.timestamp);
-    return addTagToSession(session.id, toTagContent(fields), {
+    return addTagToSession(session, toTagContent(fields), {
       origin: "agent",
       autoTagJobId: job.id,
     });
@@ -180,7 +179,7 @@ export async function updateAgentTag(
     if (updates.timestamp != null) {
       assertNoDuplicateTouch(session, updates.timestamp, tagId);
     }
-    return updateTagInSession(session.id, tagId, updates);
+    return updateTagInSession(session, tagId, updates);
   });
   await logAgentWrite(job, "update", tag, reasoning);
   return [text(`Updated ${formatAgentTagLine(tag)}`)];
@@ -194,7 +193,7 @@ export async function deleteAgentTag(
   await retryOnSessionConflict(async () => {
     const session = await requireSession(job.boutId);
     await assertAgentCanEditTag(job, session, tagId);
-    return deleteTagFromSession(session.id, tagId);
+    return deleteTagFromSession(session, tagId);
   });
   await appendAutoTagEvent(job.id, {
     kind: "delete",
@@ -255,6 +254,7 @@ function assertNoDuplicateTouch(session: VideoSession, timestamp: number, ignore
   const duplicate = session.tags.find((tag) =>
     tag.id !== ignoredTagId &&
     tag.side &&
+    tag.action &&
     tag.timestamp != null &&
     Math.abs(tag.timestamp - timestamp) < AUTO_TAG_DUPLICATE_WINDOW_SECONDS);
   if (duplicate) {
@@ -281,7 +281,7 @@ async function retryOnSessionConflict<T>(write: () => Promise<T>): Promise<T> {
   try {
     return await write();
   } catch (error) {
-    if (error instanceof Error && SESSION_CONFLICT_PATTERN.test(error.message)) {
+    if (error instanceof SessionConflictError) {
       return write();
     }
     throw error;

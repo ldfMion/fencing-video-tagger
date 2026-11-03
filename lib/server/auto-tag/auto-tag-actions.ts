@@ -6,10 +6,10 @@ import { z } from "zod";
 import type { AutoTagJobView } from "@/lib/auto-tag/job";
 import {
   cancelAutoTagJob as cancelJob,
-  createBenchmarkCopy,
   getAutoTagJobReport as buildJobReport,
   getLatestAutoTagJob,
   getLaunchableJob,
+  startAutoTagBenchmark as startBenchmark,
   startAutoTagJob as startJob,
   type AutoTagJobReport,
 } from "@/lib/server/auto-tag/job-service";
@@ -39,14 +39,11 @@ export async function startAutoTagJob(
 export async function startAutoTagBenchmark(
   input: z.infer<typeof SessionInputSchema>,
 ): Promise<{ sessionId: string; job: AutoTagJobView }> {
-  const copy = await createBenchmarkCopy(SessionInputSchema.parse(input).sessionId);
-  const job = await startJob({
-    sessionId: copy.id,
-    referenceBoutId: input.sessionId,
+  return startBenchmark({
+    sessionId: SessionInputSchema.parse(input).sessionId,
     mcpUrl: await resolveMcpUrl(),
     scheduleBackgroundWork: after,
   });
-  return { sessionId: copy.id, job };
 }
 
 export async function cancelAutoTagJob(

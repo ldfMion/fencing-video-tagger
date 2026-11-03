@@ -81,16 +81,38 @@ export async function startAutoTagJob(options: {
     lastActivityAt: now,
     finishedAt: null,
   });
-  await writeCodexLaunchFiles({ jobId: job.id, token, mcpUrl: options.mcpUrl });
+  try {
+    await writeCodexLaunchFiles({ jobId: job.id, token, mcpUrl: options.mcpUrl });
+  } catch (error) {
+    await endAutoTagJob(job.id, "fail", { error: "Could not write the job launch files." });
+    throw error;
+  }
   options.scheduleBackgroundWork(() => prepareOverview(job.id, video.absolutePath));
   return toJobView(job);
 }
 
-export async function createBenchmarkCopy(sessionId: string): Promise<VideoSession> {
+/** Copies a tagged bout without its tags and starts a job on the copy; the copy is removed if the job cannot start. */
+export async function startAutoTagBenchmark(options: {
+  sessionId: string;
+  mcpUrl: string;
+  scheduleBackgroundWork: (work: () => Promise<void>) => void;
+}): Promise<{ sessionId: string; job: AutoTagJobView }> {
+  const copy = await createBenchmarkCopy(options.sessionId);
+  try {
+    const job = await startAutoTagJob({ ...options, sessionId: copy.id, referenceBoutId: options.sessionId });
+    return { sessionId: copy.id, job };
+  } catch (error) {
+    await getSessionRepository().delete(copy.id);
+    throw error;
+  }
+}
+
+async function createBenchmarkCopy(sessionId: string): Promise<VideoSession> {
   const source = await requireSession(sessionId);
   if (!hasScoringTags(source)) {
     throw new Error("A benchmark needs a bout you have already tagged.");
   }
+  assertHasLibraryVideo(source);
   const copy = {
     ...createSessionRecord({
       fileName: source.fileName,
@@ -174,10 +196,14 @@ export async function requireJob(jobId: string): Promise<AutoTagJobRecord> {
   return job;
 }
 
-async function assertSessionCanBeAutoTagged(session: VideoSession): Promise<void> {
+function assertHasLibraryVideo(session: VideoSession): void {
   if (session.videoSourceType !== "library" || !session.videoRelativePath) {
     throw new Error("Auto-tag needs a video attached from the library.");
   }
+}
+
+async function assertSessionCanBeAutoTagged(session: VideoSession): Promise<void> {
+  assertHasLibraryVideo(session);
   if (hasScoringTags(session)) {
     throw new Error("Auto-tag only runs on bouts without scoring tags. Use a benchmark copy instead.");
   }
@@ -196,6 +222,9 @@ async function prepareOverview(jobId: string, videoPath: string): Promise<void> 
       outputDir: getAutoTagOverviewDirectory(jobId),
       fps: AUTO_TAG_OVERVIEW_FPS,
       secondsPerSheet: AUTO_TAG_OVERVIEW_SECONDS_PER_SHEET,
+      streamInfo,
+      // Long videos can take longer than the idle timeout to cut, so progress counts as activity.
+      onSheetDone: () => updateAutoTagJob(jobId, { lastActivityAt: Date.now() }),
     });
     const becameReady = await transitionAutoTagJob(jobId, ["preparing"], {
       status: "ready",

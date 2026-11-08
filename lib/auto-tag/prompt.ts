@@ -102,7 +102,7 @@ function describeActionCodes(): string {
   };
   return [
     "# Action codes",
-    "The user's own notation: the scorer's actions come before `-` and the opponent's after it; `,` chains the same fencer's successive actions, so `R` after a comma is a renewal. `A` attack, `P` parry, `R` riposte, `C` counterattack, `CT` counter-time, `CR` counter-riposte, `AP` attack on preparation, `L` point in line. Pick the code whose description matches what you saw; when unsure between two, the offense/defense grouping (from the scorer's point of view) matters most.",
+    "The user's own notation: the scorer's actions come before `-` and the opponent's after it; `,` chains the same fencer's successive actions, so `R` after a comma is a renewal. `A` attack, `P` parry, `R` riposte, `C` counterattack (`Cc` closing: collapsing the distance, dodging, or opposing the blade; `Csh` stop hit: opening the distance and running away), `CT` counter-time, `CR` counter-riposte, `CCR` counter-counter-riposte, `AP` attack on preparation, `AN` answering attack after the opponent's attack falls short, `D` defense by distance, `L` point in line. Pick the code whose description matches what you saw; when unsure between two, the offense/defense grouping (from the scorer's point of view) matters most.",
     "",
     "## Offense (the scorer was attacking)",
     ...codesByIntent.offense.map(describeCode),

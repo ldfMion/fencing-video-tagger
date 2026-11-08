@@ -18,6 +18,11 @@ import {
 } from "@/lib/auto-tag/job";
 import { buildJobBrief } from "@/lib/auto-tag/prompt";
 import { formatAgentTagLine } from "@/lib/auto-tag/tag-lines";
+import {
+  planTouchSequence,
+  TOUCH_SEQUENCE_SHEET_COLUMNS,
+  type TouchSequenceRequest,
+} from "@/lib/auto-tag/touch-sequence";
 import { finishAutoTagJob } from "@/lib/server/auto-tag/job-service";
 import {
   getAutoTagOverviewDirectory,
@@ -26,6 +31,7 @@ import {
 import {
   extractFrameSheet,
   extractSingleFrame,
+  probeVideoStream,
   readOverviewManifest,
 } from "@/lib/server/auto-tag/media";
 import { countSamplingInstants } from "@/lib/server/auto-tag/ffmpeg-helpers";
@@ -112,6 +118,50 @@ export async function sampleFrames(
   } finally {
     await fs.rm(outputPath, { force: true });
   }
+}
+
+/**
+ * The seconds leading up to a lamp, as a few wide-tiled sheets, so the phrase can be read before
+ * an action code is chosen. Spends one frame of budget per sampled instant.
+ */
+export async function getTouchSequence(
+  job: AutoTagJobRecord,
+  request: TouchSequenceRequest & { crop?: CropRect },
+): Promise<AgentToolContent[]> {
+  assertWindowInsideVideo(job, request.time, request.time);
+  const plan = planTouchSequence(request, job.videoDuration ?? 0);
+  if (plan.frameCount > AUTO_TAG_FRAMES_PER_CALL_LIMIT) {
+    throw new Error(
+      `That sequence would return about ${plan.frameCount} frames; the limit is ${AUTO_TAG_FRAMES_PER_CALL_LIMIT}. Shorten the window or lower fps.`,
+    );
+  }
+  await reserveFramesOrThrow(job, plan.frameCount);
+  const videoPath = await resolveJobVideoPath(job);
+  const streamInfo = await probeVideoStream(videoPath);
+  const content: AgentToolContent[] = [
+    text(
+      `Run-up to the touch at ${request.time.toFixed(3)}s: ${plan.start.toFixed(3)}-${plan.end.toFixed(3)}s at ${plan.fps} fps in ${plan.windows.length} sheet(s), oldest first. Read who moved forward first, any blade contact, who hit first, and whether a hit was a renewal.`,
+    ),
+  ];
+  for (const [index, window] of plan.windows.entries()) {
+    const outputPath = createSamplePath(job.id);
+    try {
+      const sheet = await extractFrameSheet({
+        videoPath,
+        start: window.start,
+        end: window.end,
+        fps: plan.fps,
+        crop: request.crop,
+        columns: TOUCH_SEQUENCE_SHEET_COLUMNS,
+        outputPath,
+        streamInfo,
+      });
+      content.push(...await describeSheetImage(sheet, `Sheet ${index + 1}/${plan.windows.length}`));
+    } finally {
+      await fs.rm(outputPath, { force: true });
+    }
+  }
+  return content;
 }
 
 export async function getFrame(

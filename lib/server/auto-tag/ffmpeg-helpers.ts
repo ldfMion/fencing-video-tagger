@@ -132,9 +132,12 @@ export function convertCropToPixels(
   };
 }
 
-export function computeSheetGrid(tileCount: number): SheetGrid {
+/** Near-square by default; a fixed column count gives wider tiles for short sequences. */
+export function computeSheetGrid(tileCount: number, fixedColumns?: number): SheetGrid {
   const safeCount = Math.max(1, Math.floor(tileCount));
-  const columns = Math.ceil(Math.sqrt(safeCount));
+  const columns = fixedColumns && fixedColumns > 0
+    ? Math.min(Math.floor(fixedColumns), safeCount)
+    : Math.ceil(Math.sqrt(safeCount));
   return { columns, rows: Math.ceil(safeCount / columns) };
 }
 

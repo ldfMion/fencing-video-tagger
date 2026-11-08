@@ -2,6 +2,7 @@ import { getActionDescription, getTacticalIntent } from "@/lib/action-classifica
 import { formatAgentTagLine } from "@/lib/auto-tag/tag-lines";
 import { STRIP_ZONE_LABELS } from "@/lib/tagging";
 import { ACTIVE_ACTION_CODES, STRIP_ZONES, type ActionCode, type Tag } from "@/lib/types";
+import { TOUCH_SEQUENCE_DEFAULTS } from "@/lib/auto-tag/touch-sequence";
 import { formatTime } from "@/lib/utils";
 
 export const AUTO_TAG_MCP_SERVER_NAME = "fencing_auto_tag";
@@ -57,7 +58,7 @@ function describeBout(context: AutoTagBriefContext): string {
 function describeGoal(): string {
   return [
     "# Goal",
-    "Save exactly one tag for every touch the referee awarded: a point to one fencer, or a card. Do not tag off-target lights, annulled touches, or simultaneous lights where no point was given. Do not record mistakes, failure modes, or comments: only the fields listed below.",
+    "Save exactly one tag for every touch the referee awarded: a point to one fencer, or a card. Do not tag off-target lights, annulled touches, or simultaneous lights where no point was given. Only tag a card you can actually see the referee show; never invent one to make the score add up. If the score changes and you saw no lamp, look closer in that window until you find the touch. Do not record mistakes, failure modes, or comments: only the fields listed below.",
   ].join("\n");
 }
 
@@ -66,7 +67,7 @@ function describeTagRules(context: AutoTagBriefContext): string {
     "# Tag fields",
     "- `timestamp`: video seconds of the first frame where the scoring lamp is visibly on. Use the exact tile times the tools report; never estimate from frame counts.",
     "- `side`: the fencer awarded the point. For cards, `side` is the fencer who received the card: `rc` gives the point to the opponent, `yc` gives no point.",
-    "- `action`: always pick your single best code from the list below, even when unsure. Never leave it empty.",
+    "- `action`: always pick your single best code from the list below, even when unsure. Never leave it empty. Choose it only after looking at the run-up to the touch with `get_touch_sequence`; overview sheets are too sparse to tell a parry-riposte from an attack.",
   ];
   if (context.matchClockEnabled) {
     rules.push(
@@ -87,7 +88,8 @@ function describeWorkflow(context: AutoTagBriefContext): string {
   return [
     "# How to work",
     `- The whole video is pre-cut into ${context.overviewSheetCount} overview sheets (\`get_overview_sheet\`, index 0-${Math.max(context.overviewSheetCount - 1, 0)}), each ${context.secondsPerSheet}s at ${context.overviewFps} frames per second, tiled into one image. The text next to each image lists every tile's time. Overview sheets are free.`,
-    `- Look closer with \`sample_frames\` (a time window at a higher frame rate, optionally cropped) or \`get_frame\` (one full-resolution frame, optionally cropped, e.g. to read the scoreboard). Crops use 0-1 coordinates of the full frame, so they work even when a handheld camera moves. Each call is capped at ${context.framesPerCallLimit} frames; ${context.framesRemaining} look-closer frames remain for this job.`,
+    `- For every touch, once you know the lamp time, call \`get_touch_sequence\` at that time: it returns the ${TOUCH_SEQUENCE_DEFAULTS.secondsBefore}s before and ${TOUCH_SEQUENCE_DEFAULTS.secondsAfter}s after the lamp at ${TOUCH_SEQUENCE_DEFAULTS.fps} fps as wide-tiled sheets. Pass a crop covering just the band of the strip where the fencers are, so they come out large. Work out the phrase from it: who started moving forward first (the attacker), whether the other fencer made blade contact (a parry or beat) before hitting, who hit first, and whether a hit came only after a parried first attempt (a renewal). Then choose the action code and strip zone.`,
+    `- Look closer with \`sample_frames\` (a time window at a higher frame rate, optionally cropped) or \`get_frame\` (one full-resolution frame, optionally cropped, e.g. to read the scoreboard). Crops use 0-1 coordinates of the full frame, so they work even when a handheld camera moves. Each call is capped at ${context.framesPerCallLimit} frames; ${context.framesRemaining} look-closer frames remain for this job, enough to inspect every touch.`,
     "- Save as you go: call `add_tag` as soon as you are confident a touch was awarded. Fix your own tags with `update_tag` or `delete_tag`. Once the user edits one of your tags, it is theirs and you can no longer change it.",
     "- A new scoring tag within 1 second of an existing one is rejected as a duplicate. Call `list_tags` whenever you lose track of what is already saved.",
     "- When the whole video is covered, call `finish_job` with a short summary. Nothing else ends the job.",

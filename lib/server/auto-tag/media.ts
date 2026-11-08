@@ -44,6 +44,8 @@ export interface ExtractFrameSheetOptions {
   crop?: CropRect;
   outputPath: string;
   maxSheetWidth?: number;
+  /** Fixed column count instead of the near-square default. */
+  columns?: number;
   /** Skips the ffprobe call when the caller already probed the video. */
   streamInfo?: VideoStreamInfo;
 }
@@ -127,7 +129,10 @@ export async function extractFrameSheet(options: ExtractFrameSheetOptions): Prom
   const { start, end } = normalizeSamplingWindow(options.start, options.end, streamInfo.duration);
 
   const cropPixels = convertCropToPixels(options.crop, streamInfo);
-  const grid = computeSheetGrid(estimateTileCount(start, end, options.fps, streamInfo.frameRate));
+  const grid = computeSheetGrid(
+    estimateTileCount(start, end, options.fps, streamInfo.frameRate),
+    options.columns,
+  );
   const tileSize = computeTileSize(cropPixels, grid.columns, options.maxSheetWidth ?? DEFAULT_MAX_SHEET_WIDTH);
 
   await mkdir(path.dirname(options.outputPath), { recursive: true });

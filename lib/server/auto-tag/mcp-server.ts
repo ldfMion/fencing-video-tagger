@@ -4,6 +4,7 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { AgentTagInputSchema } from "@/lib/auto-tag/agent-tag-fields";
 import { CropRectSchema } from "@/lib/auto-tag/frame-sheet";
+import { TOUCH_SEQUENCE_DEFAULTS, TOUCH_SEQUENCE_LIMITS } from "@/lib/auto-tag/touch-sequence";
 import {
   addAgentTag,
   deleteAgentTag,
@@ -11,6 +12,7 @@ import {
   getFrame,
   getJobBrief,
   getOverviewSheet,
+  getTouchSequence,
   listJobTags,
   sampleFrames,
   updateAgentTag,
@@ -48,6 +50,22 @@ export function registerAutoTagTools(server: McpServer): void {
     }),
     annotations: READ_ONLY,
   }, (request, ctx) => runJobTool(ctx, (job) => sampleFrames(job, request)));
+
+  server.registerTool("get_touch_sequence", {
+    description: "The seconds leading up to a lamp, as wide-tiled sheets, to read the phrase before choosing an action code. Call it for every touch. Spends one frame of budget per sampled instant.",
+    inputSchema: z.object({
+      time: TimeSchema.describe("The lamp time of the touch, in video seconds"),
+      secondsBefore: z.number().min(0).max(TOUCH_SEQUENCE_LIMITS.maxSecondsBefore).optional()
+        .describe(`Seconds before the lamp to include (default ${TOUCH_SEQUENCE_DEFAULTS.secondsBefore})`),
+      secondsAfter: z.number().min(0).max(TOUCH_SEQUENCE_LIMITS.maxSecondsAfter).optional()
+        .describe(`Seconds after the lamp to include (default ${TOUCH_SEQUENCE_DEFAULTS.secondsAfter})`),
+      fps: z.number().positive().max(TOUCH_SEQUENCE_LIMITS.maxFps).optional()
+        .describe(`Frames per second (default ${TOUCH_SEQUENCE_DEFAULTS.fps})`),
+      crop: CropRectSchema.optional()
+        .describe("Normalized 0-1 rectangle of the full frame; crop to the band of the strip where the fencers are so they come out large"),
+    }),
+    annotations: READ_ONLY,
+  }, (request, ctx) => runJobTool(ctx, (job) => getTouchSequence(job, request)));
 
   server.registerTool("get_frame", {
     description: "One full-resolution frame at or just after a time, optionally cropped (e.g. to read the scoreboard). Spends 1 frame of budget.",

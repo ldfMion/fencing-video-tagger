@@ -46,6 +46,12 @@ test("sizes grids to stay near square", () => {
   assert.deepEqual(computeSheetGrid(150), { columns: 13, rows: 12 });
 });
 
+test("a fixed column count gives wider tiles", () => {
+  assert.deepEqual(computeSheetGrid(12, 3), { columns: 3, rows: 4 });
+  assert.deepEqual(computeSheetGrid(2, 3), { columns: 2, rows: 1 });
+  assert.deepEqual(computeSheetGrid(20, undefined), { columns: 5, rows: 4 });
+});
+
 test("caps the tile count by the video's own frame rate", () => {
   assert.equal(estimateTileCount(0, 10, 2, 60), 20);
   assert.equal(estimateTileCount(0, 2, 30, 10), 21);

@@ -2,7 +2,7 @@ import "server-only";
 
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { getFinalAgentSnapshots } from "@/lib/auto-tag/agent-tag-fields";
-import { describeClaudeCodeExit, type ClaudeCodeExit } from "@/lib/auto-tag/claude-code";
+import { describeClaudeCodeExit, describeClaudeCodeUsage, type ClaudeCodeExit } from "@/lib/auto-tag/claude-code";
 import { evaluateAutoTagJob, type AutoTagEvaluationResult } from "@/lib/auto-tag/evaluation";
 import {
   ACTIVE_AUTO_TAG_JOB_STATUSES,
@@ -258,6 +258,8 @@ async function prepareOverview(options: {
 
 /** A process that ends while the job is still active did not call `finish_job`, so the job failed. */
 async function handleAgentExit(jobId: string, exit: ClaudeCodeExit): Promise<void> {
+  const usage = describeClaudeCodeUsage(exit);
+  if (usage) console.info(`[auto-tag] job ${jobId} Claude Code run: ${usage}`);
   const job = await findAutoTagJobById(jobId);
   if (!job || !isAutoTagJobActive(job.status)) return;
   await endAutoTagJob(jobId, "fail", { error: describeClaudeCodeExit(exit) });

@@ -3,6 +3,7 @@ import "server-only";
 import { spawn, type ChildProcess } from "node:child_process";
 import {
   buildClaudeCodeArgs,
+  CLAUDE_CODE_EFFORT_ENV_VAR,
   CLAUDE_CODE_MODEL_ENV_VAR,
   type ClaudeCodeExit,
 } from "@/lib/auto-tag/claude-code";
@@ -30,6 +31,7 @@ export function launchClaudeCodeAgent(options: {
       mcpUrl: options.mcpUrl,
       token: options.token,
       model: process.env[CLAUDE_CODE_MODEL_ENV_VAR] || undefined,
+      effort: process.env[CLAUDE_CODE_EFFORT_ENV_VAR] || undefined,
     }),
     { cwd: options.cwd, stdio: ["pipe", "pipe", "pipe"] },
   );

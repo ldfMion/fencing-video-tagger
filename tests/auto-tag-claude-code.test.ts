@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   buildClaudeCodeArgs,
+  describeClaudeCodeUsage,
   describeClaudeCodeExit,
   parseClaudeCodeResult,
 } from "../lib/auto-tag/claude-code";
@@ -36,6 +37,24 @@ test("claude code runs headless with only the job's MCP server and tools", () =>
   });
 });
 
+test("an effort override is passed through", () => {
+  assert.ok(!buildClaudeCodeArgs(launch).includes("--effort"));
+  const args = buildClaudeCodeArgs({ ...launch, effort: "high" });
+  assert.equal(flagValue(args, "--effort"), "high");
+});
+
+test("usage comes out of the JSON result", () => {
+  const stdout = JSON.stringify({
+    type: "result", is_error: false, result: "done", total_cost_usd: 1.2345, duration_ms: 90000,
+    num_turns: 12, modelUsage: { "claude-sonnet-5-5": { inputTokens: 1 } },
+  });
+  assert.equal(
+    describeClaudeCodeUsage({ code: 0, signal: null, stdout, stderr: "" }),
+    "models claude-sonnet-5-5 · 12 turns · 1.5 min · $1.23 at API prices",
+  );
+  assert.equal(describeClaudeCodeUsage({ code: 1, signal: null, stdout: "junk", stderr: "" }), null);
+});
+
 test("a model override is passed through", () => {
   const args = buildClaudeCodeArgs({ ...launch, model: "opus" });
   assert.equal(flagValue(args, "--model"), "opus");
@@ -44,11 +63,11 @@ test("a model override is passed through", () => {
 test("the json result is parsed leniently", () => {
   assert.deepEqual(
     parseClaudeCodeResult('{"type":"result","is_error":false,"result":"  Done tagging. "}\n'),
-    { isError: false, text: "Done tagging." },
+    { isError: false, text: "Done tagging.", usage: { costUsd: null, durationMs: null, numTurns: null, models: [] } },
   );
   assert.deepEqual(
     parseClaudeCodeResult('{"type":"result","is_error":true,"result":""}'),
-    { isError: true, text: null },
+    { isError: true, text: null, usage: { costUsd: null, durationMs: null, numTurns: null, models: [] } },
   );
   assert.equal(parseClaudeCodeResult("not json"), null);
   assert.equal(parseClaudeCodeResult(""), null);

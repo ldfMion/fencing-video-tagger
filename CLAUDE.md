@@ -66,7 +66,7 @@ app/layout.tsx (root layout)
 
 - `Tag`: { id, timestamp, comment, createdAt, side?, action?, mistake?, failureMode?, failureCause?, origin? ("agent"), autoTagJobId? }
 - `VideoSession`: { id, failureClassificationVersion, fileName, tags[], lastModified, leftFencer?, rightFencer?, boutDate? }
-- `ActionCode`: Union of fencing action notation strings (e.g., "A-P", "R-R", "yc", "rc")
+- `ActionCode`: Union of fencing action notation strings (e.g., "A-P", "R-R", "yc", "rc"). The codes, their picker order, their plain-language descriptions, and their offense/defense classification all live in one table, `ACTION_DEFINITIONS` in `lib/action-classifications.ts`; `types.ts` re-exports the list. Add a new code there and nowhere else.
 - `Side`: "L" | "R"
 - `MistakeType`: "tactical" | "execution"
 - `FailureMode`: "technique" | "distance" | "timing" | "action-choice"

@@ -1,53 +1,7 @@
 import { z } from "zod";
+import { ACTION_CODES } from "@/lib/action-classifications";
 
-// Action codes for fencing touches (sorted alphabetically)
-export const ACTION_CODES = [
-  "A,R",
-  "A,R,R",
-  "A,R-P",
-  "A-A",
-  "A-AP",
-  "A-Cc",
-  "A-Csh",
-  "A-D",
-  "A-L",
-  "A-P",
-  "AN-P",
-  "AN-R",
-  "AN,R",
-  "AP-A",
-  "AP-P",
-  "AP,R",
-  "AR,R",
-  "bl",
-  "Cc-A",
-  "Cc-AP",
-  "Cc-CT",
-  "CCR,R",
-  "CCR-R",
-  "CCR-P",
-  "CR,R",
-  "CR,R,R,R",
-  "CR-P",
-  "CR-R",
-  "Csh-A",
-  "CT-R",
-  "CT-P",
-  "CT,R",
-  "C,R",
-  "C,R,R",
-  "C,R-CT",
-  "L-A",
-  "R,R",
-  "R,R,R",
-  "R-AP,P", // parrying an attack on prep and riposting with the opponent trying to parry again
-  "R-AP,R", // parrying an attack on prep and riposting with the opponent renewing
-  "R-CT,R", // parrying a riposte from a counter time with the opponent renewing
-  "R-P",
-  "R-R",
-  "rc",
-  "yc",
-] as const;
+export { ACTION_CODES, type ActionCode } from "@/lib/action-classifications";
 
 export const ActionCodeSchema = z.enum(ACTION_CODES);
 export const SideSchema = z.enum(["L", "R"]);
@@ -83,7 +37,6 @@ export const TaggingOptionsSchema = z.object({
   stripZoneEnabled: z.boolean().optional(),
 });
 
-export type ActionCode = z.infer<typeof ActionCodeSchema>;
 export type Side = z.infer<typeof SideSchema>;
 export type MistakeType = z.infer<typeof MistakeTypeSchema>;
 export type FailureClassificationVersion = z.infer<

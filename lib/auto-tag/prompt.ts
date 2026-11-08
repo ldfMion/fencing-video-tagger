@@ -1,7 +1,7 @@
-import { getTacticalIntent } from "@/lib/action-classifications";
+import { getActionDescription, getTacticalIntent } from "@/lib/action-classifications";
 import { formatAgentTagLine } from "@/lib/auto-tag/tag-lines";
 import { STRIP_ZONE_LABELS } from "@/lib/tagging";
-import { ACTION_CODES, STRIP_ZONES, type Tag } from "@/lib/types";
+import { ACTION_CODES, STRIP_ZONES, type ActionCode, type Tag } from "@/lib/types";
 import { formatTime } from "@/lib/utils";
 
 export const AUTO_TAG_MCP_SERVER_NAME = "fencing_auto_tag";
@@ -102,11 +102,21 @@ function describeActionCodes(): string {
   };
   return [
     "# Action codes",
-    "The user's own notation, roughly: `A` attack, `P` parry, `R` riposte, `C` counterattack, `CT` counter-time, `AP` attack on preparation; `,` chains successive actions in one phrase and `-` pairs the scorer's action with the opponent's. `yc` and `rc` are yellow and red cards. Treat the abbreviations as hints and rely on the offense/defense grouping, which is from the scoring fencer's point of view.",
-    `- Offense (the scorer was attacking): ${formatCodeList(codesByIntent.offense)}`,
-    `- Defense (the scorer was defending): ${formatCodeList(codesByIntent.defense)}`,
-    `- Other: ${formatCodeList(codesByIntent.other)}`,
+    "The user's own notation: the scorer's actions come before `-` and the opponent's after it; `,` chains the same fencer's successive actions, so `R` after a comma is a renewal. `A` attack, `P` parry, `R` riposte, `C` counterattack, `CT` counter-time, `CR` counter-riposte, `AP` attack on preparation, `L` point in line. Pick the code whose description matches what you saw; when unsure between two, the offense/defense grouping (from the scorer's point of view) matters most.",
+    "",
+    "## Offense (the scorer was attacking)",
+    ...codesByIntent.offense.map(describeCode),
+    "",
+    "## Defense (the scorer was defending)",
+    ...codesByIntent.defense.map(describeCode),
+    "",
+    "## Other",
+    ...codesByIntent.other.map(describeCode),
   ].join("\n");
+}
+
+function describeCode(code: ActionCode): string {
+  return `- \`${code}\`: ${getActionDescription(code)}`;
 }
 
 function describeExistingTags(tags: Tag[]): string {
@@ -115,8 +125,4 @@ function describeExistingTags(tags: Tag[]): string {
     return "# Existing tags\nNone yet.";
   }
   return ["# Existing tags", ...scoringTags.map(formatAgentTagLine)].join("\n");
-}
-
-function formatCodeList(codes: readonly string[]): string {
-  return codes.map((code) => `\`${code}\``).join(", ");
 }

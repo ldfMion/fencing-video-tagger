@@ -2,7 +2,7 @@ import "server-only";
 
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { AgentTagFieldsSchema } from "@/lib/auto-tag/agent-tag-fields";
+import { AgentTagInputSchema } from "@/lib/auto-tag/agent-tag-fields";
 import { CropRectSchema } from "@/lib/auto-tag/frame-sheet";
 import {
   addAgentTag,
@@ -65,12 +65,12 @@ export function registerAutoTagTools(server: McpServer): void {
 
   server.registerTool("add_tag", {
     description: "Save one awarded touch immediately. It appears in the app right away.",
-    inputSchema: AgentTagFieldsSchema.extend({ reasoning: ReasoningSchema }),
+    inputSchema: AgentTagInputSchema.extend({ reasoning: ReasoningSchema }),
   }, ({ reasoning, ...fields }, ctx) => runJobTool(ctx, (job) => addAgentTag(job, fields, reasoning)));
 
   server.registerTool("update_tag", {
     description: "Correct a tag you saved earlier. Only fields you pass change.",
-    inputSchema: AgentTagFieldsSchema.partial().extend({
+    inputSchema: AgentTagInputSchema.partial().extend({
       tagId: z.string(),
       reasoning: ReasoningSchema,
     }),

@@ -1,7 +1,7 @@
 import { getActionDescription, getTacticalIntent } from "@/lib/action-classifications";
 import { formatAgentTagLine } from "@/lib/auto-tag/tag-lines";
 import { STRIP_ZONE_LABELS } from "@/lib/tagging";
-import { ACTION_CODES, STRIP_ZONES, type ActionCode, type Tag } from "@/lib/types";
+import { ACTIVE_ACTION_CODES, STRIP_ZONES, type ActionCode, type Tag } from "@/lib/types";
 import { formatTime } from "@/lib/utils";
 
 export const AUTO_TAG_MCP_SERVER_NAME = "fencing_auto_tag";
@@ -96,9 +96,9 @@ function describeWorkflow(context: AutoTagBriefContext): string {
 
 function describeActionCodes(): string {
   const codesByIntent = {
-    offense: ACTION_CODES.filter((code) => getTacticalIntent(code) === "offense"),
-    defense: ACTION_CODES.filter((code) => getTacticalIntent(code) === "defense"),
-    other: ACTION_CODES.filter((code) => getTacticalIntent(code) === null),
+    offense: ACTIVE_ACTION_CODES.filter((code) => getTacticalIntent(code) === "offense"),
+    defense: ACTIVE_ACTION_CODES.filter((code) => getTacticalIntent(code) === "defense"),
+    other: ACTIVE_ACTION_CODES.filter((code) => getTacticalIntent(code) === null),
   };
   return [
     "# Action codes",

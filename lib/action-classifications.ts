@@ -10,6 +10,11 @@ export interface ActionDefinition {
   scoringDefAlt?: DefAlternative;
   /** for offensive actions, what defense the non-scoring fencer attempted */
   receivingDefAlt?: DefAlternative;
+  /**
+   * Kept only so existing tags stay valid: hidden from the tag picker and from the auto-tag agent.
+   * Legacy codes still show up in search filters and statistics.
+   */
+  legacy?: true;
 }
 
 /**
@@ -120,12 +125,13 @@ export const ACTION_DEFINITIONS = {
     tacticalIntent: "defense",
     scoringDefAlt: "AP",
   },
-  // TODO: likely a duplicate of "A,R,R"; migrate existing tags and remove it later.
+  // TODO: migrate existing "AR,R" tags to "A,R,R" and remove this entry.
   "AR,R": {
     description:
-      "Legacy spelling of `A,R,R` (attack, missed renewal, hit on the second renewal). Prefer `A,R,R` for new tags.",
+      "Legacy spelling of `A,R,R`: attack, missed renewal, hit on the second renewal.",
     tacticalIntent: "offense",
     receivingDefAlt: "P",
+    legacy: true,
   },
   bl: {
     description: "The fencer goes past the back line and a touch is awarded to the opponent.",
@@ -293,11 +299,20 @@ export const ACTION_DEFINITIONS = {
 
 export type ActionCode = keyof typeof ACTION_DEFINITIONS;
 
-/** All action codes in picker order. */
+/** All action codes in picker order, legacy ones included, so every stored tag validates. */
 export const ACTION_CODES = Object.keys(ACTION_DEFINITIONS) as [
   ActionCode,
   ...ActionCode[],
 ];
+
+/** The codes offered for new tags: everything that is not legacy. */
+export const ACTIVE_ACTION_CODES = ACTION_CODES.filter(
+  (code) => !isLegacyActionCode(code),
+) as [ActionCode, ...ActionCode[]];
+
+export function isLegacyActionCode(action: ActionCode): boolean {
+  return getActionDefinition(action).legacy === true;
+}
 
 export function getActionDefinition(action: ActionCode): ActionDefinition {
   return ACTION_DEFINITIONS[action];

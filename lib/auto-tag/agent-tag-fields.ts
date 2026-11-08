@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   ActionCodeSchema,
+  ActiveActionCodeSchema,
   MatchClockSchema,
   MatchPeriodSchema,
   SideSchema,
@@ -19,6 +20,11 @@ export const AgentTagFieldsSchema = z.object({
 });
 
 export type AgentTagFields = z.infer<typeof AgentTagFieldsSchema>;
+
+/** What the agent may send to `add_tag` and `update_tag`: legacy action codes are refused. */
+export const AgentTagInputSchema = AgentTagFieldsSchema.extend({
+  action: ActiveActionCodeSchema,
+});
 
 export const AutoTagEventKindSchema = z.enum(["add", "update", "delete"]);
 export type AutoTagEventKind = z.infer<typeof AutoTagEventKindSchema>;

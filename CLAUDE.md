@@ -66,7 +66,7 @@ app/layout.tsx (root layout)
 
 - `Tag`: { id, timestamp, comment, createdAt, side?, action?, mistake?, failureMode?, failureCause?, origin? ("agent"), autoTagJobId? }
 - `VideoSession`: { id, failureClassificationVersion, fileName, tags[], lastModified, leftFencer?, rightFencer?, boutDate? }
-- `ActionCode`: Union of fencing action notation strings (e.g., "A-P", "R-R", "yc", "rc"). The codes, their picker order, their plain-language descriptions, and their offense/defense classification all live in one table, `ACTION_DEFINITIONS` in `lib/action-classifications.ts`; `types.ts` re-exports the list. Add a new code there and nowhere else.
+- `ActionCode`: Union of fencing action notation strings (e.g., "A-P", "R-R", "yc", "rc"). The codes, their picker order, their plain-language descriptions, and their offense/defense classification all live in one table, `ACTION_DEFINITIONS` in `lib/action-classifications.ts`; `types.ts` re-exports the list. Add a new code there and nowhere else. A code marked `legacy: true` stays valid on stored tags (`ACTION_CODES`, `ActionCodeSchema`) but is left out of `ACTIVE_ACTION_CODES`, which the tag picker, the agent brief, and the MCP `add_tag`/`update_tag` input use.
 - `Side`: "L" | "R"
 - `MistakeType`: "tactical" | "execution"
 - `FailureMode`: "technique" | "distance" | "timing" | "action-choice"

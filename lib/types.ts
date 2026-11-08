@@ -1,9 +1,16 @@
 import { z } from "zod";
-import { ACTION_CODES } from "@/lib/action-classifications";
+import { ACTION_CODES, ACTIVE_ACTION_CODES } from "@/lib/action-classifications";
 
-export { ACTION_CODES, type ActionCode } from "@/lib/action-classifications";
+export {
+  ACTION_CODES,
+  ACTIVE_ACTION_CODES,
+  type ActionCode,
+} from "@/lib/action-classifications";
 
+/** Every code a stored tag may carry, legacy ones included. */
 export const ActionCodeSchema = z.enum(ACTION_CODES);
+/** The codes accepted for new tags. */
+export const ActiveActionCodeSchema = z.enum(ACTIVE_ACTION_CODES);
 export const SideSchema = z.enum(["L", "R"]);
 export const MistakeTypeSchema = z.enum(["tactical", "execution"]);
 export const FailureClassificationVersionSchema = z.union([

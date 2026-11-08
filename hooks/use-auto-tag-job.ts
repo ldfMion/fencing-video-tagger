@@ -7,7 +7,6 @@ import {
   cancelAutoTagJob,
   getAutoTagJobForSession,
   getAutoTagJobReport,
-  openAutoTagJobInTerminal,
   startAutoTagBenchmark,
   startAutoTagJob,
 } from "@/lib/server/auto-tag/auto-tag-actions";
@@ -49,23 +48,15 @@ export function useAutoTagJob(sessionId: string) {
     mutationFn: (jobId: string) => cancelAutoTagJob({ jobId }),
     onSuccess: setJob,
   });
-  const openTerminalMutation = useMutation({
-    mutationFn: (jobId: string) => openAutoTagJobInTerminal({ jobId }),
-  });
-
   return {
     job,
     isLoading: jobQuery.isLoading,
     startJob: startMutation.mutateAsync,
     startBenchmark: benchmarkMutation.mutateAsync,
     cancelJob: cancelMutation.mutateAsync,
-    openInTerminal: openTerminalMutation.mutateAsync,
-    terminalResult: openTerminalMutation.data ?? null,
     isStarting: startMutation.isPending || benchmarkMutation.isPending,
     isCancelling: cancelMutation.isPending,
-    isOpeningTerminal: openTerminalMutation.isPending,
-    error: startMutation.error ?? benchmarkMutation.error ?? cancelMutation.error ??
-      openTerminalMutation.error ?? null,
+    error: startMutation.error ?? benchmarkMutation.error ?? cancelMutation.error ?? null,
   };
 }
 

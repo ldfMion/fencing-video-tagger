@@ -2,6 +2,7 @@ import "server-only";
 
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { getFinalAgentSnapshots } from "@/lib/auto-tag/agent-tag-fields";
+import { describeClaudeCodeExit, type ClaudeCodeExit } from "@/lib/auto-tag/claude-code";
 import { evaluateAutoTagJob, type AutoTagEvaluationResult } from "@/lib/auto-tag/evaluation";
 import {
   ACTIVE_AUTO_TAG_JOB_STATUSES,
@@ -15,10 +16,14 @@ import {
 } from "@/lib/auto-tag/job";
 import { createSessionRecord } from "@/lib/session-service";
 import {
-  buildLaunchCommand,
+  launchClaudeCodeAgent,
+  stopClaudeCodeAgent,
+} from "@/lib/server/auto-tag/claude-launcher";
+import {
+  ensureAutoTagJobWorkspace,
+  getAutoTagJobDirectory,
   getAutoTagOverviewDirectory,
   removeAutoTagJobWorkspace,
-  writeCodexLaunchFiles,
 } from "@/lib/server/auto-tag/job-workspace";
 import { generateOverviewSheets, probeVideoStream } from "@/lib/server/auto-tag/media";
 import {
@@ -68,7 +73,7 @@ export async function startAutoTagJob(options: {
     boutId: session.id,
     referenceBoutId: options.referenceBoutId ?? null,
     status: "preparing",
-    agent: "codex",
+    agent: "claude-code",
     tokenHash: hashToken(token),
     videoDuration: null,
     overviewSheetCount: null,
@@ -82,12 +87,14 @@ export async function startAutoTagJob(options: {
     finishedAt: null,
   });
   try {
-    await writeCodexLaunchFiles({ jobId: job.id, token, mcpUrl: options.mcpUrl });
+    await ensureAutoTagJobWorkspace(job.id);
   } catch (error) {
-    await endAutoTagJob(job.id, "fail", { error: "Could not write the job launch files." });
+    await endAutoTagJob(job.id, "fail", { error: "Could not create the job folder." });
     throw error;
   }
-  options.scheduleBackgroundWork(() => prepareOverview(job.id, video.absolutePath));
+  options.scheduleBackgroundWork(() =>
+    prepareOverview({ jobId: job.id, videoPath: video.absolutePath, token, mcpUrl: options.mcpUrl }),
+  );
   return toJobView(job);
 }
 
@@ -164,14 +171,6 @@ export async function recordAgentActivity(jobId: string): Promise<void> {
   }
 }
 
-export async function getLaunchableJob(jobId: string): Promise<AutoTagJobRecord> {
-  const job = await expireIdleJob(await requireJob(jobId));
-  if (job.status !== "ready" && job.status !== "running") {
-    throw new Error("This job can no longer be started.");
-  }
-  return job;
-}
-
 export async function getAutoTagJobReport(jobId: string): Promise<AutoTagJobReport> {
   const job = await requireJob(jobId);
   const session = await requireSession(job.boutId);
@@ -213,7 +212,14 @@ async function assertSessionCanBeAutoTagged(session: VideoSession): Promise<void
   }
 }
 
-async function prepareOverview(jobId: string, videoPath: string): Promise<void> {
+/** Cuts the overview sheets, then starts the agent once the job is ready. */
+async function prepareOverview(options: {
+  jobId: string;
+  videoPath: string;
+  token: string;
+  mcpUrl: string;
+}): Promise<void> {
+  const { jobId, videoPath } = options;
   try {
     const streamInfo = await probeVideoStream(videoPath);
     const sheets = await generateOverviewSheets({
@@ -234,12 +240,27 @@ async function prepareOverview(jobId: string, videoPath: string): Promise<void> 
     });
     if (!becameReady) {
       await removeAutoTagJobWorkspace(jobId);
+      return;
     }
+    launchClaudeCodeAgent({
+      jobId,
+      token: options.token,
+      mcpUrl: options.mcpUrl,
+      cwd: getAutoTagJobDirectory(jobId),
+      onExit: (exit) => void handleAgentExit(jobId, exit),
+    });
   } catch (error) {
     await endAutoTagJob(jobId, "fail", {
       error: error instanceof Error ? error.message : "Could not prepare the overview.",
     });
   }
+}
+
+/** A process that ends while the job is still active did not call `finish_job`, so the job failed. */
+async function handleAgentExit(jobId: string, exit: ClaudeCodeExit): Promise<void> {
+  const job = await findAutoTagJobById(jobId);
+  if (!job || !isAutoTagJobActive(job.status)) return;
+  await endAutoTagJob(jobId, "fail", { error: describeClaudeCodeExit(exit) });
 }
 
 async function expireIdleJob(job: AutoTagJobRecord): Promise<AutoTagJobRecord> {
@@ -262,6 +283,8 @@ async function endAutoTagJob(
     ...details,
   });
   if (ended) {
+    // After finish_job the process is already wrapping up on its own.
+    if (reason !== "finish") stopClaudeCodeAgent(jobId);
     await removeAutoTagJobWorkspace(jobId);
   }
 }
@@ -283,9 +306,6 @@ function toJobView(job: AutoTagJobRecord): AutoTagJobView {
     createdAt: job.createdAt,
     lastActivityAt: job.lastActivityAt,
     finishedAt: job.finishedAt,
-    launchCommand: job.status === "ready" || job.status === "running"
-      ? buildLaunchCommand(job.id)
-      : null,
   };
 }
 

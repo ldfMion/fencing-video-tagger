@@ -8,12 +8,10 @@ import {
   cancelAutoTagJob as cancelJob,
   getAutoTagJobReport as buildJobReport,
   getLatestAutoTagJob,
-  getLaunchableJob,
   startAutoTagBenchmark as startBenchmark,
   startAutoTagJob as startJob,
   type AutoTagJobReport,
 } from "@/lib/server/auto-tag/job-service";
-import { buildLaunchCommand, openCommandInTerminal } from "@/lib/server/auto-tag/job-workspace";
 
 const SessionInputSchema = z.object({ sessionId: z.string() });
 const JobInputSchema = z.object({ jobId: z.string() });
@@ -50,23 +48,6 @@ export async function cancelAutoTagJob(
   input: z.infer<typeof JobInputSchema>,
 ): Promise<AutoTagJobView> {
   return cancelJob(JobInputSchema.parse(input).jobId);
-}
-
-export async function openAutoTagJobInTerminal(
-  input: z.infer<typeof JobInputSchema>,
-): Promise<{ opened: true } | { opened: false; error: string }> {
-  const job = await getLaunchableJob(JobInputSchema.parse(input).jobId);
-  try {
-    await openCommandInTerminal(buildLaunchCommand(job.id));
-    return { opened: true };
-  } catch (error) {
-    return {
-      opened: false,
-      error: error instanceof Error && /-1743|not allowed|not authorized/i.test(error.message)
-        ? "macOS blocked the app from controlling Terminal. Allow it under System Settings → Privacy & Security → Automation, or copy the command."
-        : "Could not open Terminal. Copy the command and run it yourself.",
-    };
-  }
 }
 
 export async function getAutoTagJobReport(

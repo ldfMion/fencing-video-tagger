@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bot, Copy, Loader2, Square, SquareTerminal } from "lucide-react";
+import { Bot, Loader2, Square } from "lucide-react";
 import { AutoTagReport } from "@/components/auto-tag-report";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,6 +17,7 @@ import { useAutoTagJob } from "@/hooks/use-auto-tag-job";
 import {
   formatAutoTagJobStatus,
   isAutoTagJobActive,
+  type AutoTagJobStatus,
   type AutoTagJobView,
 } from "@/lib/auto-tag/job";
 import { isMatchClockEnabled, isStripZoneEnabled } from "@/lib/tagging";
@@ -40,11 +40,11 @@ export function AutoTagDialog({ session, open, onOpenChange }: AutoTagDialogProp
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Bot className="size-4" />
-            Auto-tag with Codex
+            Auto-tag with Claude Code
           </DialogTitle>
           <DialogDescription>
-            Codex scans frames of the attached video and saves each awarded touch as it goes.
-            Its tags are marked as agent-made.
+            Claude Code runs in the background, scans frames of the attached video, and saves each
+            awarded touch as it goes. Its tags are marked as agent-made.
           </DialogDescription>
         </DialogHeader>
 
@@ -145,20 +145,11 @@ function TaggingOptionsNote({ session }: { session: VideoSession }) {
 }
 
 function ActiveJobPanel({ job, autoTag }: { job: AutoTagJobView; autoTag: AutoTagControls }) {
-  const [copyState, setCopyState] = useState<"idle" | "copied">("idle");
-  const canLaunch = job.launchCommand !== null;
-
-  const copyCommand = async () => {
-    if (!job.launchCommand) return;
-    await navigator.clipboard.writeText(job.launchCommand);
-    setCopyState("copied");
-  };
-
   return (
     <div className="flex flex-col gap-3 text-sm">
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant="outline" className="gap-1">
-          {job.status === "preparing" ? <Loader2 className="size-3 animate-spin" /> : null}
+          <Loader2 className="size-3 animate-spin" />
           {formatAutoTagJobStatus(job.status)}
         </Badge>
         <span className="text-xs text-muted-foreground">
@@ -166,24 +157,9 @@ function ActiveJobPanel({ job, autoTag }: { job: AutoTagJobView; autoTag: AutoTa
         </span>
       </div>
 
-      {job.status === "preparing" ? (
-        <p className="text-muted-foreground">
-          Cutting overview frames from the video. This takes under a minute for a typical bout.
-        </p>
-      ) : null}
+      <p className="text-muted-foreground">{describeActiveJob(job.status)}</p>
 
-      {canLaunch ? (
-        <div className="flex flex-col gap-2">
-          <code className="block overflow-x-auto rounded-md bg-muted px-2 py-1.5 font-mono text-xs">
-            {job.launchCommand}
-          </code>
-          {autoTag.terminalResult && !autoTag.terminalResult.opened ? (
-            <p className="text-xs text-destructive">{autoTag.terminalResult.error}</p>
-          ) : null}
-        </div>
-      ) : null}
-
-      <DialogFooter className="gap-2 sm:justify-between">
+      <DialogFooter>
         <Button
           variant="ghost"
           onClick={() => void autoTag.cancelJob(job.id)}
@@ -192,22 +168,22 @@ function ActiveJobPanel({ job, autoTag }: { job: AutoTagJobView; autoTag: AutoTa
           <Square data-icon="inline-start" />
           Cancel job
         </Button>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => void copyCommand()} disabled={!canLaunch}>
-            <Copy data-icon="inline-start" />
-            {copyState === "copied" ? "Copied" : "Copy command"}
-          </Button>
-          <Button
-            onClick={() => void autoTag.openInTerminal(job.id)}
-            disabled={!canLaunch || autoTag.isOpeningTerminal}
-          >
-            <SquareTerminal data-icon="inline-start" />
-            Open in Terminal
-          </Button>
-        </div>
       </DialogFooter>
     </div>
   );
+}
+
+function describeActiveJob(status: AutoTagJobStatus): string {
+  switch (status) {
+    case "preparing":
+      return "Cutting overview frames from the video. This takes under a minute for a typical bout.";
+    case "ready":
+      return "Starting Claude Code in the background.";
+    case "running":
+      return "Claude Code is working through the video. Tags appear in the list as it saves them, so you can close this dialog.";
+    default:
+      return "";
+  }
 }
 
 function FinishedJobSummary({ job }: { job: AutoTagJobView }) {

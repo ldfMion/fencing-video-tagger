@@ -13,7 +13,7 @@ export const AUTO_TAG_JOB_STATUSES = [
 export const AutoTagJobStatusSchema = z.enum(AUTO_TAG_JOB_STATUSES);
 export type AutoTagJobStatus = z.infer<typeof AutoTagJobStatusSchema>;
 
-export const AutoTagAgentSchema = z.enum(["codex"]);
+export const AutoTagAgentSchema = z.enum(["claude-code"]);
 export type AutoTagAgent = z.infer<typeof AutoTagAgentSchema>;
 
 export const ACTIVE_AUTO_TAG_JOB_STATUSES: readonly AutoTagJobStatus[] = [
@@ -49,8 +49,6 @@ export interface AutoTagJobView {
   createdAt: number;
   lastActivityAt: number;
   finishedAt: number | null;
-  /** Shell command that starts the agent; only present while the job can still run. */
-  launchCommand: string | null;
 }
 
 export function isAutoTagJobActive(status: AutoTagJobStatus): boolean {
@@ -62,7 +60,7 @@ export function formatAutoTagJobStatus(status: AutoTagJobStatus): string {
     case "preparing":
       return "Preparing overview";
     case "ready":
-      return "Waiting for agent";
+      return "Starting Claude Code";
     case "running":
       return "Agent tagging";
     case "finished":

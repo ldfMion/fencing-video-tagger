@@ -28,7 +28,7 @@ export function buildAgentPrompt(): string {
     "",
     "Start by calling `get_job_brief`. It has the fencers, the rules, the action codes, and the tools' limits. Follow it until every awarded touch in the video is tagged, then call `finish_job`.",
     "",
-    "Do not run shell commands, read files, or edit anything on disk. You may delegate time ranges to subagents; give them these same instructions.",
+    "These MCP tools are the only tools you have. Work through the video from start to end and keep going until it is fully covered. Nobody reads your messages while you work, so never stop to ask a question; decide and move on.",
   ].join("\n");
 }
 
@@ -89,7 +89,7 @@ function describeWorkflow(context: AutoTagBriefContext): string {
     `- The whole video is pre-cut into ${context.overviewSheetCount} overview sheets (\`get_overview_sheet\`, index 0-${Math.max(context.overviewSheetCount - 1, 0)}), each ${context.secondsPerSheet}s at ${context.overviewFps} frames per second, tiled into one image. The text next to each image lists every tile's time. Overview sheets are free.`,
     `- Look closer with \`sample_frames\` (a time window at a higher frame rate, optionally cropped) or \`get_frame\` (one full-resolution frame, optionally cropped, e.g. to read the scoreboard). Crops use 0-1 coordinates of the full frame, so they work even when a handheld camera moves. Each call is capped at ${context.framesPerCallLimit} frames; ${context.framesRemaining} look-closer frames remain for this job.`,
     "- Save as you go: call `add_tag` as soon as you are confident a touch was awarded. Fix your own tags with `update_tag` or `delete_tag`. Once the user edits one of your tags, it is theirs and you can no longer change it.",
-    "- A new scoring tag within 1 second of an existing one is rejected as a duplicate. Call `list_tags` before adding near the edge of a range another subagent covers.",
+    "- A new scoring tag within 1 second of an existing one is rejected as a duplicate. Call `list_tags` whenever you lose track of what is already saved.",
     "- When the whole video is covered, call `finish_job` with a short summary. Nothing else ends the job.",
   ].join("\n");
 }

@@ -43,6 +43,13 @@
       "when": 1793041236319,
       "tag": "0005_auto_tag_jobs",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1794159840807,
+      "tag": "0006_claude_code_agent",
+      "breakpoints": true
     }
   ]
 }

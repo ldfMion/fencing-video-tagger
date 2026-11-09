@@ -33,7 +33,7 @@ export interface ActionDefinition {
 export const ACTION_DEFINITIONS = {
   "A,R": {
     description:
-      "The scorer attacks, is parried, and scores with a renewal of the attack. Usually when the defender parries and misses the riposte, but sometimes also when the riposte is delayed and the attacker regains priority.",
+      "The scorer attacks, is parried, and scores with a renewal of the attack. Usually a good parry that clearly found the blade, then a missed riposte, then the attacker's second action lands; sometimes the riposte is delayed and the attacker regains priority.",
     tacticalIntent: "offense",
     receivingDefAlt: "P",
   },
@@ -51,7 +51,7 @@ export const ACTION_DEFINITIONS = {
   },
   "A-A": {
     description:
-      "Both fencers attempt an attack. Either the scoring fencer had right of way or the other fencer missed.",
+      "Both fencers attempt an attack. Either the scoring fencer had right of way or the other fencer missed. Usually only happens right after 'allez'.",
     tacticalIntent: "offense",
   },
   "A-AP": {
@@ -62,7 +62,7 @@ export const ACTION_DEFINITIONS = {
   },
   "A-Cc": {
     description:
-      "The scorer attacks and scores against the opponent's closing counterattack, meaning the defender makes the attacker miss by collapsing the distance, dodging in place, hitting and opposing with the blade or a combination of these.",
+      "The scorer attacks and scores against the opponent's closing counterattack, meaning the defender tries to make the attacker miss by collapsing the distance, dodging in place, hitting and opposing with the blade or a combination of these. Ducking, leaning or contorting the body away while extending is this, not a parry.",
     tacticalIntent: "offense",
     receivingDefAlt: "C",
   },
@@ -85,7 +85,8 @@ export const ACTION_DEFINITIONS = {
     receivingDefAlt: "AP",
   },
   "A-P": {
-    description: "The scorer attacks and scores against an attempted parry by the defender.",
+    description:
+      "The scorer attacks and scores against an attempted parry by the defender. Usually the parry fails to find the blade and the attack lands directly, with no riposte attempt by the fencer who was hit; if the parry clearly found the blade and a riposte was attempted, consider `A,R` instead.",
     tacticalIntent: "offense",
     receivingDefAlt: "P",
   },
@@ -139,7 +140,7 @@ export const ACTION_DEFINITIONS = {
   },
   "Cc-A": {
     description:
-      "The opponent attacks and misses; the scorer's closing counterattack arrives.",
+      "The opponent attacks and misses; the scorer's closing counterattack arrives: the scorer extends into the attack while standing, closing in, dodging or contorting the body away, with or without blade opposition.",
     tacticalIntent: "defense",
     scoringDefAlt: "C",
   },

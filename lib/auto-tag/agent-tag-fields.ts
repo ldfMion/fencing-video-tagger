@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PhraseFactsSchema } from "@/lib/auto-tag/phrase";
 import {
   ActionCodeSchema,
   ActiveActionCodeSchema,
@@ -24,6 +25,16 @@ export type AgentTagFields = z.infer<typeof AgentTagFieldsSchema>;
 /** What the agent may send to `add_tag` and `update_tag`: legacy action codes are refused. */
 export const AgentTagInputSchema = AgentTagFieldsSchema.extend({
   action: ActiveActionCodeSchema,
+});
+
+/** `add_tag` also requires the phrase facts the action code was derived from. */
+export const AgentTagAddInputSchema = AgentTagInputSchema.extend({
+  phrase: PhraseFactsSchema.describe("What you worked out from the touch sequence before choosing the action code."),
+});
+
+/** `update_tag` may resend the phrase facts when the action changes. */
+export const AgentTagUpdateInputSchema = AgentTagInputSchema.partial().extend({
+  phrase: PhraseFactsSchema.optional().describe("Resend when you change the action code."),
 });
 
 export const AutoTagEventKindSchema = z.enum(["add", "update", "delete"]);

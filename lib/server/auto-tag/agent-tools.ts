@@ -16,6 +16,7 @@ import {
   AUTO_TAG_OVERVIEW_FPS,
   AUTO_TAG_OVERVIEW_SECONDS_PER_SHEET,
 } from "@/lib/auto-tag/job";
+import { checkPhraseAgainstCode, formatPhraseFacts, type PhraseFacts } from "@/lib/auto-tag/phrase";
 import { buildJobBrief } from "@/lib/auto-tag/prompt";
 import { formatAgentTagLine } from "@/lib/auto-tag/tag-lines";
 import {
@@ -201,6 +202,7 @@ export async function addAgentTag(
   job: AutoTagJobRecord,
   fields: AgentTagFields,
   reasoning: string,
+  phrase?: PhraseFacts,
 ): Promise<AgentToolContent[]> {
   assertWindowInsideVideo(job, fields.timestamp, fields.timestamp);
   const { tag } = await retryOnSessionConflict(async () => {
@@ -211,8 +213,8 @@ export async function addAgentTag(
       autoTagJobId: job.id,
     });
   });
-  await logAgentWrite(job, "add", tag, reasoning);
-  return [text(`Saved ${formatAgentTagLine(tag)}`)];
+  await logAgentWrite(job, "add", tag, withPhrase(reasoning, phrase));
+  return [text(`Saved ${formatAgentTagLine(tag)}${describePhraseCheck(phrase, fields.action)}`)];
 }
 
 export async function updateAgentTag(
@@ -220,6 +222,7 @@ export async function updateAgentTag(
   tagId: string,
   updates: Partial<AgentTagFields>,
   reasoning: string,
+  phrase?: PhraseFacts,
 ): Promise<AgentToolContent[]> {
   if (updates.timestamp != null) {
     assertWindowInsideVideo(job, updates.timestamp, updates.timestamp);
@@ -232,8 +235,8 @@ export async function updateAgentTag(
     }
     return updateTagInSession(session, tagId, updates);
   });
-  await logAgentWrite(job, "update", tag, reasoning);
-  return [text(`Updated ${formatAgentTagLine(tag)}`)];
+  await logAgentWrite(job, "update", tag, withPhrase(reasoning, phrase));
+  return [text(`Updated ${formatAgentTagLine(tag)}${describePhraseCheck(phrase, tag.action)}`)];
 }
 
 export async function deleteAgentTag(
@@ -352,6 +355,16 @@ async function logAgentWrite(
     reasoning,
     createdAt: Date.now(),
   });
+}
+
+function withPhrase(reasoning: string, phrase?: PhraseFacts): string {
+  return phrase ? `${formatPhraseFacts(phrase)} | ${reasoning}` : reasoning;
+}
+
+function describePhraseCheck(phrase: PhraseFacts | undefined, action: Tag["action"]): string {
+  if (!phrase || !action) return "";
+  const note = checkPhraseAgainstCode(phrase, action);
+  return note ? `\n${note}` : "";
 }
 
 function toTagContent(fields: AgentTagFields) {

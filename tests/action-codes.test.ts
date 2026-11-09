@@ -8,7 +8,7 @@ import {
   getTacticalIntent,
 } from "../lib/action-classifications";
 import { buildJobBrief } from "../lib/auto-tag/prompt";
-import { AgentTagInputSchema } from "../lib/auto-tag/agent-tag-fields";
+import { AgentTagAddInputSchema, AgentTagInputSchema } from "../lib/auto-tag/agent-tag-fields";
 import { ActionCodeSchema, ActiveActionCodeSchema } from "../lib/types";
 
 test("every action code has a description and a classification", () => {
@@ -46,6 +46,12 @@ test("legacy codes stay valid on stored tags but are refused from the agent", ()
   const base = { timestamp: 1, side: "L" as const };
   assert.ok(AgentTagInputSchema.safeParse({ ...base, action: "A,R,R" }).success);
   assert.ok(!AgentTagInputSchema.safeParse({ ...base, action: "AR,R" }).success);
+  const phrase = {
+    attacker: "scorer", defence: "parry-found-blade", dodged: false, riposteAttempted: true,
+    scoringHitWasRenewal: true, exchangesBeforeHit: 0,
+  };
+  assert.ok(AgentTagAddInputSchema.safeParse({ ...base, action: "A,R,R", phrase }).success);
+  assert.ok(!AgentTagAddInputSchema.safeParse({ ...base, action: "A,R,R" }).success, "add_tag needs the phrase facts");
 });
 
 test("the job brief explains each action code", () => {

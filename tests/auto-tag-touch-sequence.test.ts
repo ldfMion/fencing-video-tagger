@@ -3,34 +3,42 @@ import test from "node:test";
 import { buildJobBrief } from "../lib/auto-tag/prompt";
 import { planTouchSequence, TOUCH_SEQUENCE_DEFAULTS } from "../lib/auto-tag/touch-sequence";
 
-test("a touch sequence covers the run-up and splits into sheet-sized windows", () => {
+test("a touch sequence has sparse context, a dense exchange, and full-frame lamp shots", () => {
   const plan = planTouchSequence({ time: 100 }, 600);
-  assert.equal(plan.start, 97);
-  assert.equal(plan.end, 100.5);
-  assert.equal(plan.fps, TOUCH_SEQUENCE_DEFAULTS.fps);
-  assert.equal(plan.frameCount, 21);
-  assert.equal(plan.windows.length, 2);
-  assert.deepEqual(plan.windows.map((window) => window.frameCount), [12, 9]);
-  // Windows are consecutive: the second starts one step after the first's last instant.
-  const step = 1 / plan.fps;
-  assert.ok(Math.abs(plan.windows[1].start - (plan.start + 12 * step)) < 1e-9);
-  assert.ok(plan.windows[0].end < plan.windows[1].start);
-  assert.ok(plan.windows[1].end <= plan.end);
+  assert.equal(plan.start, 96.5);
+  assert.deepEqual(plan.windows.map((window) => [window.kind, window.frameCount, window.fps, window.cropped]), [
+    ["context", 6, 3, true],
+    ["exchange", 12, 12, true],
+    ["exchange", 12, 12, true],
+    ["lamps", 3, 2, false],
+  ]);
+  assert.equal(plan.frameCount, 33);
+  const [context, exchange1, exchange2, lamps] = plan.windows;
+  assert.equal(exchange1.start, 98.5);
+  assert.ok(Math.abs(exchange2.start - 99.5) < 1e-9);
+  assert.ok(context.end < exchange1.start && exchange1.end < exchange2.start);
+  assert.ok(exchange2.end <= 100.5 + 1e-9, "the exchange runs to half a second after the lamp");
+  assert.ok(Math.abs(lamps.start - 100.5) < 1e-9);
+  // The window ends half a step past the last instant (101.5) so ffmpeg keeps that frame.
+  assert.ok(lamps.end > 101.5 && lamps.end < 102);
+  assert.equal(TOUCH_SEQUENCE_DEFAULTS.lampOffsets.length, 3);
 });
 
 test("a touch sequence is clamped to the video", () => {
-  const atStart = planTouchSequence({ time: 1, secondsBefore: 3, secondsAfter: 1 }, 600);
+  const atStart = planTouchSequence({ time: 1 }, 600);
   assert.equal(atStart.start, 0);
-  assert.equal(atStart.end, 2);
-  const atEnd = planTouchSequence({ time: 599.8 }, 600);
-  assert.equal(atEnd.end, 600);
+  assert.equal(atStart.windows[0].kind, "exchange", "no context when the exchange already starts at 0");
+  const atEnd = planTouchSequence({ time: 599.9 }, 600);
+  assert.ok(atEnd.windows.every((window) => window.kind !== "lamps"), "no lamp shots past the end of the video");
+  assert.ok(atEnd.end <= 600);
   assert.throws(() => planTouchSequence({ time: 700 }, 600), /No video around/);
 });
 
-test("custom fps and window change the frame count", () => {
-  const plan = planTouchSequence({ time: 50, secondsBefore: 2, secondsAfter: 0, fps: 10 }, 600, 12);
-  assert.equal(plan.frameCount, 20);
-  assert.deepEqual(plan.windows.map((window) => window.frameCount), [12, 8]);
+test("a longer or denser exchange changes the frame count", () => {
+  const plan = planTouchSequence({ time: 50, exchangeSeconds: 3, exchangeFps: 6 }, 600);
+  const exchange = plan.windows.filter((window) => window.kind === "exchange");
+  assert.deepEqual(exchange.map((window) => window.frameCount), [12, 9]);
+  assert.equal(exchange[0].start, 47);
 });
 
 test("the job brief tells the agent to inspect the run-up before choosing an action", () => {

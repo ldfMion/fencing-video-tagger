@@ -52,17 +52,15 @@ export function registerAutoTagTools(server: McpServer): void {
   }, (request, ctx) => runJobTool(ctx, (job) => sampleFrames(job, request)));
 
   server.registerTool("get_touch_sequence", {
-    description: "The seconds leading up to a lamp, as wide-tiled sheets, to read the phrase before choosing an action code. Call it for every touch. Spends one frame of budget per sampled instant.",
+    description: "The phrase and outcome of one touch as wide-tiled sheets: sparse context, a dense exchange around the lamp, and full-frame lamp shots after the hit. Call it for every touch before choosing an action code. Spends one frame of budget per sampled instant.",
     inputSchema: z.object({
       time: TimeSchema.describe("The lamp time of the touch, in video seconds"),
-      secondsBefore: z.number().min(0).max(TOUCH_SEQUENCE_LIMITS.maxSecondsBefore).optional()
-        .describe(`Seconds before the lamp to include (default ${TOUCH_SEQUENCE_DEFAULTS.secondsBefore})`),
-      secondsAfter: z.number().min(0).max(TOUCH_SEQUENCE_LIMITS.maxSecondsAfter).optional()
-        .describe(`Seconds after the lamp to include (default ${TOUCH_SEQUENCE_DEFAULTS.secondsAfter})`),
-      fps: z.number().positive().max(TOUCH_SEQUENCE_LIMITS.maxFps).optional()
-        .describe(`Frames per second (default ${TOUCH_SEQUENCE_DEFAULTS.fps})`),
+      exchangeSeconds: z.number().min(TOUCH_SEQUENCE_LIMITS.minExchangeSeconds).max(TOUCH_SEQUENCE_LIMITS.maxExchangeSeconds).optional()
+        .describe(`Seconds before the lamp covered densely (default ${TOUCH_SEQUENCE_DEFAULTS.exchangeSeconds}); use more for long phrases with several ripostes`),
+      exchangeFps: z.number().min(TOUCH_SEQUENCE_LIMITS.minExchangeFps).max(TOUCH_SEQUENCE_LIMITS.maxExchangeFps).optional()
+        .describe(`Frame rate of the dense exchange (default ${TOUCH_SEQUENCE_DEFAULTS.exchangeFps})`),
       crop: CropRectSchema.optional()
-        .describe("Normalized 0-1 rectangle of the full frame; crop to the band of the strip where the fencers are so they come out large"),
+        .describe("Normalized 0-1 rectangle of the full frame applied to the context and exchange sheets (the lamp sheet is never cropped). Cover both fencers' full bodies with clear margin above the heads and below the feet; the camera pans and tilts, so check the context sheet and widen the crop if anything is cut off"),
     }),
     annotations: READ_ONLY,
   }, (request, ctx) => runJobTool(ctx, (job) => getTouchSequence(job, request)));

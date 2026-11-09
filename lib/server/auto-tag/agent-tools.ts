@@ -140,7 +140,7 @@ export async function getTouchSequence(
   const streamInfo = await probeVideoStream(videoPath);
   const content: AgentToolContent[] = [
     text(
-      `Run-up to the touch at ${request.time.toFixed(3)}s: ${plan.start.toFixed(3)}-${plan.end.toFixed(3)}s at ${plan.fps} fps in ${plan.windows.length} sheet(s), oldest first. Read who moved forward first, any blade contact, who hit first, and whether a hit was a renewal.`,
+      `Touch at ${request.time.toFixed(3)}s, ${plan.start.toFixed(3)}-${plan.end.toFixed(3)}s in ${plan.windows.length} sheets, oldest first: context (sparse, cropped), exchange (dense, cropped: read who moved forward first, any blade contact, who hit first, and whether the hit was a renewal), then lamps (full frame, after the hit: read which lights are on and who was hit).`,
     ),
   ];
   for (const [index, window] of plan.windows.entries()) {
@@ -150,13 +150,14 @@ export async function getTouchSequence(
         videoPath,
         start: window.start,
         end: window.end,
-        fps: plan.fps,
-        crop: request.crop,
+        fps: window.fps,
+        crop: window.cropped ? request.crop : undefined,
         columns: TOUCH_SEQUENCE_SHEET_COLUMNS,
         outputPath,
         streamInfo,
       });
-      content.push(...await describeSheetImage(sheet, `Sheet ${index + 1}/${plan.windows.length}`));
+      const label = `Sheet ${index + 1}/${plan.windows.length}: ${window.kind} at ${window.fps} fps${window.cropped && request.crop ? ", cropped" : ", full frame"}`;
+      content.push(...await describeSheetImage(sheet, label));
     } finally {
       await fs.rm(outputPath, { force: true });
     }

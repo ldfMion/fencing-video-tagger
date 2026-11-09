@@ -55,6 +55,8 @@ export function registerAutoTagTools(server: McpServer): void {
     description: "The phrase and outcome of one touch as wide-tiled sheets: sparse context, a dense exchange around the lamp, and full-frame lamp shots after the hit. Call it for every touch before choosing an action code. Spends one frame of budget per sampled instant.",
     inputSchema: z.object({
       time: TimeSchema.describe("The lamp time of the touch, in video seconds"),
+      contextSeconds: z.number().min(TOUCH_SEQUENCE_LIMITS.minContextSeconds).max(TOUCH_SEQUENCE_LIMITS.maxContextSeconds).optional()
+        .describe(`Seconds of sparse context before the exchange (default ${TOUCH_SEQUENCE_DEFAULTS.contextSeconds}); use more when the phrase starts earlier, e.g. a long march or a preparation that was already under way`),
       exchangeSeconds: z.number().min(TOUCH_SEQUENCE_LIMITS.minExchangeSeconds).max(TOUCH_SEQUENCE_LIMITS.maxExchangeSeconds).optional()
         .describe(`Seconds before the lamp covered densely (default ${TOUCH_SEQUENCE_DEFAULTS.exchangeSeconds}); use more for long phrases with several ripostes`),
       exchangeFps: z.number().min(TOUCH_SEQUENCE_LIMITS.minExchangeFps).max(TOUCH_SEQUENCE_LIMITS.maxExchangeFps).optional()

@@ -4,11 +4,11 @@
  * and an uncropped lamp sheet after the hit so the lights and the box are always visible.
  */
 export const TOUCH_SEQUENCE_DEFAULTS = {
-  /** Seconds of sparse context before the exchange. */
-  contextSeconds: 2,
+  /** Seconds of sparse context before the exchange: the preparation and the march. */
+  contextSeconds: 4,
   contextFps: 3,
   /** Seconds before the lamp covered densely. */
-  exchangeSeconds: 1.5,
+  exchangeSeconds: 2,
   /** Seconds after the lamp still covered densely (the hit itself and the first lamp frames). */
   exchangeAfterSeconds: 0.5,
   exchangeFps: 12,
@@ -17,8 +17,10 @@ export const TOUCH_SEQUENCE_DEFAULTS = {
 } as const;
 
 export const TOUCH_SEQUENCE_LIMITS = {
+  minContextSeconds: 0,
+  maxContextSeconds: 10,
   minExchangeSeconds: 1,
-  maxExchangeSeconds: 3,
+  maxExchangeSeconds: 4,
   minExchangeFps: 6,
   maxExchangeFps: 15,
 } as const;
@@ -29,6 +31,8 @@ export const TOUCH_SEQUENCE_FRAMES_PER_SHEET = 12;
 
 export interface TouchSequenceRequest {
   time: number;
+  /** Sparse context before the exchange. */
+  contextSeconds?: number;
   /** Length of the dense exchange before the lamp. */
   exchangeSeconds?: number;
   exchangeFps?: number;
@@ -60,6 +64,7 @@ export function planTouchSequence(
   framesPerSheet: number = TOUCH_SEQUENCE_FRAMES_PER_SHEET,
 ): TouchSequencePlan {
   const d = TOUCH_SEQUENCE_DEFAULTS;
+  const contextSeconds = request.contextSeconds ?? d.contextSeconds;
   const exchangeSeconds = request.exchangeSeconds ?? d.exchangeSeconds;
   const exchangeFps = request.exchangeFps ?? d.exchangeFps;
   const time = request.time;
@@ -69,7 +74,7 @@ export function planTouchSequence(
 
   const windows: TouchSequenceWindow[] = [];
   const exchangeStart = Math.max(0, time - exchangeSeconds);
-  const contextStart = Math.max(0, exchangeStart - d.contextSeconds);
+  const contextStart = Math.max(0, exchangeStart - contextSeconds);
   if (exchangeStart > contextStart) {
     windows.push(...splitWindow("context", contextStart, exchangeStart, d.contextFps, true, framesPerSheet));
   }

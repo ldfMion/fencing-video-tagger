@@ -5,19 +5,20 @@ import { planTouchSequence, TOUCH_SEQUENCE_DEFAULTS } from "../lib/auto-tag/touc
 
 test("a touch sequence has sparse context, a dense exchange, and full-frame lamp shots", () => {
   const plan = planTouchSequence({ time: 100 }, 600);
-  assert.equal(plan.start, 96.5);
+  assert.equal(plan.start, 94);
   assert.deepEqual(plan.windows.map((window) => [window.kind, window.frameCount, window.fps, window.cropped]), [
-    ["context", 6, 3, true],
+    ["context", 12, 3, true],
     ["exchange", 12, 12, true],
     ["exchange", 12, 12, true],
+    ["exchange", 6, 12, true],
     ["lamps", 3, 2, false],
   ]);
-  assert.equal(plan.frameCount, 33);
-  const [context, exchange1, exchange2, lamps] = plan.windows;
-  assert.equal(exchange1.start, 98.5);
-  assert.ok(Math.abs(exchange2.start - 99.5) < 1e-9);
-  assert.ok(context.end < exchange1.start && exchange1.end < exchange2.start);
-  assert.ok(exchange2.end <= 100.5 + 1e-9, "the exchange runs to half a second after the lamp");
+  assert.equal(plan.frameCount, 45);
+  const [context, exchange1, exchange2, exchange3, lamps] = plan.windows;
+  assert.equal(exchange1.start, 98);
+  assert.ok(Math.abs(exchange2.start - 99) < 1e-9);
+  assert.ok(context.end < exchange1.start && exchange1.end < exchange2.start && exchange2.end < exchange3.start);
+  assert.ok(exchange3.end <= 100.5 + 1e-9, "the exchange runs to half a second after the lamp");
   assert.ok(Math.abs(lamps.start - 100.5) < 1e-9);
   // The window ends half a step past the last instant (101.5) so ffmpeg keeps that frame.
   assert.ok(lamps.end > 101.5 && lamps.end < 102);
@@ -34,9 +35,12 @@ test("a touch sequence is clamped to the video", () => {
   assert.throws(() => planTouchSequence({ time: 700 }, 600), /No video around/);
 });
 
-test("a longer or denser exchange changes the frame count", () => {
-  const plan = planTouchSequence({ time: 50, exchangeSeconds: 3, exchangeFps: 6 }, 600);
+test("a longer or denser exchange and more context change the frame count", () => {
+  const plan = planTouchSequence({ time: 50, contextSeconds: 8, exchangeSeconds: 3, exchangeFps: 6 }, 600);
+  const context = plan.windows.filter((window) => window.kind === "context");
   const exchange = plan.windows.filter((window) => window.kind === "exchange");
+  assert.deepEqual(context.map((window) => window.frameCount), [12, 12]);
+  assert.equal(context[0].start, 39);
   assert.deepEqual(exchange.map((window) => window.frameCount), [12, 9]);
   assert.equal(exchange[0].start, 47);
 });

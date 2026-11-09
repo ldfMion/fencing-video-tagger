@@ -2,7 +2,9 @@ import "server-only";
 
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { AgentTagAddInputSchema, AgentTagUpdateInputSchema } from "@/lib/auto-tag/agent-tag-fields";
+// Phrase facts (AgentTagAddInputSchema / AgentTagUpdateInputSchema) are kept in agent-tag-fields.ts
+// but not exposed: requiring or offering them cost accuracy in the Nov 2026 benchmarks.
+import { AgentTagInputSchema } from "@/lib/auto-tag/agent-tag-fields";
 import { CropRectSchema } from "@/lib/auto-tag/frame-sheet";
 import { TOUCH_SEQUENCE_DEFAULTS, TOUCH_SEQUENCE_LIMITS } from "@/lib/auto-tag/touch-sequence";
 import {
@@ -83,17 +85,17 @@ export function registerAutoTagTools(server: McpServer): void {
 
   server.registerTool("add_tag", {
     description: "Save one awarded touch immediately. It appears in the app right away.",
-    inputSchema: AgentTagAddInputSchema.extend({ reasoning: ReasoningSchema }),
-  }, ({ reasoning, phrase, ...fields }, ctx) => runJobTool(ctx, (job) => addAgentTag(job, fields, reasoning, phrase)));
+    inputSchema: AgentTagInputSchema.extend({ reasoning: ReasoningSchema }),
+  }, ({ reasoning, ...fields }, ctx) => runJobTool(ctx, (job) => addAgentTag(job, fields, reasoning)));
 
   server.registerTool("update_tag", {
     description: "Correct a tag you saved earlier. Only fields you pass change.",
-    inputSchema: AgentTagUpdateInputSchema.extend({
+    inputSchema: AgentTagInputSchema.partial().extend({
       tagId: z.string(),
       reasoning: ReasoningSchema,
     }),
-  }, ({ tagId, reasoning, phrase, ...updates }, ctx) =>
-    runJobTool(ctx, (job) => updateAgentTag(job, tagId, updates, reasoning, phrase)));
+  }, ({ tagId, reasoning, ...updates }, ctx) =>
+    runJobTool(ctx, (job) => updateAgentTag(job, tagId, updates, reasoning)));
 
   server.registerTool("delete_tag", {
     description: "Withdraw a tag you saved earlier that you no longer believe.",

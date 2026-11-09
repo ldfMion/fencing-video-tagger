@@ -57,8 +57,9 @@ import {
   STRIP_ZONE_FLEX_WEIGHTS,
   STRIP_ZONE_LABELS,
 } from "@/lib/tagging";
+import { getActionDescription } from "@/lib/action-classifications";
 import {
-  ACTION_CODES,
+  ACTIVE_ACTION_CODES,
   MATCH_PERIODS,
   STRIP_ZONES,
   type Side,
@@ -172,14 +173,26 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
     [matchClock],
   );
   const isCommentOnly = !side && Boolean(comment.trim());
+  // Legacy codes are hidden, except the one already on the tag being edited.
+  const selectableActions = useMemo<ActionCode[]>(() => {
+    const current = editingTag?.action;
+    if (current && !ACTIVE_ACTION_CODES.includes(current)) {
+      return [...ACTIVE_ACTION_CODES, current];
+    }
+    return ACTIVE_ACTION_CODES;
+  }, [editingTag?.action]);
   const filteredActions = useMemo(() => {
     if (!actionSearch) {
-      return ACTION_CODES;
+      return selectableActions;
     }
 
     const lower = actionSearch.toLowerCase();
-    return ACTION_CODES.filter((code) => code.toLowerCase().includes(lower));
-  }, [actionSearch]);
+    return selectableActions.filter(
+      (code) =>
+        code.toLowerCase().includes(lower) ||
+        getActionDescription(code).toLowerCase().includes(lower),
+    );
+  }, [actionSearch, selectableActions]);
   const matchTimeError = useMemo(() => {
     if (!requiresMatchClock || isCommentOnly || !matchClock.trim()) return null;
     if (!normalizedMatchClock) return "Enter a valid match clock, such as 2:17.";
@@ -450,18 +463,21 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
                                 <CommandItem
                                   key={code}
                                   value={code}
+                                  keywords={[getActionDescription(code)]}
                                   data-checked={action === code}
                                   onSelect={() => {
                                     setAction(
-                                      action === code
-                                        ? undefined
-                                        : (code as ActionCode),
+                                      action === code ? undefined : code,
                                     );
                                     setActionOpen(false);
                                     setActionSearch("");
                                   }}
+                                  className="flex-col items-start gap-0.5"
                                 >
-                                  {code}
+                                  <span className="font-medium">{code}</span>
+                                  <span className="text-xs leading-snug text-muted-foreground">
+                                    {getActionDescription(code)}
+                                  </span>
                                 </CommandItem>
                               ))}
                             </CommandGroup>
@@ -471,8 +487,14 @@ const TagFormFields = forwardRef<TagFormHandle, TagFormFieldsProps>(function Tag
                     </Popover>
                   </div>
                 </TooltipTrigger>
-                <TooltipContent>
-                  <p>Search actions (/)</p>
+                <TooltipContent className="max-w-xs">
+                  {action ? (
+                    <p>
+                      <span className="font-medium">{action}</span>: {getActionDescription(action)}
+                    </p>
+                  ) : (
+                    <p>Search actions (/)</p>
+                  )}
                 </TooltipContent>
               </Tooltip>
             </div>

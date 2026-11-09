@@ -107,9 +107,13 @@ export const tagsTable = sqliteTable(
     matchPeriod: text("match_period"),
     matchClock: text("match_clock"),
     stripZone: text("strip_zone"),
+    // Plain columns: adding a CHECK or FK here forces SQLite to rebuild `tags`.
+    origin: text("origin"),
+    autoTagJobId: text("auto_tag_job_id"),
   },
   (table) => [
     uniqueIndex("tags_bout_id_id_unique").on(table.boutId, table.id),
+    index("tags_auto_tag_job_id_idx").on(table.autoTagJobId),
     uniqueIndex("tags_bout_position_unique").on(table.boutId, table.position),
     index("tags_bout_id_idx").on(table.boutId),
     index("tags_side_idx").on(table.side),
@@ -144,6 +148,60 @@ export const tagsTable = sqliteTable(
     check(
       "tags_strip_zone_valid",
       sql`${table.stripZone} IS NULL OR ${table.stripZone} IN ('1', '2', '3', '4', '5')`,
+    ),
+  ],
+);
+
+export const autoTagJobsTable = sqliteTable(
+  "auto_tag_jobs",
+  {
+    id: text("id").primaryKey(),
+    boutId: text("bout_id").notNull()
+      .references(() => boutsTable.id, { onDelete: "cascade" }),
+    referenceBoutId: text("reference_bout_id")
+      .references(() => boutsTable.id, { onDelete: "set null" }),
+    status: text("status").notNull(),
+    agent: text("agent").notNull(),
+    tokenHash: text("token_hash").notNull(),
+    videoDuration: real("video_duration"),
+    overviewSheetCount: integer("overview_sheet_count"),
+    frameBudget: integer("frame_budget").notNull(),
+    framesUsed: integer("frames_used").notNull().default(0),
+    writeCount: integer("write_count").notNull().default(0),
+    error: text("error"),
+    summary: text("summary"),
+    createdAt: integer("created_at").notNull(),
+    lastActivityAt: integer("last_activity_at").notNull(),
+    finishedAt: integer("finished_at"),
+  },
+  (table) => [
+    index("auto_tag_jobs_bout_id_idx").on(table.boutId),
+    uniqueIndex("auto_tag_jobs_token_hash_unique").on(table.tokenHash),
+    check(
+      "auto_tag_jobs_status_valid",
+      sql`${table.status} IN ('preparing', 'ready', 'running', 'finished', 'cancelled', 'abandoned', 'failed')`,
+    ),
+  ],
+);
+
+export const autoTagJobEventsTable = sqliteTable(
+  "auto_tag_job_events",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    jobId: text("job_id").notNull()
+      .references(() => autoTagJobsTable.id, { onDelete: "cascade" }),
+    seq: integer("seq").notNull(),
+    kind: text("kind").notNull(),
+    tagId: text("tag_id").notNull(),
+    snapshot: text("snapshot"),
+    reasoning: text("reasoning").notNull(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("auto_tag_job_events_job_seq_unique").on(table.jobId, table.seq),
+    check(
+      "auto_tag_job_events_kind_valid",
+      sql`${table.kind} IN ('add', 'update', 'delete')`,
     ),
   ],
 );
@@ -229,6 +287,8 @@ export const databaseSchema = {
   fencersTable,
   boutParticipantsTable,
   tagsTable,
+  autoTagJobsTable,
+  autoTagJobEventsTable,
   commentsTable,
   heartRateImportsTable,
   heartRateSamplesTable,

@@ -1,0 +1,130 @@
+import { getActionDescription, getTacticalIntent } from "@/lib/action-classifications";
+import { formatAgentTagLine } from "@/lib/auto-tag/tag-lines";
+import { STRIP_ZONE_LABELS } from "@/lib/tagging";
+import { ACTIVE_ACTION_CODES, STRIP_ZONES, type ActionCode, type Tag } from "@/lib/types";
+import { TOUCH_SEQUENCE_DEFAULTS } from "@/lib/auto-tag/touch-sequence";
+import { formatTime } from "@/lib/utils";
+
+export const AUTO_TAG_MCP_SERVER_NAME = "fencing_auto_tag";
+
+export interface AutoTagBriefContext {
+  leftFencer?: string;
+  rightFencer?: string;
+  videoDuration: number;
+  matchClockEnabled: boolean;
+  stripZoneEnabled: boolean;
+  overviewSheetCount: number;
+  overviewFps: number;
+  secondsPerSheet: number;
+  framesPerCallLimit: number;
+  framesRemaining: number;
+  tags: Tag[];
+}
+
+export function buildAgentPrompt(): string {
+  return [
+    "You are auto-tagging the scoring touches of a recorded foil bout for a fencing video tagger app.",
+    "",
+    `You cannot open the video directly. Everything goes through the \`${AUTO_TAG_MCP_SERVER_NAME}\` MCP tools: they return frame images and save tags straight into the app.`,
+    "",
+    "Start by calling `get_job_brief`. It has the fencers, the rules, the action codes, and the tools' limits. Follow it until every awarded touch in the video is tagged, then call `finish_job`.",
+    "",
+    "These MCP tools are the only tools you have. Work through the video from start to end and keep going until it is fully covered. Nobody reads your messages while you work, so never stop to ask a question; decide and move on.",
+  ].join("\n");
+}
+
+export function buildJobBrief(context: AutoTagBriefContext): string {
+  return [
+    describeBout(context),
+    describeGoal(),
+    describeTagRules(context),
+    describeWorkflow(context),
+    describeActionCodes(),
+    describeExistingTags(context.tags),
+  ].join("\n\n");
+}
+
+function describeBout(context: AutoTagBriefContext): string {
+  return [
+    "# Bout",
+    `- Left fencer (side L, on the left of the frame at the start): ${context.leftFencer ?? "unknown"}`,
+    `- Right fencer (side R): ${context.rightFencer ?? "unknown"}`,
+    `- Video length: ${formatTime(context.videoDuration)} (${context.videoDuration.toFixed(1)}s)`,
+    `- Match clock required on every tag: ${context.matchClockEnabled ? "yes" : "no"}`,
+    `- Strip zone required on every tag: ${context.stripZoneEnabled ? "yes" : "no"}`,
+  ].join("\n");
+}
+
+function describeGoal(): string {
+  return [
+    "# Goal",
+    "Save exactly one tag for every touch the referee awarded: a point to one fencer, or a card. Do not tag off-target lights, annulled touches, or simultaneous lights where no point was given. Only tag a card you can actually see the referee show; never invent one to make the score add up. If the score changes and you saw no lamp, look closer in that window until you find the touch. Do not record mistakes, failure modes, or comments: only the fields listed below.",
+  ].join("\n");
+}
+
+function describeTagRules(context: AutoTagBriefContext): string {
+  const rules = [
+    "# Tag fields",
+    "- `timestamp`: video seconds of the first frame where the scoring lamp is visibly on. Use the exact tile times the tools report; never estimate from frame counts.",
+    "- `side`: the fencer awarded the point. For cards, `side` is the fencer who received the card: `rc` gives the point to the opponent, `yc` gives no point.",
+    "- `action`: always pick your single best code from the list below, even when unsure. Never leave it empty. Choose it only after looking at the touch with `get_touch_sequence`; overview sheets are too sparse to tell a parry-riposte from an attack.",
+  ];
+  if (context.matchClockEnabled) {
+    rules.push(
+      "- `matchPeriod` (`1`, `2`, `3`, or `priority`) and `matchClock` (time remaining as `m:ss`, e.g. `2:17`): read them from the scoreboard at the touch. Clocks must be in order across tags; if a save is rejected for ordering, one of the neighbouring tags it names may be the misread one.",
+    );
+  }
+  if (context.stripZoneEnabled) {
+    const zones = STRIP_ZONES.map((zone) => `\`${zone}\` = ${STRIP_ZONE_LABELS[zone]}`).join(", ");
+    rules.push(
+      `- \`stripZone\`: where on the strip the touch happened, left to right as seen in the frame: ${zones}.`,
+    );
+  }
+  rules.push("- `reasoning`: one or two sentences on what you saw. It is logged, not shown on the tag.");
+  return rules.join("\n");
+}
+
+function describeWorkflow(context: AutoTagBriefContext): string {
+  return [
+    "# How to work",
+    `- The whole video is pre-cut into ${context.overviewSheetCount} overview sheets (\`get_overview_sheet\`, index 0-${Math.max(context.overviewSheetCount - 1, 0)}), each ${context.secondsPerSheet}s at ${context.overviewFps} frames per second, tiled into one image. The text next to each image lists every tile's time. Overview sheets are free.`,
+    `- For every touch, once you know the lamp time, call \`get_touch_sequence\` at that time. It returns three kinds of sheet, oldest first: ${TOUCH_SEQUENCE_DEFAULTS.contextSeconds}s of sparse context, then the exchange from ${TOUCH_SEQUENCE_DEFAULTS.exchangeSeconds}s before to ${TOUCH_SEQUENCE_DEFAULTS.exchangeAfterSeconds}s after the lamp at ${TOUCH_SEQUENCE_DEFAULTS.exchangeFps} fps, then full-frame lamp shots after the hit. Pass a crop that keeps both fencers' whole bodies with margin above the heads and below the feet; if the context sheet shows anything cut off, call again with a wider crop. If the phrase was already under way at the start of the context sheet, call again with more \`contextSeconds\` so you see how it began: who initiated matters for the code. Work out the phrase from the exchange: who started moving forward first (the attacker), whether the other fencer's blade met the attacker's blade before the hit (a parry or beat deflects the point; an arm extending forward into the attack is a counterattack, not a parry), who hit first, and whether the scoring hit came only after a parried first attempt (a renewal). Two cues matter most. A fencer who ducks, leans back, twists or otherwise contorts the body to avoid being hit is counterattacking, not parrying, even if the blade also moves: that is \`Cc\`, not \`P\`. And \`A-P\` means the parry failed and the attack landed directly, usually with no riposte attempt by the fencer who was hit; when the parry clearly found the blade and a riposte was attempted and missed before the attacker's second action landed, the code is \`A,R\`. Every exchange before the hit belongs in the code, so a parry-riposte that is itself parried and answered is a counter-riposte, not a riposte. Read the lamp sheet for which lights are on and who was hit. Then choose the action code and strip zone.`,
+    `- Look closer with \`sample_frames\` (a time window at a higher frame rate, optionally cropped) or \`get_frame\` (one full-resolution frame, optionally cropped, e.g. to read the scoreboard). Crops use 0-1 coordinates of the full frame, so they work even when a handheld camera moves. Each call is capped at ${context.framesPerCallLimit} frames; ${context.framesRemaining} look-closer frames remain for this job, enough to inspect every touch.`,
+    "- Save as you go: call `add_tag` as soon as you are confident a touch was awarded. Fix your own tags with `update_tag` or `delete_tag`. Once the user edits one of your tags, it is theirs and you can no longer change it.",
+    "- A new scoring tag within 1 second of an existing one is rejected as a duplicate. Call `list_tags` whenever you lose track of what is already saved.",
+    "- When the whole video is covered, call `finish_job` with a short summary. Nothing else ends the job.",
+  ].join("\n");
+}
+
+function describeActionCodes(): string {
+  const codesByIntent = {
+    offense: ACTIVE_ACTION_CODES.filter((code) => getTacticalIntent(code) === "offense"),
+    defense: ACTIVE_ACTION_CODES.filter((code) => getTacticalIntent(code) === "defense"),
+    other: ACTIVE_ACTION_CODES.filter((code) => getTacticalIntent(code) === null),
+  };
+  return [
+    "# Action codes",
+    "The user's own notation: the scorer's actions come before `-` and the opponent's after it; `,` chains the same fencer's successive actions, so `R` after a comma is a renewal. `A` attack, `P` parry, `R` riposte, `C` counterattack (`Cc` closing: collapsing the distance, dodging, or opposing the blade; `Csh` stop hit: opening the distance and running away), `CT` counter-time, `CR` counter-riposte, `CCR` counter-counter-riposte, `AP` attack on preparation, `AN` answering attack after the opponent's attack falls short, `D` defense by distance, `L` point in line. Pick the code whose description matches what you saw; when unsure between two, the offense/defense grouping (from the scorer's point of view) matters most.",
+    "",
+    "## Offense (the scorer was attacking)",
+    ...codesByIntent.offense.map(describeCode),
+    "",
+    "## Defense (the scorer was defending)",
+    ...codesByIntent.defense.map(describeCode),
+    "",
+    "## Other",
+    ...codesByIntent.other.map(describeCode),
+  ].join("\n");
+}
+
+function describeCode(code: ActionCode): string {
+  return `- \`${code}\`: ${getActionDescription(code)}`;
+}
+
+function describeExistingTags(tags: Tag[]): string {
+  const scoringTags = tags.filter((tag) => tag.side && tag.action);
+  if (scoringTags.length === 0) {
+    return "# Existing tags\nNone yet.";
+  }
+  return ["# Existing tags", ...scoringTags.map(formatAgentTagLine)].join("\n");
+}

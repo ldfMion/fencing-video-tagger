@@ -56,15 +56,17 @@ app/layout.tsx (root layout)
 - **`lib/server/db/`** — Drizzle SQLite client, schema, and migrations.
 - **`lib/server/repositories/session-repository.ts`** — Server-only repository that assembles separately stored, Zod-validated session and tag JSON entities.
 - **`lib/server/session-service.ts`** — Server-side session/tag domain logic and request validation used by server actions and SSR loaders.
+- **`lib/auto-tag/`** — Pure auto-tag rules: agent-editable tag fields, job statuses and limits, the agent prompt and job brief, the headless Claude Code flags, and `evaluateAutoTagJob` for review and benchmark reports.
+- **`lib/server/auto-tag/`** — Auto-tag job service, server actions, ffmpeg frame sheets, MCP tool implementations, the Claude Code process launcher, and the per-job workspace in `.data/auto-tag-jobs/`. The MCP route is `app/api/auto-tag/mcp/route.ts`.
 - **`lib/utils.ts`** — `cn()` (Tailwind class merging) and `formatTime()` (seconds → `m:ss` string).
 - **`lib/score.ts`** — `computeScore(tags)` returns final left/right score; `computeRunningScore(tags)` returns event-by-event `ScoringEvent[]` timeline. `computeScore` delegates to `computeRunningScore`.
 - **`lib/constants.ts`** — `SIDE_COLORS` with `left`/`right` keys containing `text` and `badge` Tailwind class strings for fencer side coloring (red for left, green for right).
 
 ### Types (`lib/types.ts`)
 
-- `Tag`: { id, timestamp, comment, createdAt, side?, action?, mistake?, failureMode?, failureCause? }
+- `Tag`: { id, timestamp, comment, createdAt, side?, action?, mistake?, failureMode?, failureCause?, origin? ("agent"), autoTagJobId? }
 - `VideoSession`: { id, failureClassificationVersion, fileName, tags[], lastModified, leftFencer?, rightFencer?, boutDate? }
-- `ActionCode`: Union of fencing action notation strings (e.g., "A-P", "R-R", "yc", "rc")
+- `ActionCode`: Union of fencing action notation strings (e.g., "A-P", "R-R", "yc", "rc"). The codes, their picker order, their plain-language descriptions, and their offense/defense classification all live in one table, `ACTION_DEFINITIONS` in `lib/action-classifications.ts`; `types.ts` re-exports the list. Add a new code there and nowhere else. A code marked `legacy: true` stays valid on stored tags (`ACTION_CODES`, `ActionCodeSchema`) but is left out of `ACTIVE_ACTION_CODES`, which the tag picker, the agent brief, and the MCP `add_tag`/`update_tag` input use.
 - `Side`: "L" | "R"
 - `MistakeType`: "tactical" | "execution"
 - `FailureMode`: "technique" | "distance" | "timing" | "action-choice"

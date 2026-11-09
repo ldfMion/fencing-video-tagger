@@ -1,5 +1,5 @@
 import { Badge } from "@/components/ui/badge";
-import { Hash, Timer, Video } from "lucide-react";
+import { Bot, Hash, Timer, Video } from "lucide-react";
 import { SIDE_COLORS } from "@/lib/constants";
 import {
   formatFailureCause,
@@ -128,6 +128,16 @@ export function TagSummary({
             className="tag-mistake-badge tag-failure-cause-badge px-1.5 py-0 text-xs"
           >
             {formatFailureCause(tag.failureCause)}
+          </Badge>
+        ) : null}
+        {tag.origin === "agent" ? (
+          <Badge
+            variant="secondary"
+            className="px-1.5 py-0 text-xs font-normal"
+            title="Saved by the auto-tag agent"
+          >
+            <Bot role="img" aria-label="Agent tag" />
+            Agent
           </Badge>
         ) : null}
       </div>

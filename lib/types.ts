@@ -1,55 +1,16 @@
 import { z } from "zod";
+import { ACTION_CODES, ACTIVE_ACTION_CODES } from "@/lib/action-classifications";
 
-// Action codes for fencing touches (sorted alphabetically)
-export const ACTION_CODES = [
-  "A,R",
-  "A,R,R",
-  "A,R-P",
-  "A-A",
-  "A-AP",
-  "A-Cc",
-  "A-Csh",
-  "A-D",
-  "A-L",
-  "A-P",
-  "AN-P",
-  "AN-R",
-  "AN,R",
-  "AP-A",
-  "AP-P",
-  "AP,R",
-  "AR,R",
-  "bl",
-  "Cc-A",
-  "Cc-AP",
-  "Cc-CT",
-  "CCR,R",
-  "CCR-R",
-  "CCR-P",
-  "CR,R",
-  "CR,R,R,R",
-  "CR-P",
-  "CR-R",
-  "Csh-A",
-  "CT-R",
-  "CT-P",
-  "CT,R",
-  "C,R",
-  "C,R,R",
-  "C,R-CT",
-  "L-A",
-  "R,R",
-  "R,R,R",
-  "R-AP,P", // parrying an attack on prep and riposting with the opponent trying to parry again
-  "R-AP,R", // parrying an attack on prep and riposting with the opponent renewing
-  "R-CT,R", // parrying a riposte from a counter time with the opponent renewing
-  "R-P",
-  "R-R",
-  "rc",
-  "yc",
-] as const;
+export {
+  ACTION_CODES,
+  ACTIVE_ACTION_CODES,
+  type ActionCode,
+} from "@/lib/action-classifications";
 
+/** Every code a stored tag may carry, legacy ones included. */
 export const ActionCodeSchema = z.enum(ACTION_CODES);
+/** The codes accepted for new tags. */
+export const ActiveActionCodeSchema = z.enum(ACTIVE_ACTION_CODES);
 export const SideSchema = z.enum(["L", "R"]);
 export const MistakeTypeSchema = z.enum(["tactical", "execution"]);
 export const FailureClassificationVersionSchema = z.union([
@@ -71,6 +32,7 @@ export const FailureCauseSchema = z.enum([
   "skill-gap",
 ]);
 export const VideoSourceTypeSchema = z.enum(["library", "temporary"]);
+export const TagOriginSchema = z.enum(["agent"]);
 export const MATCH_PERIODS = ["1", "2", "3", "priority"] as const;
 export const STRIP_ZONES = ["1", "2", "3", "4", "5"] as const;
 export const MATCH_CLOCK_PATTERN = /^(\d{1,2}):([0-5]\d)$/;
@@ -82,7 +44,6 @@ export const TaggingOptionsSchema = z.object({
   stripZoneEnabled: z.boolean().optional(),
 });
 
-export type ActionCode = z.infer<typeof ActionCodeSchema>;
 export type Side = z.infer<typeof SideSchema>;
 export type MistakeType = z.infer<typeof MistakeTypeSchema>;
 export type FailureClassificationVersion = z.infer<
@@ -95,6 +56,7 @@ export type MatchPeriod = z.infer<typeof MatchPeriodSchema>;
 export type MatchClock = z.infer<typeof MatchClockSchema>;
 export type StripZone = z.infer<typeof StripZoneSchema>;
 export type TaggingOptions = z.infer<typeof TaggingOptionsSchema>;
+export type TagOrigin = z.infer<typeof TagOriginSchema>;
 
 const TagFieldsSchema = z.object({
   id: z.string(),
@@ -111,6 +73,8 @@ const TagFieldsSchema = z.object({
   matchPeriod: MatchPeriodSchema.optional(),
   matchClock: MatchClockSchema.optional(),
   stripZone: StripZoneSchema.optional(),
+  origin: TagOriginSchema.optional(), // absent for tags you created yourself
+  autoTagJobId: z.string().optional(),
 });
 
 export const TagSchema = TagFieldsSchema.refine(
@@ -126,6 +90,8 @@ export const TagContentFieldsSchema = TagFieldsSchema.omit({
   id: true,
   seq: true,
   createdAt: true,
+  origin: true,
+  autoTagJobId: true,
 });
 export const TagContentSchema = TagContentFieldsSchema.refine(
   (tag) => !tag.failureCause || tag.failureMode,

@@ -1,0 +1,320 @@
+import "server-only";
+
+import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { getFinalAgentSnapshots } from "@/lib/auto-tag/agent-tag-fields";
+import { describeClaudeCodeExit, describeClaudeCodeUsage, type ClaudeCodeExit } from "@/lib/auto-tag/claude-code";
+import { evaluateAutoTagJob, type AutoTagEvaluationResult } from "@/lib/auto-tag/evaluation";
+import {
+  ACTIVE_AUTO_TAG_JOB_STATUSES,
+  AUTO_TAG_FRAME_BUDGET,
+  AUTO_TAG_IDLE_TIMEOUT_MS,
+  AUTO_TAG_OVERVIEW_FPS,
+  AUTO_TAG_OVERVIEW_SECONDS_PER_SHEET,
+  isAutoTagJobActive,
+  type AutoTagJobStatus,
+  type AutoTagJobView,
+} from "@/lib/auto-tag/job";
+import { createSessionRecord } from "@/lib/session-service";
+import {
+  launchClaudeCodeAgent,
+  stopClaudeCodeAgent,
+} from "@/lib/server/auto-tag/claude-launcher";
+import {
+  ensureAutoTagJobWorkspace,
+  getAutoTagJobDirectory,
+  getAutoTagOverviewDirectory,
+  removeAutoTagJobWorkspace,
+} from "@/lib/server/auto-tag/job-workspace";
+import { generateOverviewSheets, probeVideoStream } from "@/lib/server/auto-tag/media";
+import {
+  findActiveAutoTagJobForBout,
+  findAutoTagJobById,
+  findAutoTagJobByTokenHash,
+  findLatestAutoTagJobForBout,
+  insertAutoTagJob,
+  listAutoTagEvents,
+  transitionAutoTagJob,
+  updateAutoTagJob,
+  type AutoTagJobRecord,
+} from "@/lib/server/repositories/auto-tag-job-repository";
+import { getSessionRepository } from "@/lib/server/repositories/session-repository";
+import { requireSession } from "@/lib/server/tag-mutations";
+import { resolveVideoLibraryFile } from "@/lib/server/video-library";
+import { isMatchClockEnabled, isStripZoneEnabled } from "@/lib/tagging";
+import type { VideoSession } from "@/lib/types";
+
+const TERMINAL_STATUS_BY_REASON = {
+  finish: "finished",
+  cancel: "cancelled",
+  abandon: "abandoned",
+  fail: "failed",
+} as const satisfies Record<string, AutoTagJobStatus>;
+
+type JobEndReason = keyof typeof TERMINAL_STATUS_BY_REASON;
+
+export interface AutoTagJobReport {
+  job: AutoTagJobView;
+  evaluation: AutoTagEvaluationResult;
+}
+
+export async function startAutoTagJob(options: {
+  sessionId: string;
+  mcpUrl: string;
+  referenceBoutId?: string;
+  scheduleBackgroundWork: (work: () => Promise<void>) => void;
+}): Promise<AutoTagJobView> {
+  const session = await requireSession(options.sessionId);
+  await assertSessionCanBeAutoTagged(session);
+  const video = await resolveVideoLibraryFile(session.videoRelativePath!);
+  const token = randomBytes(32).toString("base64url");
+  const now = Date.now();
+  const job = await insertAutoTagJob({
+    id: randomUUID(),
+    boutId: session.id,
+    referenceBoutId: options.referenceBoutId ?? null,
+    status: "preparing",
+    agent: "claude-code",
+    tokenHash: hashToken(token),
+    videoDuration: null,
+    overviewSheetCount: null,
+    frameBudget: AUTO_TAG_FRAME_BUDGET,
+    framesUsed: 0,
+    writeCount: 0,
+    error: null,
+    summary: null,
+    createdAt: now,
+    lastActivityAt: now,
+    finishedAt: null,
+  });
+  try {
+    await ensureAutoTagJobWorkspace(job.id);
+  } catch (error) {
+    await endAutoTagJob(job.id, "fail", { error: "Could not create the job folder." });
+    throw error;
+  }
+  options.scheduleBackgroundWork(() =>
+    prepareOverview({ jobId: job.id, videoPath: video.absolutePath, token, mcpUrl: options.mcpUrl }),
+  );
+  return toJobView(job);
+}
+
+/** Copies a tagged bout without its tags and starts a job on the copy; the copy is removed if the job cannot start. */
+export async function startAutoTagBenchmark(options: {
+  sessionId: string;
+  mcpUrl: string;
+  scheduleBackgroundWork: (work: () => Promise<void>) => void;
+}): Promise<{ sessionId: string; job: AutoTagJobView }> {
+  const copy = await createBenchmarkCopy(options.sessionId);
+  try {
+    const job = await startAutoTagJob({ ...options, sessionId: copy.id, referenceBoutId: options.sessionId });
+    return { sessionId: copy.id, job };
+  } catch (error) {
+    await getSessionRepository().delete(copy.id);
+    throw error;
+  }
+}
+
+async function createBenchmarkCopy(sessionId: string): Promise<VideoSession> {
+  const source = await requireSession(sessionId);
+  if (!hasScoringTags(source)) {
+    throw new Error("A benchmark needs a bout you have already tagged.");
+  }
+  assertHasLibraryVideo(source);
+  const copy = {
+    ...createSessionRecord({
+      fileName: source.fileName,
+      videoRelativePath: source.videoRelativePath,
+      videoMimeType: source.videoMimeType,
+      videoSourceType: source.videoSourceType,
+      leftFencer: source.leftFencer,
+      rightFencer: source.rightFencer,
+      boutDate: source.boutDate,
+      externalSource: `Auto-tag benchmark copy of bout ${source.id}`,
+      taggingOptions: source.taggingOptions,
+    }),
+    ...(source.boutType && { boutType: source.boutType }),
+    failureClassificationVersion: source.failureClassificationVersion,
+  };
+  return getSessionRepository().create(copy);
+}
+
+export async function getLatestAutoTagJob(sessionId: string): Promise<AutoTagJobView | null> {
+  const job = await findLatestAutoTagJobForBout(sessionId);
+  return job ? toJobView(await expireIdleJob(job)) : null;
+}
+
+export async function cancelAutoTagJob(jobId: string): Promise<AutoTagJobView> {
+  await endAutoTagJob(jobId, "cancel");
+  return toJobView(await requireJob(jobId));
+}
+
+export async function finishAutoTagJob(jobId: string, summary: string): Promise<void> {
+  await endAutoTagJob(jobId, "finish", { summary });
+}
+
+/** Resolves a bearer token to its job, only while the agent may still use it. */
+export async function authenticateAutoTagToken(token: string): Promise<AutoTagJobRecord | null> {
+  const job = await findAutoTagJobByTokenHash(hashToken(token));
+  if (!job) return null;
+  const currentJob = await expireIdleJob(job);
+  return currentJob.status === "ready" || currentJob.status === "running" ? currentJob : null;
+}
+
+export async function recordAgentActivity(jobId: string): Promise<void> {
+  const now = Date.now();
+  const started = await transitionAutoTagJob(jobId, ["ready"], {
+    status: "running",
+    lastActivityAt: now,
+  });
+  if (!started) {
+    await updateAutoTagJob(jobId, { lastActivityAt: now });
+  }
+}
+
+export async function getAutoTagJobReport(jobId: string): Promise<AutoTagJobReport> {
+  const job = await requireJob(jobId);
+  const session = await requireSession(job.boutId);
+  const referenceSession = job.referenceBoutId
+    ? await requireSession(job.referenceBoutId)
+    : session;
+  const evaluation = evaluateAutoTagJob({
+    agentTags: getFinalAgentSnapshots(await listAutoTagEvents(job.id)),
+    referenceTags: referenceSession.tags,
+    mode: job.referenceBoutId ? "benchmark" : "review",
+    matchClockEnabled: isMatchClockEnabled(session),
+    stripZoneEnabled: isStripZoneEnabled(session),
+  });
+  return { job: toJobView(job), evaluation };
+}
+
+export async function requireJob(jobId: string): Promise<AutoTagJobRecord> {
+  const job = await findAutoTagJobById(jobId);
+  if (!job) {
+    throw new Error(`Auto-tag job ${jobId} was not found`);
+  }
+  return job;
+}
+
+function assertHasLibraryVideo(session: VideoSession): void {
+  if (session.videoSourceType !== "library" || !session.videoRelativePath) {
+    throw new Error("Auto-tag needs a video attached from the library.");
+  }
+}
+
+async function assertSessionCanBeAutoTagged(session: VideoSession): Promise<void> {
+  assertHasLibraryVideo(session);
+  if (hasScoringTags(session)) {
+    throw new Error("Auto-tag only runs on bouts without scoring tags. Use a benchmark copy instead.");
+  }
+  const activeJob = await findActiveAutoTagJobForBout(session.id);
+  if (activeJob && isAutoTagJobActive((await expireIdleJob(activeJob)).status)) {
+    throw new Error("This bout already has an auto-tag job in progress.");
+  }
+}
+
+/** Cuts the overview sheets, then starts the agent once the job is ready. */
+async function prepareOverview(options: {
+  jobId: string;
+  videoPath: string;
+  token: string;
+  mcpUrl: string;
+}): Promise<void> {
+  const { jobId, videoPath } = options;
+  try {
+    const streamInfo = await probeVideoStream(videoPath);
+    const sheets = await generateOverviewSheets({
+      videoPath,
+      duration: streamInfo.duration,
+      outputDir: getAutoTagOverviewDirectory(jobId),
+      fps: AUTO_TAG_OVERVIEW_FPS,
+      secondsPerSheet: AUTO_TAG_OVERVIEW_SECONDS_PER_SHEET,
+      streamInfo,
+      // Long videos can take longer than the idle timeout to cut, so progress counts as activity.
+      onSheetDone: () => updateAutoTagJob(jobId, { lastActivityAt: Date.now() }),
+    });
+    const becameReady = await transitionAutoTagJob(jobId, ["preparing"], {
+      status: "ready",
+      videoDuration: streamInfo.duration,
+      overviewSheetCount: sheets.length,
+      lastActivityAt: Date.now(),
+    });
+    if (!becameReady) {
+      await removeAutoTagJobWorkspace(jobId);
+      return;
+    }
+    launchClaudeCodeAgent({
+      jobId,
+      token: options.token,
+      mcpUrl: options.mcpUrl,
+      cwd: getAutoTagJobDirectory(jobId),
+      onExit: (exit) => void handleAgentExit(jobId, exit),
+    });
+  } catch (error) {
+    await endAutoTagJob(jobId, "fail", {
+      error: error instanceof Error ? error.message : "Could not prepare the overview.",
+    });
+  }
+}
+
+/** A process that ends while the job is still active did not call `finish_job`, so the job failed. */
+async function handleAgentExit(jobId: string, exit: ClaudeCodeExit): Promise<void> {
+  const usage = describeClaudeCodeUsage(exit);
+  if (usage) console.info(`[auto-tag] job ${jobId} Claude Code run: ${usage}`);
+  const job = await findAutoTagJobById(jobId);
+  if (!job || !isAutoTagJobActive(job.status)) return;
+  await endAutoTagJob(jobId, "fail", { error: describeClaudeCodeExit(exit) });
+}
+
+async function expireIdleJob(job: AutoTagJobRecord): Promise<AutoTagJobRecord> {
+  const isIdle = Date.now() - job.lastActivityAt > AUTO_TAG_IDLE_TIMEOUT_MS;
+  if (!isAutoTagJobActive(job.status) || !isIdle) {
+    return job;
+  }
+  await endAutoTagJob(job.id, "abandon");
+  return requireJob(job.id);
+}
+
+async function endAutoTagJob(
+  jobId: string,
+  reason: JobEndReason,
+  details: { summary?: string; error?: string } = {},
+): Promise<void> {
+  const ended = await transitionAutoTagJob(jobId, ACTIVE_AUTO_TAG_JOB_STATUSES, {
+    status: TERMINAL_STATUS_BY_REASON[reason],
+    finishedAt: Date.now(),
+    ...details,
+  });
+  if (ended) {
+    // After finish_job the process is already wrapping up on its own.
+    if (reason !== "finish") stopClaudeCodeAgent(jobId);
+    await removeAutoTagJobWorkspace(jobId);
+  }
+}
+
+function toJobView(job: AutoTagJobRecord): AutoTagJobView {
+  return {
+    id: job.id,
+    boutId: job.boutId,
+    referenceBoutId: job.referenceBoutId,
+    status: job.status,
+    agent: job.agent,
+    videoDuration: job.videoDuration,
+    overviewSheetCount: job.overviewSheetCount,
+    frameBudget: job.frameBudget,
+    framesUsed: job.framesUsed,
+    writeCount: job.writeCount,
+    error: job.error,
+    summary: job.summary,
+    createdAt: job.createdAt,
+    lastActivityAt: job.lastActivityAt,
+    finishedAt: job.finishedAt,
+  };
+}
+
+function hasScoringTags(session: VideoSession): boolean {
+  return session.tags.some((tag) => tag.side && tag.action);
+}
+
+function hashToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}

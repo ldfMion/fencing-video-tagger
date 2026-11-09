@@ -345,6 +345,8 @@ function parseTagRow(row: TagRow): Tag {
     ...(row.tag.matchPeriod != null && { matchPeriod: row.tag.matchPeriod }),
     ...(row.tag.matchClock != null && { matchClock: row.tag.matchClock }),
     ...(row.tag.stripZone != null && { stripZone: row.tag.stripZone }),
+    ...(row.tag.origin != null && { origin: row.tag.origin }),
+    ...(row.tag.autoTagJobId != null && { autoTagJobId: row.tag.autoTagJobId }),
   });
 }
 
@@ -391,6 +393,8 @@ function toTagValues(tag: Tag) {
     matchPeriod: tag.matchPeriod ?? null,
     matchClock: tag.matchClock ?? null,
     stripZone: tag.stripZone ?? null,
+    origin: tag.origin ?? null,
+    autoTagJobId: tag.autoTagJobId ?? null,
   };
 }
 
@@ -517,10 +521,16 @@ function sessionVersionMatches(session: VideoSession) {
   );
 }
 
+/** Thrown when another write changed the session after the caller loaded it. */
+export class SessionConflictError extends Error {
+  constructor(sessionId: string) {
+    super(`Session ${sessionId} changed while this request was being processed. Please retry.`);
+    this.name = "SessionConflictError";
+  }
+}
+
 function throwSessionConflict(sessionId: string): never {
-  throw new Error(
-    `Session ${sessionId} changed while this request was being processed. Please retry.`,
-  );
+  throw new SessionConflictError(sessionId);
 }
 
 function isDuplicateSessionError(error: unknown): boolean {

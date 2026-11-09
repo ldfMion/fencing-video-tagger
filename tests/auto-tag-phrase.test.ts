@@ -80,7 +80,6 @@ test("the brief carries the coach's cues", () => {
     framesRemaining: 4000,
     tags: [],
   });
-  assert.ok(brief.includes("`phrase`"));
   assert.ok(/contort/i.test(brief));
   assert.ok(brief.includes("missed riposte"));
 });

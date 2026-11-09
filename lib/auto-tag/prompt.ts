@@ -67,8 +67,7 @@ function describeTagRules(context: AutoTagBriefContext): string {
     "# Tag fields",
     "- `timestamp`: video seconds of the first frame where the scoring lamp is visibly on. Use the exact tile times the tools report; never estimate from frame counts.",
     "- `side`: the fencer awarded the point. For cards, `side` is the fencer who received the card: `rc` gives the point to the opponent, `yc` gives no point.",
-    "- `phrase`: what you saw in the touch sequence, as structured facts: who attacked first, what the fencer being attacked did (a parry that found the blade, a parry that missed, a closing counterattack, a stop hit, a point in line, a retreat, or an attack into the preparation), whether they dodged or contorted the body, whether a riposte was attempted, whether the scoring hit was a renewal, and how many parry-riposte exchanges preceded the hit. Fill these in before you choose the code; `add_tag` tells you when the facts and the code disagree.",
-    "- `action`: always pick your single best code from the list below, even when unsure. Never leave it empty. Derive it from the `phrase` facts: the scorer's actions go before `-`, the opponent's after it, and `,` chains the scorer's successive actions.",
+    "- `action`: always pick your single best code from the list below, even when unsure. Never leave it empty. Choose it only after looking at the touch with `get_touch_sequence`; overview sheets are too sparse to tell a parry-riposte from an attack.",
   ];
   if (context.matchClockEnabled) {
     rules.push(

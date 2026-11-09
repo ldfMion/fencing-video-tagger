@@ -51,7 +51,8 @@ test("legacy codes stay valid on stored tags but are refused from the agent", ()
     scoringHitWasRenewal: true, exchangesBeforeHit: 0,
   };
   assert.ok(AgentTagAddInputSchema.safeParse({ ...base, action: "A,R,R", phrase }).success);
-  assert.ok(!AgentTagAddInputSchema.safeParse({ ...base, action: "A,R,R" }).success, "add_tag needs the phrase facts");
+  assert.ok(AgentTagAddInputSchema.safeParse({ ...base, action: "A,R,R" }).success, "phrase facts are optional");
+  assert.ok(!AgentTagAddInputSchema.safeParse({ ...base, action: "A,R,R", phrase: { ...phrase, defence: "parry" } }).success);
 });
 
 test("the job brief explains each action code", () => {

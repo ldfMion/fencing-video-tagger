@@ -27,9 +27,9 @@ export const AgentTagInputSchema = AgentTagFieldsSchema.extend({
   action: ActiveActionCodeSchema,
 });
 
-/** `add_tag` also requires the phrase facts the action code was derived from. */
+/** `add_tag` may carry the phrase facts the action code was derived from; they are logged and checked. */
 export const AgentTagAddInputSchema = AgentTagInputSchema.extend({
-  phrase: PhraseFactsSchema.describe("What you worked out from the touch sequence before choosing the action code."),
+  phrase: PhraseFactsSchema.optional().describe("Optional: what you worked out from the touch sequence. Logged with the tag; the reply flags facts that disagree with the action code."),
 });
 
 /** `update_tag` may resend the phrase facts when the action changes. */

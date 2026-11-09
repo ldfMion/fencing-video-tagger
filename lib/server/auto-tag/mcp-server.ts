@@ -82,7 +82,7 @@ export function registerAutoTagTools(server: McpServer): void {
   }, (ctx) => runJobTool(ctx, (job) => listJobTags(job)));
 
   server.registerTool("add_tag", {
-    description: "Save one awarded touch immediately. It appears in the app right away. Fill in the phrase facts from the touch sequence first; the reply tells you if they disagree with your action code.",
+    description: "Save one awarded touch immediately. It appears in the app right away.",
     inputSchema: AgentTagAddInputSchema.extend({ reasoning: ReasoningSchema }),
   }, ({ reasoning, phrase, ...fields }, ctx) => runJobTool(ctx, (job) => addAgentTag(job, fields, reasoning, phrase)));
 
